@@ -4,7 +4,7 @@
   (:import-from :cl-urbit-worker/nock :nock)
   (:import-from :rove :ok))
 
-(in-package :urbit-serf/tests/nock)
+(in-package :cl-urbit-worker/tests/basic-nock)
 
 (deftest test-1
  (testing "nock 1 operator"

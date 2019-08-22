@@ -10,8 +10,8 @@
                 :serial t
                 :components
                 ((:file "error")
-                 (:file "noun")
-                 (:file "nock"))))
+                 (:file "noun"))))
+                 ;(:file "nock"))))
   :description "nock runtime and urbit worker process (http://urbit.org)"
   :long-description
   #.(uiop:read-file-string

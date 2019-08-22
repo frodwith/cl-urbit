@@ -1,6 +1,6 @@
 (defpackage cl-urbit-worker/noun
- (:use :cl)
- (:import-from :cl-urbit-worker/error :exit))
+ (:use :cl :cl-urbit-worker/error)
+ (:export :noun :cellp :atomp :head :tail :mug))
 
 (in-package cl-urbit-worker/noun)
 
@@ -59,14 +59,23 @@
 (defun dcons (a b)
  (make-instance 'dynamic-cell :head a :tail b))
 
-(defgeneric noun (a))
-;; noun isn't a class...
-;; 
-(defmethod noun ((a noun)) a)
-(defmethod noun ((a cons))
+(defgeneric to-noun (a))
+
+(defmethod to-noun ((a cons))
  (let* ((head (car a))
         (tail (cdr a))
-        (hi (noun head)))
+        (here (to-noun head)))
   (if (null tail)
-   hi
-   (dcons hi (noun tail)))))
+   here
+   (dcons here (to-noun tail)))))
+
+(defmethod to-noun ((a integer)) a)
+
+(define-condition no-noun-coercion (oops) ())
+(defmethod noun ((a t))
+ (if (nounp a)
+  a
+  (error 'no-noun-coercion)))
+
+(defun noun (&rest args)
+ (to-noun args))
