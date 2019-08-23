@@ -1,10 +1,10 @@
-(defpackage cl-urbit-worker/tests/basic-nock
+(defpackage cl-urbit/tests/basic-nock
   (:use :cl)
-  (:import-from :cl-urbit-worker/noun :noun)
-  (:import-from :cl-urbit-worker/nock :nock)
+  (:import-from :cl-urbit/noun :noun)
+  (:import-from :cl-urbit/nock :nock)
   (:import-from :rove :ok))
 
-(in-package :cl-urbit-worker/tests/basic-nock)
+(in-package :cl-urbit/tests/basic-nock)
 
 (deftest test-1
  (testing "nock 1 operator"

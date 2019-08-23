@@ -1,8 +1,8 @@
-(defpackage cl-urbit-worker/tests/noun
-  (:use :cl :rove :cl-urbit-worker/noun)
-  (:import-from :cl-urbit-worker/error :exit))
+(defpackage cl-urbit/tests/noun
+  (:use :cl :rove :cl-urbit/noun)
+  (:import-from :cl-urbit/error :exit))
 
-(in-package :cl-urbit-worker/tests/noun)
+(in-package :cl-urbit/tests/noun)
 
 (deftest noun
  (testing "integers"

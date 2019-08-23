@@ -1,9 +1,9 @@
-(defpackage cl-urbit-worker/noun
- (:use :cl :cl-urbit-worker/error)
+(defpackage cl-urbit/noun
+ (:use :cl :cl-urbit/error)
  (:import-from :murmurhash :murmurhash)
  (:export :noun :cellp :atomp :head :tail :mug))
 
-(in-package cl-urbit-worker/noun)
+(in-package cl-urbit/noun)
 
 (defgeneric atomp (a))
 (defgeneric cellp (a))
@@ -92,7 +92,7 @@
         :initform 0
         :accessor dmug
         :type (unsigned-byte 31)))
-  (:documentation "a pair of two nouns"))
+  (:documentation "pair of nouns with cached mug"))
 
 (defun mug-both (a b)
   (murmug (mix a (mix #x7fffffff b))))

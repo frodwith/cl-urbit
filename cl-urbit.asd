@@ -1,8 +1,8 @@
-(defsystem cl-urbit-worker
+(defsystem cl-urbit
   :author "Paul Driver <frodwith@gmail.com>"
   :maintainer "Paul Driver <frodwith@gmail.com>"
   :license "MIT"
-  :homepage "https://github.com/frodwith/cl-urbit-worker"
+  :homepage "https://github.com/frodwith/cl-urbit"
   :version "0.1"
   :depends-on (:cl-murmurhash)
   :components ((:module "src"
@@ -15,4 +15,4 @@
   :long-description
   #.(uiop:read-file-string
      (uiop:subpathname *load-pathname* "README.md"))
-  :in-order-to ((test-op (test-op cl-urbit-worker-test))))
+  :in-order-to ((test-op (test-op cl-urbit-test))))
