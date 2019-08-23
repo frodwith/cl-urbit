@@ -4,8 +4,7 @@
   :license "MIT"
   :homepage "https://github.com/frodwith/cl-urbit-worker"
   :version "0.1"
-  ; for future reference
-  ; :depends-on (:local-time)
+  :depends-on (:cl-murmurhash)
   :components ((:module "src"
                 :serial t
                 :components
