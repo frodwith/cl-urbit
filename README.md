@@ -1,6 +1,6 @@
-# cl-urbit-worker
+# cl-urbit
 
-A replacement for the "urbit-worker" binary in common lisp.
+Nock/urbit runtime in Common Lisp.
 
 # Overview
 
