@@ -92,9 +92,8 @@
  (loop with stack = (list (cons 0 a))
        with r     = nil
        for top    = (pop stack)
-       for state  = (car top)
        for item   = (cdr top)
-       do (ecase state
+       do (ecase (car top)
            ((0)
             (setq r (funcall quick item))
             (unless r
@@ -105,7 +104,7 @@
             (push (cons 0 (tail item)) stack))
            ((2)
             (setq r (funcall combine item r))))
-       until (null stack)
+       while   stack
        finally (return r)))
 
 (defclass dynamic-cell ()
