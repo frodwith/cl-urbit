@@ -9,7 +9,8 @@
 (defgeneric cellp (a))
 (defgeneric head (a))
 (defgeneric tail (a))
-(defgeneric mug (a))
+(defgeneric cached-mug (a))
+(defgeneric compute-mug (a))
 
 (defun nounp (a) (or (atomp a) (cellp a)))
 (deftype noun () `(satisfies nounp))
@@ -19,6 +20,11 @@
 ; most things are neither atoms nor cells
 (defmethod cellp ((a t)) nil)
 (defmethod atomp ((a t)) nil)
+
+; things have no cached mug by default
+(defmethod cached-mug ((a t)) nil)
+(defun mug (a)
+ (or (cached-mug a) (compute-mug a)))
 
 ; these all work on regular lisp numbers, not atoms.
 ; (so you have to unpack bigatoms, in particular)
@@ -59,13 +65,13 @@
 (defmethod atomp ((a fixnum)) t)
 (defmethod head ((a fixnum)) (error 'exit))
 (defmethod tail ((a fixnum)) (error 'exit))
-(defmethod mug ((a fixnum)) (murmug a))
+(defmethod compute-mug ((a fixnum)) (murmug a))
 
 (defclass bigatom ()
   ((num :initarg :num
         :accessor bnum
         :type bignum)
-   (mug :initform 0
+   (mug :initform nil
         :accessor bmug
         :type (unsigned-byte 31)))
   (:documentation "wrapping around bignum to cache mug"))
@@ -73,13 +79,34 @@
 (defmethod atomp ((a bigatom)) t)
 (defmethod head ((a bigatom)) (error 'exit))
 (defmethod tail ((a bigatom)) (error 'exit))
-(defmethod mug ((a bigatom))
- (let ((got (bmug a)))
-  (if (not (zerop got))
-   got
-   (let ((calculated (murmug (bnum a))))
-    (setf (bmug a) calculated)
-    calculated))))
+(defmethod cached-mug ((a bigatom)) (bmug a))
+(defmethod compute-mug ((a bigatom))
+ (let ((calculated (murmug (bnum a))))
+  (setf (bmug a) calculated)
+  calculated))
+
+; explicit stack traversal of a noun
+;  quick should give an answer with no further noun traversal, or nil
+;  combine should take the answers from two sides and combine them
+(defun sum (a quick combine)
+ (loop with stack = (list (cons 0 a))
+       with r     = nil
+       for top    = (pop stack)
+       for state  = (car top)
+       for item   = (cdr top)
+       do (ecase state
+           ((0)
+            (setq r (funcall quick item))
+            (unless r
+             (push (cons 1 item) stack)
+             (push (cons 0 (head item)) stack)))
+           ((1)
+            (push (cons 2 r) stack)
+            (push (cons 0 (tail item)) stack))
+           ((2)
+            (setq r (funcall combine item r))))
+       until (null stack)
+       finally (return r)))
 
 (defclass dynamic-cell ()
   ((head :initarg :head
@@ -89,26 +116,26 @@
          :accessor dtail
          :type noun)
    (mug :initarg :mug
-        :initform 0
+        :initform nil
         :accessor dmug
         :type (unsigned-byte 31)))
   (:documentation "pair of nouns with cached mug"))
 
-(defun mug-both (a b)
-  (murmug (mix a (mix #x7fffffff b))))
+(defun mug-cell (a)
+ (sum a
+  (lambda (a)
+   (or (cached-mug a) (and (atomp a) (compute-mug a))))
+  (lambda (a b)
+   (murmug (mix a (mix #x7fffffff b))))))
 
 (defmethod cellp ((a dynamic-cell)) t)
 (defmethod head ((a dynamic-cell)) (dhead a))
 (defmethod tail ((a dynamic-cell)) (dtail a))
-(defmethod mug ((a dynamic-cell))
- (let ((m (dmug a)))
-   (if (not (zerop m))
-    m
-    (let* ((ma (mug (dhead a)))
-           (mb (mug (dtail a)))
-           (mc (mug-both ma mb)))
-     (setf (dmug a) mc)
-     mc))))
+(defmethod cached-mug ((a dynamic-cell)) (dmug a))
+(defmethod compute-mug ((a dynamic-cell))
+ (let ((computed (mug-cell a)))
+  (setf (dmug a) computed)
+  computed))
 
 (defgeneric to-noun (a))
 
