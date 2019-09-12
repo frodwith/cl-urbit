@@ -1,8 +1,9 @@
 (defpackage urbit/equality
  (:use :cl)
  (:import-from :urbit/mug :cached-mug)
- (:import-from :urbit/atom :atomp)
- (:import-from :urbit/cell :cellp))
+ (:import-from :urbit/atom :atomp :to-integer)
+ (:import-from :urbit/cell :cellp :head :tail)
+ (:import-from :urbit/pairset :make-pairset :has-pair :have-pair))
 
 (in-package :urbit/equality)
 

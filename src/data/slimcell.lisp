@@ -1,5 +1,6 @@
 (defpackage urbit/data/slimcell
  (:use :cl)
+ (:import-from :urbit/noun :to-noun)
  (:import-from :urbit/mug :cached-mug :compute-mug :murmug :learn-mug :mug-cell)
  (:import-from :urbit/cell :cellp :head :tail :learn-head :learn-tail)
  (:import-from :urbit/equality :teach))
@@ -55,3 +56,11 @@
   (setf (dmug b) (dmug a))
   (when (dmug b)
    (setf (dmug a) (dmug b)))))
+
+(defmethod to-noun ((a cons))
+ (let* ((head (car a))
+				(tail (cdr a))
+				(here (to-noun head)))
+	(if (null tail)
+	 here
+	 (make-instance 'slimcell :head here :tail (to-noun tail)))))

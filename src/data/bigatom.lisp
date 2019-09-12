@@ -1,5 +1,6 @@
 (defpackage urbit/data/bigatom
  (:use :cl)
+ (:import-from :urbit/noun :to-noun)
  (:import-from :urbit/mug :cached-mug :compute-mug :murmug :learn-mug)
  (:import-from :urbit/atom :atomp :to-integer :learn-integer)
  (:import-from :urbit/equality :teach :atom=))
@@ -50,5 +51,8 @@
  (setf (bnum b) (bnum a))
  (if (bmug a)
   (setf (bmug b) (bmug a))
-  (when (bmub b)
+  (when (bmug b)
    (setf (bmug a) (bmug b)))))
+
+(defmethod to-noun ((a bignum))
+ (make-instance 'bigatom :num a))

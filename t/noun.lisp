@@ -1,8 +1,12 @@
-(defpackage cl-urbit/tests/noun
-  (:use :cl :rove :cl-urbit/noun)
-  (:import-from :cl-urbit/error :exit))
+(defpackage urbit/tests/noun
+  (:use :cl :rove)
+  (:import-from :urbit/noun :noun)
+  (:import-from :urbit/atom :atomp)
+  (:import-from :urbit/cell :head :tail :cellp)
+  (:import-from :urbit/mug :mug)
+  (:import-from :urbit/error :exit))
 
-(in-package :cl-urbit/tests/noun)
+(in-package :urbit/tests/noun)
 
 (deftest noun
  (testing "integers"

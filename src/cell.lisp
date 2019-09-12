@@ -14,8 +14,8 @@
 ; trying to fragment an atom is defined in nock as !! (exit)
 (defun bad-cell (a)
  (if (atomp a)
-  (exit)
-  (oops)))
+  (error 'exit)
+  (error 'oops)))
 
 (defgeneric head (a))
 (defmethod head ((a t))
@@ -24,3 +24,11 @@
 (defgeneric tail (a))
 (defmethod tail ((a t))
  (bad-cell a))
+
+(defgeneric learn-head (a hed))
+(defmethod learn-head ((a t) (hed t))
+ nil)
+
+(defgeneric learn-tail (a tal))
+(defmethod learn-tail ((a t) (tl t))
+ nil)

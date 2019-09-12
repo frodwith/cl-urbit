@@ -12,11 +12,12 @@
                  (:file "atom")
                  (:file "cell")
                  (:file "noun")
+                 (:file "math")
                  (:file "mug")
                  (:file "pairset")
                  (:file "equality")
-                 (:file "data/bigatom")
                  (:file "data/fixnum")
+                 (:file "data/bigatom")
                  (:file "data/slimcell"))))
                  ;(:file "nock"))))
   :description "nock runtime and urbit worker process (http://urbit.org)"

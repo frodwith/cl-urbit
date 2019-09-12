@@ -2,7 +2,7 @@
  (:use :cl)
  (:import-from :urbit/error :oops)
  (:import-from :urbit/atom :atomp)
- (:import-from :urbit/cell :cellp))
+ (:import-from :urbit/cell :cellp :head :tail))
 
 (in-package :urbit/noun)
 
@@ -15,7 +15,7 @@
 (defmethod to-noun ((a t))
  (if (nounp a)
   a
-  (no-noun-coercion)))
+  (error 'no-noun-coercion)))
 
 (defun noun (&rest args)
  (to-noun args))

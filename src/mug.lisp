@@ -14,7 +14,7 @@
 
 (defgeneric compute-mug (a))
 (defmethod compute-mug ((a t))
- (oops))
+ (error 'oops))
 
 (defgeneric learn-mug (a m))
 (defmethod learn-mug ((a t) (m fixnum))

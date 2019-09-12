@@ -13,7 +13,7 @@
 ; to-integer isn't a nock operation, so it just oopses if you don't define it
 (defgeneric to-integer (a))
 (defmethod to-integer ((a t))
- (oops))
+ (error 'oops))
 
 (defgeneric learn-integer (a i))
 (defmethod learn-integer ((a t) (i integer))

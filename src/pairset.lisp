@@ -13,7 +13,7 @@
  (make-hash-table :test 'pair-eq))
 
 (defun pairset-hash (a)
- (mug-both (mug (car a)) (mug (cdr a))))
+ (murmug-two (mug (car a)) (mug (cdr a))))
 
 (defun has-pair (table a b)
  (gethash (cons a b) table))
@@ -22,4 +22,4 @@
  (setf (gethash (cons a b) table) t))
 
 ; SBCL only
-(define-hashtable-test pair-eq pairset-hash)
+(sb-ext:define-hash-table-test pair-eq pairset-hash)
