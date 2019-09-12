@@ -59,8 +59,8 @@
 
 (defmethod to-noun ((a cons))
  (let* ((head (car a))
-				(tail (cdr a))
-				(here (to-noun head)))
-	(if (null tail)
+        (tail (cdr a))
+        (here (to-noun head)))
+  (if (null tail)
 	 here
 	 (make-instance 'slimcell :head here :tail (to-noun tail)))))
