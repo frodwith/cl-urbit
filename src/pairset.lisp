@@ -17,10 +17,10 @@
 (defun pairset-hash (a)
  (mug-both (mug (car a)) (mug (cdr a))))
 
-(defun contains (table a b)
+(defun has-pair (table a b)
  (gethash (cons a b) table))
 
-(defun put (table a b)
+(defun have-pair (table a b)
  (setf (gethash (cons a b) table) t))
 
 ; SBCL only
