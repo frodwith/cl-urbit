@@ -1,10 +1,11 @@
 (defpackage urbit/tests/noun
   (:use :cl :rove)
-  (:import-from :urbit/noun :noun)
-  (:import-from :urbit/atom :atomp)
-  (:import-from :urbit/cell :head :tail :cellp)
   (:import-from :urbit/mug :mug)
-  (:import-from :urbit/error :exit))
+  (:import-from :urbit/noun :noun)
+  (:import-from :urbit/atom :atomp :to-integer)
+  (:import-from :urbit/error :exit)
+  (:import-from :urbit/cell :head :tail :cellp)
+  (:import-from :urbit/equality :same))
 
 (in-package :urbit/tests/noun)
 
@@ -43,13 +44,23 @@
 (deftest atomp
  (testing "cells"
   (ng (atomp (noun 1 2))))
- (testing "atoms"
-  (ok (atomp (noun 1)))))
+ (testing "fixnums"
+  (ok (atomp (noun 1))))
+ (testing "bignums"
+  (ok (atomp (noun #xdeadbeefcafebabedeed)))))
 
 (deftest cellp
  (testing "cells"
   (ok (cellp (noun 1 2))))
- (testing "atoms"
+ (testing "fixnums"
+  (ng (cellp (noun 1))))
+ (testing "bignums"
+  (ng (cellp (noun #xdeadbeefcafebabedeed)))))
+
+(deftest cellp
+ (testing "cells"
+  (ok (cellp (noun 1 2))))
+ (testing "ms"
   (ng (cellp (noun 1)))))
 
 (deftest mug
@@ -60,5 +71,27 @@
  (testing "cells"
   (ok (= 1392748553 (mug (noun 0 42))))
   (ok (= 436876331 (mug (noun '(1 2 (3 4 (5 6 7) 8 9 10) 11 12)))))))
+
+(deftest equality
+ (testing "fixnums"
+  (ok (same (noun 1) (noun 1)))
+  (ng (same (noun 1) (noun 2))))
+ (testing "bigatoms"
+  (let ((a (noun #xdeadbeefcabebabedeed))
+        (b (noun (parse-integer "deadbeefcabebabedeed" :radix 16))))
+   (ng (eq (to-integer a) (to-integer b)))
+   (ok (same a b))
+   (ok (eq (to-integer a) (to-integer b)))
+   (ng (same a (noun #xdeedbabecafebeefdead)))))
+ (testing "cells"
+  (let ((a (noun '((1 2) 3 4)))
+        (b (noun '((1 2) 3 4)))
+        (c (noun '((3 4) 1 2))))
+   (ng (same a c))
+   (ng (eq (head a) (head b)))
+   (ng (eq (tail a) (tail b)))
+   (ok (same a b))
+   (ok (eq (head a) (head b)))
+   (ok (eq (tail a) (tail b))))))
 
 (run-suite *package*)

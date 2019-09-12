@@ -39,8 +39,9 @@
   (setf (bnum b) (bnum a))
   (if (bmug a)
    (setf (bmug b) (bmug a))
-   (if (bmug b)
-    (setf (bmug a) (bmug b))))))
+   (when (bmug b)
+    (setf (bmug a) (bmug b))))
+  t))
 
 (defmethod teach ((a bigatom) (b t))
  (learn-integer b (bnum a))
