@@ -1,8 +1,8 @@
-(defpackage cl-urbit/error
+(defpackage urbit/error
  (:use :cl)
  (:export :bail :exit :fail :oops))
 
-(in-package cl-urbit/error)
+(in-package :urbit/error)
 
 (define-condition bail (error) ())
 (define-condition exit (bail) ())

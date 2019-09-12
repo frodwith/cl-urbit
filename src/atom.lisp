@@ -1,20 +1,16 @@
-(defpackage cl-urbit/noun/atom
+(defpackage urbit/atom
  (:use :cl)
- (:import-from cl-urbit/unify :unify))
+ (:import-from :urbit/error :oops))
 
-(in-package :cl-urbit/noun/atom)
+(in-package :urbit/atom)
 
 (defgeneric atomp (a))
 (defmethod atomp ((a t))
  nil)
 
+(deftype natom () `(satisfies atomp))
+
+; to-integer isn't a nock operation, so it just oopses if you don't define it
 (defgeneric to-integer (a))
 (defmethod to-integer ((a t))
- (error 'oops))
-
-(defgeneric atom= (a b))
-
-; implementations are encouraged to add specializations, this is the fallback
-(defmethod atom= ((a t) (b t))
- (when (= (to-integer a) (to-integer b))
-  (unify a b)))
+ (oops))

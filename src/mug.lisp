@@ -1,9 +1,12 @@
-(defpackage cl-urbit/mug
+(defpackage urbit/mug
  (:use :cl)
  (:import-from :murmurhash :murmurhash)
- (:import-from cl-urbit/error :oops)
- (:import-from cl-urbit/noun :atomp :cached-mug :compute-mug :sum)
- (:import-from cl-urbit/math :mix :end :rsh))
+ (:import-from :urbit/error :oops)
+ (:import-from :urbit/noun :sum)
+ (:import-from :urbit/atom :atomp)
+ (:import-from :urbit/math :mix :end :rsh))
+
+(in-package :urbit/mug)
 
 (defgeneric cached-mug (a))
 (defmethod cached-mug ((a t))
@@ -11,7 +14,7 @@
 
 (defgeneric compute-mug (a))
 (defmethod compute-mug ((a t))
- (error 'oops))
+ (oops))
 
 (defgeneric learn-mug (a))
 (defmethod learn-mug ((a t))
@@ -29,8 +32,8 @@
 (defun murmug-two (a b)
  (murmug (mix a (mix #x7fffffff b))))
 
+(defun mug-cell-fast (a)
+ (or (cached-mug a) (and (atomp a) (compute-mug a))))
+
 (defun mug-cell (a)
- (sum a
-  (lambda (a)
-     (or (cached-mug a) (and (atomp a) (compute-mug a))))
-  #'murmug-two))
+ (sum a #'mug-cell-fast #'murmug-two))

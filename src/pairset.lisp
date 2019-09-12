@@ -1,12 +1,10 @@
+(defpackage urbit/pairset
+ (:use :cl)
+ (:import-from :urbit/mug :mug :murmug-two))
+
+(in-package :urbit/pairset)
+
 ; set of pairs of nouns
-
-(defpackage cl-urbit/pairset
- (:import-from :cl-urbit/noun :mug)
- (:import-from :cl-urbit/mug :mug :murmug-two)
- (:export :make-pairset :put :contains))
-
-(in-package cl-urbit/pairset)
-
 (defun pair-eq (a b)
  (and (eq (car a) (car b))
       (eq (cdr a) (cdr b))))

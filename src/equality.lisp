@@ -1,10 +1,10 @@
-(defpackage cl-urbit/equality
+(defpackage urbit/equality
  (:use :cl)
- (:import-from :cl-urbit/mug :cached-mug)
- (:import-from :cl-urbit/atom :atomp :atom=)
- (:import-from :cl-urbit/cell :cellp :fast-cell=))
+ (:import-from :urbit/mug :cached-mug)
+ (:import-from :urbit/atom :atomp)
+ (:import-from :urbit/cell :cellp))
 
-(in-package cl-urbit/equality)
+(in-package :urbit/equality)
 
 ; tell an equal object everything you know
 ; return value is ignored
@@ -31,6 +31,20 @@
     (if (and ca cb (not (= ca cb)))
      'no
      (fast-cell= a b))))))
+
+(defgeneric atom= (a b))
+; implementations are encouraged to add specializations, this is the fallback
+(defmethod atom= ((a t) (b t))
+ (when (= (to-integer a) (to-integer b))
+  (unify a b)))
+
+;; fast-cell= should be specialized if you have a shortcut for known types.
+;; mismatching noun type, eq, and mug shortcuts are applied in elsewhere,
+;; so do not duplicate those checks in specializations.
+;; Return values are yes, no, or maybe (symbols)
+(defgeneric fast-cell= (a b))
+(defmethod fast-cell= ((a t) (b t))
+ 'maybe)
 
 (defun more (stack a b)
  (cons (cons 'compare (cons (head a) (head b)))

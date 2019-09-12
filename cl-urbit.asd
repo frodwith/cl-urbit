@@ -9,7 +9,14 @@
                 :serial t
                 :components
                 ((:file "error")
-                 (:file "noun"))))
+                 (:file "atom")
+                 (:file "cell")
+                 (:file "noun")
+                 (:file "mug")
+                 (:file "pairset")
+                 (:file "equality")
+                 (:file "data/bigatom")
+                 (:file "data/slimcell"))))
                  ;(:file "nock"))))
   :description "nock runtime and urbit worker process (http://urbit.org)"
   :long-description

@@ -1,7 +1,7 @@
-; these all work on regular lisp numbers, not atoms.
-(defpackage cl-urbit/math
+(defpackage urbit/math
  (:use :cl))
 
+; these all work on regular lisp numbers, not atoms.
 (defun mask (bits)
  (1- (ash 1 bits)))
 
