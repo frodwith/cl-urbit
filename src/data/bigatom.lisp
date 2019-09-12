@@ -1,8 +1,10 @@
-(defpackage cl-urbit/data/bigatom
+(defpackage urbit/data/bigatom
  (:use :cl)
- (:import-from :cl-urbit/unify :teach)
- (:import-from :cl-urbit/mug :murmug :compute-mug :cached-mug :learn-mug)
- (:import-from :cl-urbit/atom :atomp :atom= :to-integer :learn-integer))
+ (:import-from :urbit/mug :cached-mug :compute-mug :murmug :learn-mug)
+ (:import-from :urbit/atom :atomp :to-integer :learn-integer)
+ (:import-from :urbit/equality :teach :atom=))
+
+(in-package :urbit/data/bigatom)
 
 (defclass bigatom ()
   ((num :initarg :num
@@ -18,6 +20,12 @@
 
 (defmethod to-integer ((a bigatom))
  (bnum a))
+
+(defmethod learn-integer ((a bigatom) (i integer))
+ (setf (bnum a) i))
+
+(defmethod learn-mug ((a bigatom) (m fixnum))
+ (setf (bmug a) m))
 
 (defmethod cached-mug ((a bigatom))
  (bmug a))

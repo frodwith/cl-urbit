@@ -16,8 +16,8 @@
 (defmethod compute-mug ((a t))
  (oops))
 
-(defgeneric learn-mug (a))
-(defmethod learn-mug ((a t))
+(defgeneric learn-mug (a m))
+(defmethod learn-mug ((a t) (m fixnum))
  nil)
 
 (defun mug (a)

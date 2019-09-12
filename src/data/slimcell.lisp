@@ -1,8 +1,10 @@
-(defpackage cl-urbit/data/slimcell
+(defpackage urbit/data/slimcell
  (:use :cl)
- (:import-from :cl-urbit/unify :teach)
- (:import-from :cl-urbit/cell :cellp :head :tail :learn-head :learn-tail)
- (:import-from :cl-urbit/mug :cached-mug :compute-mug :mug-cell :learn-mug))
+ (:import-from :urbit/mug :cached-mug :compute-mug :murmug :learn-mug :mug-cell)
+ (:import-from :urbit/cell :cellp :head :tail :learn-head :learn-tail)
+ (:import-from :urbit/equality :teach))
+
+(in-package :urbit/data/slimcell)
 
 (defclass slimcell ()
   ((head :initarg :head
@@ -31,7 +33,7 @@
 (defmethod compute-mug ((a slimcell))
  (setf (dmug a) (mug-cell a)))
 
-(defmethod learn-mug ((a slimcell) (mug t))
+(defmethod learn-mug ((a slimcell) (mug fixnum))
  (setf (dmug a) mug))
 
 (defmethod learn-head ((a slimcell) (head t))

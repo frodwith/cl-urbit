@@ -14,3 +14,7 @@
 (defgeneric to-integer (a))
 (defmethod to-integer ((a t))
  (oops))
+
+(defgeneric learn-integer (a i))
+(defmethod learn-integer ((a t) (i integer))
+ nil)

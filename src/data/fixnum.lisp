@@ -1,7 +1,10 @@
-(defpackage cl-urbit/noun/fixnum
+(defpackage urbit/data/fixnum
  (:use :cl)
- (:import-from :cl-urbit/mug :murmug)
- (:import-from :cl-urbit/noun :atomp :atom= :to-integer :compute-mug))
+ (:import-from :urbit/mug :murmug :compute-mug)
+ (:import-from :urbit/atom :atomp :to-integer)
+ (:import-from :urbit/equality :atom=))
+
+(in-package :urbit/data/fixnum)
 
 (defmethod atomp ((a fixnum))
  t)
@@ -15,8 +18,6 @@
 (defmethod atom= ((a fixnum) (b fixnum))
  (= a b))
 
-; fixnums are only -ever- equal to other fixnums. other representations are
-; verboten by this logic.
 (defmethod atom= ((a fixnum) (b t))
  nil)
 
