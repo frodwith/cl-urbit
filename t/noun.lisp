@@ -72,6 +72,16 @@
   (ok (= 1392748553 (mug (noun 0 42))))
   (ok (= 436876331 (mug (noun '(1 2 (3 4 (5 6 7) 8 9 10) 11 12)))))))
 
+(defun many (n item)
+ (loop for x = item then (noun item x)
+       repeat n
+       finally (return x)))
+
+(defun levels (n f seed)
+ (loop for v = seed then (funcall f v)
+       repeat n
+       finally (return v)))
+
 (deftest equality
  (testing "fixnums"
   (ok (same (noun 1) (noun 1)))
@@ -92,10 +102,12 @@
    (ng (eq (tail a) (tail b)))
    (ok (same a b))
    (ok (eq (head a) (head b)))
-   (ok (eq (tail a) (tail b))))))
-
-;; XX TODO: test pairset independently
-;; do equality on a really big noun, manually test that it takes forever without
-;; the escape hatch
+   (ok (eq (tail a) (tail b)))))
+ (labels ((hun (xs) (many 100 xs))
+          (big () (levels 5 #'hun 0)))
+  (let ((a (big))
+        (b (big)))
+   (testing "shoggoths"
+    (ok (same a b))))))
 
 (run-suite *package*)
