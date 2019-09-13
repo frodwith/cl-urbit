@@ -77,8 +77,8 @@
   (ok (same (noun 1) (noun 1)))
   (ng (same (noun 1) (noun 2))))
  (testing "bigatoms"
-  (let ((a (noun #xdeadbeefcabebabedeed))
-        (b (noun (parse-integer "deadbeefcabebabedeed" :radix 16))))
+  (let ((a (noun #xdeadbeefcafebabedeed))
+        (b (noun (parse-integer "deadbeefcafebabedeed" :radix 16))))
    (ng (eq (to-integer a) (to-integer b)))
    (ok (same a b))
    (ok (eq (to-integer a) (to-integer b)))
@@ -93,5 +93,9 @@
    (ok (same a b))
    (ok (eq (head a) (head b)))
    (ok (eq (tail a) (tail b))))))
+
+;; XX TODO: test pairset independently
+;; do equality on a really big noun, manually test that it takes forever without
+;; the escape hatch
 
 (run-suite *package*)
