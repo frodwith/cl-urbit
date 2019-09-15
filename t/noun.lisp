@@ -63,6 +63,19 @@
  (testing "ms"
   (ng (cellp (noun 1)))))
 
+(defun many (n item)
+ (loop for x = item then (noun x x)
+       repeat n
+       finally (return x)))
+
+(defun levels (seed n f)
+ (loop for v = seed then (funcall f v)
+       repeat n
+       finally (return v)))
+
+(defun bigdag ()
+ (levels 0 50 (lambda (xs) (many 100 xs))))
+
 (deftest mug
  (testing "atoms"
   (ok (= 1681410502 (mug (noun 42))))
@@ -71,16 +84,6 @@
  (testing "cells"
   (ok (= 1392748553 (mug (noun 0 42))))
   (ok (= 436876331 (mug (noun '(1 2 (3 4 (5 6 7) 8 9 10) 11 12)))))))
-
-(defun many (n item)
- (loop for x = item then (noun item x)
-       repeat n
-       finally (return x)))
-
-(defun levels (n f seed)
- (loop for v = seed then (funcall f v)
-       repeat n
-       finally (return v)))
 
 (deftest equality
  (testing "fixnums"
@@ -103,11 +106,9 @@
    (ok (same a b))
    (ok (eq (head a) (head b)))
    (ok (eq (tail a) (tail b)))))
- (labels ((hun (xs) (many 100 xs))
-          (big () (levels 5 #'hun 0)))
-  (let ((a (big))
-        (b (big)))
-   (testing "shoggoths"
-    (ok (same a b))))))
+  (let ((a (bigdag))
+        (b (bigdag)))
+   (testing "bigdags"
+    (ok (same a b)))))
 
 (run-suite *package*)

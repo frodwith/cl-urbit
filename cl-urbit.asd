@@ -14,7 +14,6 @@
                  (:file "noun")
                  (:file "math")
                  (:file "mug")
-                 (:file "pairset")
                  (:file "equality")
                  (:file "data/fixnum")
                  (:file "data/bigatom")

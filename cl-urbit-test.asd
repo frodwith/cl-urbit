@@ -6,5 +6,4 @@
   :components ((:module "t"
                 :serial t
                 :components
-                ((:file "pairset")
-                 (:file "noun")))))
+                ((:file "noun")))))
