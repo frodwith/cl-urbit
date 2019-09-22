@@ -15,11 +15,12 @@
                  (:file "math")
                  (:file "mug")
                  (:file "equality")
-                 (:file "data/fixnum")
-                 (:file "data/bigatom")
                  (:file "data/constant-cell")
-                 (:file "data/slimcell"))))
-                 ;(:file "nock"))))
+                 (:file "data/constant-atom")
+                 (:file "data/slimcell")
+                 (:file "data/bigatom")
+                 (:file "data/fixnum")
+                 (:file "context"))))
   :description "nock runtime and urbit worker process (http://urbit.org)"
   :long-description
   #.(uiop:read-file-string

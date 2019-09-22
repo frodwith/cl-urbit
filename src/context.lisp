@@ -1,7 +1,9 @@
 (defpackage urbit/context
  (:use :cl)
+ (:import-from urbit/atom :atomp :learn-integer :to-integer)
+ (:import-from urbit/cell :learn-constant-cell :get-constant-cell :head :tail)
  (:import-from urbit/data/constant-cell :make-constant-cell)
- (:import-from urbit/data/constant-atom :make-constant-atom))
+ (:import-from urbit/data/constant-atom :make-constant-atom :constant-atom))
 
 (in-package :urbit/context)
 
@@ -13,7 +15,7 @@
  ; SBCL only (weakness)
  (make-hash-table :test 'equal :weakness :value))
 
-(defclass context
+(defclass context ()
  ((cell-table 
    :reader   cells
    :initform (make-cell-table))

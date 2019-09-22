@@ -1,6 +1,6 @@
 (defpackage urbit/data/constant-cell
  (:use :cl)
- (:import-from :urbit/mug :mug :cached-mug :compute-mug :murmug-two)
+ (:import-from :urbit/mug :mug :cached-mug :murmug-two)
  (:import-from :urbit/cell :cellp :head :tail 
                :get-constant-cell :learn-constant-cell)
  (:import-from :urbit/equality :teach))
@@ -45,9 +45,6 @@
  (ctail a))
 
 (defmethod cached-mug ((a constant-cell))
- (cmug a))
-
-(defmethod compute-mug ((a constant-cell))
  (cmug a))
 
 (defmethod teach ((a constant-cell) (b t))
