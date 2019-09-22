@@ -32,22 +32,22 @@
 (defun make-context ()
  (make-instance 'context))
 
-(defun intern-atom (i)
+(defun intern-atom (i &optional mug)
  (if (typep i 'fixnum)
   i
   (let* ((table (atoms *context*))
          (got   (gethash i table)))
    (or got
     (setf (gethash i table)
-     (make-constant-atom i))))))
+     (make-constant-atom i mug))))))
 
-(defun intern-cell (head tail)
+(defun intern-cell (head tail &optional mug)
  (let* ((table (cells *context*))
         (key   (cons head tail))
         (got   (gethash key table)))
   (or got
    (setf (gethash key table)
-    (make-constant-cell head tail)))))
+    (make-constant-cell head tail mug)))))
 
 (defun intern-noun (n)
  (if (atomp n)
