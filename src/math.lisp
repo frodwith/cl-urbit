@@ -1,5 +1,6 @@
 (defpackage urbit/math
- (:use :cl))
+ (:use :cl)
+ (:import-from :urbit/error :exit))
 
 (in-package :urbit/math)
 
@@ -30,3 +31,17 @@
 
 (defun rsh (bloq n a)
  (ash a (- (ash n bloq))))
+
+(defun cap (a)
+ (case a
+  ((0 1) (error 'exit))
+  (t (let ((len (- (integer-length a) 2)))
+      (if (logbitp len a)
+       3
+       2)))))
+
+(defun mas (a)
+ (case a
+  ((0 1) (error 'exit))
+  (t (let ((len (- (integer-length a) 2)))
+      (logxor (ash 1 len) (low-bits len a))))))

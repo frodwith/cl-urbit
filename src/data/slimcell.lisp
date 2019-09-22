@@ -3,10 +3,10 @@
  (:import-from :urbit/noun :to-noun)
  (:import-from :urbit/equality :teach)
  (:import-from :urbit/formula :formula)
- (:import-from :urbit/context :intern-cell)
+ (:import-from :urbit/context :intern-noun)
  (:import-from :urbit/cell :cellp :head :tail :learn-head :learn-tail)
  (:import-from :urbit/mug :cached-mug :compute-mug :murmug :learn-mug :mug-cell)
- (:import-from :urbit/data/constant-cell :constant-cell :chead :ctail :cmug :code))
+ (:import-from :urbit/data/constant-cell :constant-cell :chead :ctail :cmug))
 
 (in-package :urbit/data/slimcell)
 
@@ -31,13 +31,13 @@
  (stail a))
 
 (defun in (a &optional mug)
- (let ((i (intern-cell (shead a) (stail a) mug)))
+ (let ((i (intern-noun a mug)))
   (setf (shead a) (chead i))
   (setf (stail a) (ctail i))
   (setf (smeta a) i)))
 
 (defmethod formula ((a slimcell))
- (code
+ (formula
   (let ((m (smeta a)))
    (etypecase m
     (null (in a))

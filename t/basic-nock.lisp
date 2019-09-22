@@ -1,11 +1,18 @@
-(defpackage cl-urbit/tests/basic-nock
-  (:use :cl)
-  (:import-from :cl-urbit/noun :noun)
-  (:import-from :cl-urbit/nock :nock)
-  (:import-from :rove :ok))
+(defpackage urbit/tests/basic-nock
+  (:use :cl :rove)
+  (:import-from urbit/noun :noun)
+  (:import-from urbit/cell :head :tail)
+  (:import-from urbit/formula :nock)
+  (:import-from urbit/context :with-context :make-context))
 
-(in-package :cl-urbit/tests/basic-nock)
+(in-package :urbit/tests/basic-nock)
 
-(deftest test-1
- (testing "nock 1 operator"
-  (ok (nock 0 (noun 1 0)))))
+(deftest autocons
+ (testing "flip"
+  (with-context (make-context)
+                              ; this is ugly fix with macro
+   (let ((r (nock (noun 0 42) (noun '((0 3) 0 2)))))
+    (ok (= 42 (head r)))
+    (ok (= 0 (tail r)))))))
+
+(run-suite *package*)

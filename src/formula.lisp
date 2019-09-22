@@ -8,7 +8,6 @@
  (error 'exit))
 
 (defgeneric formula (a))
-
 (defmethod formula ((a t))
  #'crash)
 

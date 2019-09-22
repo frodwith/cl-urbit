@@ -41,6 +41,7 @@
     (setf (gethash i table)
      (make-constant-atom i mug))))))
 
+; call with INTERNED head and tail
 (defun intern-cell (head tail &optional mug)
  (let* ((table (cells *context*))
         (key   (cons head tail))
@@ -49,18 +50,18 @@
    (setf (gethash key table)
     (make-constant-cell head tail mug)))))
 
-(defun intern-noun (n)
+(defun intern-noun (n &optional mug)
  (if (atomp n)
   (if (typep n 'constant-atom)
    n
    (let* ((i (to-integer n))
-          (k (intern-atom i)))
+          (k (intern-atom i mug)))
     (learn-integer n (to-integer k))
     k))
   (let ((cc (get-constant-cell n)))
    (or cc
     (let* ((head (intern-noun (head n)))
            (tail (intern-noun (tail n)))
-           (k (intern-cell head tail)))
+           (k (intern-cell head tail mug)))
      (learn-constant-cell n k)
      k)))))

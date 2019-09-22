@@ -21,7 +21,8 @@
                  (:file "context")
                  (:file "data/slimcell")
                  (:file "data/bigatom")
-                 (:file "data/fixnum"))))
+                 (:file "data/fixnum")
+                 (:file "compiler"))))
   :description "nock runtime and urbit worker process (http://urbit.org)"
   :long-description
   #.(uiop:read-file-string
