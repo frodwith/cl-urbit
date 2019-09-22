@@ -1,7 +1,8 @@
 (defpackage urbit/data/constant-atom
  (:use :cl)
+ (:import-from :urbit/error :oops)
  (:import-from :urbit/mug :cached-mug :murmug :learn-mug)
- (:import-from :urbit/atom :atomp :to-integer)
+ (:import-from :urbit/atom :atomp :to-integer :learn-integer)
  (:import-from :urbit/equality :teach :atom= :unify))
 
 (in-package :urbit/data/constant-atom)

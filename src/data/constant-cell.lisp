@@ -1,5 +1,6 @@
 (defpackage urbit/data/constant-cell
  (:use :cl)
+ (:import-from :urbit/error :oops)
  (:import-from :urbit/mug :mug :cached-mug :murmug-two)
  (:import-from :urbit/cell :cellp :head :tail 
                :get-constant-cell :learn-constant-cell)
@@ -38,6 +39,9 @@
 
 (defmethod teach ((a constant-cell) (b t))
  (learn-constant-cell b a))
+
+(defmethod unify ((a constant-cell) (b constant-cell))
+ (error 'oops))
 
 (defmethod get-constant-cell ((a constant-cell))
  a)
