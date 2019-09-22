@@ -17,6 +17,7 @@
                  (:file "equality")
                  (:file "data/fixnum")
                  (:file "data/bigatom")
+                 (:file "data/constant-cell")
                  (:file "data/slimcell"))))
                  ;(:file "nock"))))
   :description "nock runtime and urbit worker process (http://urbit.org)"

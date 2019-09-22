@@ -32,3 +32,12 @@
 (defgeneric learn-tail (a tal))
 (defmethod learn-tail ((a t) (tl t))
  nil)
+
+(defgeneric get-constant-cell (a))
+(defmethod get-constant-cell ((a t))
+ nil)
+
+(defgeneric learn-constant-cell (a k))
+(defmethod learn-constant-cell ((a t) (k t))
+ nil)
+

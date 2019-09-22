@@ -1,61 +1,82 @@
 (defpackage urbit/data/slimcell
  (:use :cl)
  (:import-from :urbit/noun :to-noun)
- (:import-from :urbit/mug :cached-mug :compute-mug :murmug :learn-mug :mug-cell)
+ (:import-from :urbit/equality :teach)
  (:import-from :urbit/cell :cellp :head :tail :learn-head :learn-tail)
- (:import-from :urbit/equality :teach))
+ (:import-from :urbit/mug :cached-mug :compute-mug :murmug :learn-mug :mug-cell)
+ (:import-from :urbit/data/constant-cell :constant-cell))
 
 (in-package :urbit/data/slimcell)
 
 (defclass slimcell ()
   ((head :initarg :head
-         :accessor dhead
+         :accessor shead
          :type noun)
    (tail :initarg :tail
-         :accessor dtail
+         :accessor stail
          :type noun)
-   (mug :initarg :mug
-        :initform nil
-        :accessor dmug
-        :type (unsigned-byte 31))))
+   (meta :initarg :mug
+         :initform nil
+         :accessor smeta)))
 
 (defmethod cellp ((a slimcell))
  t)
 
 (defmethod head ((a slimcell))
- (dhead a))
+ (shead a))
 
 (defmethod tail ((a slimcell))
- (dtail a))
+ (stail a))
 
 (defmethod cached-mug ((a slimcell))
- (dmug a))
+ (let ((m (smeta a)))
+  (cond ((null m) nil)
+        ((typep m 'fixnum) m)
+        (t (cached-mug m)))))
 
 (defmethod compute-mug ((a slimcell))
- (setf (dmug a) (mug-cell a)))
+ (let ((m (smeta a)))
+  (cond ((null m) (setf (smeta a) (mug-cell a)))
+        ((typep m 'fixnum) nil)
+        (t (compute-mug m)))))
 
 (defmethod learn-mug ((a slimcell) (mug fixnum))
- (setf (dmug a) mug))
+ (let ((m (smeta a)))
+  (cond ((null m) (setf (smeta a) mug))
+        ((typep m 'fixnum) nil)
+        (t (learn-mug m mug)))))
 
 (defmethod learn-head ((a slimcell) (head t))
- (setf (dhead a) head))
+ (setf (shead a) head))
 
 (defmethod learn-tail ((a slimcell) (tail t))
- (setf (dtail a) tail))
+ (setf (stail a) tail))
+
+(defmethod learn-constant-cell ((a slimcell) (k constant-cell))
+ (setf (smeta a) k))
+
+(defmethod get-constant-cell ((a slimcell))
+ (let ((m (smeta a)))
+  (if (or (null m) (typep m 'fixnum))
+   nil
+   (get-constant-cell m))))
+
+(defun teach-meta (a b)
+ (let ((m (smeta a)))
+  (cond ((null m) nil)
+        ((typep m 'fixnum) (learn-mug b m))
+        (t (teach m b)))))
 
 (defmethod teach ((a slimcell) (b t))
- (learn-head b (dhead a))
- (learn-tail b (dtail a))
- (when (dmug a)
-  (learn-mug b (dmug a))))
+ (learn-head b (shead a))
+ (learn-tail b (stail a))
+ (teach-meta a b))
 
 (defmethod unify ((a slimcell) (b slimcell))
- (setf (dhead b) (dhead a))
- (setf (dtail b) (dtail a))
- (if (dmug a)
-  (setf (dmug b) (dmug a))
-  (when (dmug b)
-   (setf (dmug a) (dmug b)))))
+ (setf (shead b) (shead a))
+ (setf (stail b) (stail a))
+ (teach-meta a b)
+ (teach-meta b a))
 
 (defmethod to-noun ((a cons))
  (let* ((head (car a))

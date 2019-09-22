@@ -2,7 +2,7 @@
  (:use :cl)
  (:import-from :urbit/mug :cached-mug)
  (:import-from :urbit/atom :atomp :to-integer)
- (:import-from :urbit/cell :cellp :head :tail))
+ (:import-from :urbit/cell :cellp :head :tail :get-constant-cell))
 
 (in-package :urbit/equality)
 
@@ -25,14 +25,6 @@
  (when (= (to-integer a) (to-integer b))
   (unify a b)))
 
-;; fast-cell= should be specialized if you have a shortcut for known types.
-;; mismatching noun type, eq, and mug shortcuts are applied in elsewhere,
-;; so do not duplicate those checks in specializations.
-;; Return values are yes, no, or maybe (symbols)
-(defgeneric fast-cell= (a b))
-(defmethod fast-cell= ((a t) (b t))
- 'maybe)
-
 (defun more (stack a b)
  (cons (cons 'compare (cons (head a) (head b)))
   (cons (cons 'compare (cons (tail a) (tail b)))
@@ -45,13 +37,17 @@
    (if (atomp b)
     (if (atom= a b) 'yes 'no)
     'no)
-   (let ((ca (cached-mug a))
-         (cb (cached-mug b)))
-    (if (and ca cb (not (= ca cb)))
-     'no
-     (fast-cell= a b))))))
+   (let ((ka (get-constant-cell a))
+         (kb (get-constant-cell b)))
+    (if (and ka kb)
+     (if (eq ka kb) 'yes 'no)
+     (let ((ca (cached-mug a))
+           (cb (cached-mug b)))
+       (if (and ca cb (not (= ca cb)))
+        'no
+        'maybe)))))))
 
-; unifying equality with explict stack
+; unifying equality with explicit stack
 ;   "dag detection" a la vere is only necessary if there are some nouns
 ;   (e.g. on the home road) that you don't unify
 ;   we unify everything, so dag detection is useless overhead
