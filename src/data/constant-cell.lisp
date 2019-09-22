@@ -7,17 +7,6 @@
 
 (in-package :urbit/data/constant-cell)
 
-(defclass slimcell ()
-  ((head :initarg :head
-         :accessor shead
-         :type noun)
-   (tail :initarg :tail
-         :accessor stail
-         :type noun)
-   (meta :initarg :mug
-         :initform nil
-         :accessor smeta)))
-
 (defclass constant-cell ()
  ((head :initarg :head
         :reader chead
