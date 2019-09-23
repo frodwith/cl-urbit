@@ -11,13 +11,19 @@
 
 (in-package :urbit/compiler)
 
-(defconstant +crash+ '(error 'exit))
+;logically defconstant, bad standard + sbcl conformance = annoying warnings
+(defparameter +crash+ '(error 'exit))
 
 (defmethod formula ((a constant-cell))
  (or (rawcode a)
   (setf (rawcode a)
    (let ((form `(lambda (a) ,(qcell a))))
     (compile nil form)))))
+
+(defun qf (a)
+ (etypecase a
+  (constant-cell (qcell a))
+  ((or fixnum constant-atom) +crash+)))
 
 (defun qcell (a)
  (or (rawform a)
@@ -43,11 +49,6 @@
        (11 (q11 ar))
        (12 (q12 ar))
        (t +crash+))))))))
-
-(defun qf (a)
- (etypecase a
-  (constant-cell (qcell a))
-  ((or fixnum constant-atom) +crash+)))
 
 (defun qcons (head tail)
  `(scons ,(qcell head) ,(qf tail)))
@@ -90,12 +91,12 @@
  `(same ,(qf (chead a)) ,(qf (ctail a)))))
 
 (defun q6 (a)
- (or (nc a) (nc (ctail a))
+ (or (nc a)
   (let ((bran (ctail a)))
    (or (nc bran)
     `(case ,(qf (chead a))
       (0 ,(qf (chead bran)))
-      (1 ,(qf (tail bran)))
+      (1 ,(qf (ctail bran)))
       (t ,+crash+))))))
 
 (defun q7 (a)

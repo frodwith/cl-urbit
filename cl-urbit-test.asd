@@ -6,6 +6,6 @@
   :components ((:module "t"
                 :serial t
                 :components
-                ((:file "interner")
-                 (:file "basic-nock")
-                 (:file "noun")))))
+                ((:file "noun")
+                 (:file "interner")
+                 (:file "basic-nock")))))
