@@ -57,3 +57,6 @@
 
 (defmethod to-noun ((a bignum))
  (make-instance 'bigatom :num a))
+
+(defmethod print-object ((a bigatom) out)
+  (write (bnum a)))

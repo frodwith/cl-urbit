@@ -110,5 +110,5 @@
         here
         (scons here (to-noun tail)))))
 
-(defmethod print-object ((a slimcell) (out stream))
+(defmethod print-object ((a slimcell) out)
   (print-cell (shead a) (stail a) out))

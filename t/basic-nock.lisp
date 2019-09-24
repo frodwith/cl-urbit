@@ -12,7 +12,7 @@
 (with-context (make-context)
   (subtest "flip"
     (let ((r (nock (noun 0 42) (noun '(0 3) 0 2))))
-      (ok (= 42 (head r)))
-      (ok (= 0 (tail r))))))
+      (is= 42 (head r))
+      (is= 0 (tail r)))))
 
 (finalize)

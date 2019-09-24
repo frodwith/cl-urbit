@@ -2,7 +2,8 @@
  (:use :cl)
  (:import-from :urbit/error :oops)
  (:import-from :urbit/mug :mug :cached-mug :murmug-two)
- (:import-from :urbit/cell :cellp :head :tail :get-constant-cell :learn-constant-cell)
+ (:import-from :urbit/cell :cellp :head :tail
+               :get-constant-cell :learn-constant-cell :print-cell)
  (:import-from :urbit/equality :teach))
 
 (in-package :urbit/data/constant-cell)
@@ -50,3 +51,6 @@
 
 (defmethod get-constant-cell ((a constant-cell))
  a)
+
+(defmethod print-object ((a constant-cell) out)
+  (print-cell (chead a) (ctail a) out))

@@ -37,3 +37,6 @@
 
 (defun make-constant-atom (big &optional mug)
  (make-instance 'constant-atom :num big :mug (or mug (murmug big))))
+
+(defmethod print-object ((a constant-atom) out)
+  (write (cnum a)))
