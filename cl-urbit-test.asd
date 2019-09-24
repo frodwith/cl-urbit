@@ -8,6 +8,7 @@
                 :serial t
                 :components
                 ((:file "util")
+                 (:test-file "syntax")
                  (:test-file "interner")
                  (:test-file "noun")
                  (:test-file "basic-nock"))))

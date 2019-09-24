@@ -4,7 +4,7 @@
   :license "MIT"
   :homepage "https://github.com/frodwith/cl-urbit"
   :version "0.1"
-  :depends-on (:cl-murmurhash)
+  :depends-on (:cl-murmurhash :named-readtables)
   :components ((:module "src"
                 :serial t
                 :components
@@ -12,6 +12,7 @@
                  (:file "atom")
                  (:file "cell")
                  (:file "noun")
+                 (:file "syntax")
                  (:file "math")
                  (:file "mug")
                  (:file "formula")
