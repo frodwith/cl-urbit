@@ -25,7 +25,7 @@
 
 (defparameter *context* nil)
 
-(defmacro with-context (c &rest body)
+(defmacro with-context (c &body body)
  `(let ((*context* ,c))
    ,@body))
 

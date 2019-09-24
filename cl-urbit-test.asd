@@ -2,10 +2,14 @@
   :author "Paul Driver <frodwith@gmail.com>"
   :license "MIT"
   :depends-on (:cl-urbit
-               :rove)
+               :prove)
+  :defsystem-depends-on (:prove-asdf)
   :components ((:module "t"
                 :serial t
                 :components
-                ((:file "noun")
-                 (:file "interner")
-                 (:file "basic-nock")))))
+                ((:file "util")
+                 (:test-file "interner")
+                 (:test-file "noun")
+                 (:test-file "basic-nock"))))
+  :perform (test-op :after (op c)
+    (funcall (intern #.(string :run) :prove) c)))

@@ -6,7 +6,7 @@
 
 ; these all work on regular lisp numbers, not atoms.
 (defun mask (bits)
- (1- (ash 1 bits)))
+  (1- (ash 1 bits)))
 
 (defun low-bits (bits of)
  (logand of (mask bits)))
