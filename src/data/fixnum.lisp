@@ -1,25 +1,25 @@
 (defpackage urbit/data/fixnum
- (:use :cl)
- (:import-from :urbit/mug :murmug :compute-mug)
- (:import-from :urbit/atom :atomp :to-integer)
- (:import-from :urbit/equality :atom=))
+  (:use :cl)
+  (:import-from :urbit/mug :murmug :compute-mug)
+  (:import-from :urbit/atom :atomp :to-integer)
+  (:import-from :urbit/equality :atom=))
 
 (in-package :urbit/data/fixnum)
 
 (defmethod atomp ((a fixnum))
- t)
+  t)
 
 (defmethod to-integer ((a fixnum))
- a)
+  a)
 
 (defmethod compute-mug ((a fixnum))
- (murmug a))
+  (murmug a))
 
 (defmethod atom= ((a fixnum) (b fixnum))
- (= a b))
+  (= a b))
 
 (defmethod atom= ((a fixnum) (b t))
- nil)
+  nil)
 
 (defmethod atom= ((a t) (b fixnum))
- nil)
+  nil)

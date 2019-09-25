@@ -1,6 +1,6 @@
-(defpackage urbit/error
- (:use :cl)
- (:export :bail :exit :fail :oops))
+(defpackage #:urbit/error
+  (:use :cl)
+  (:export :bail :exit :fail :oops))
 
 (in-package :urbit/error)
 
