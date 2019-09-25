@@ -1,9 +1,11 @@
 (defpackage #:urbit/compiler
   (:use :cl)
+  (:import-from :urbit/noun :to-noun)
   (:import-from :urbit/math :cap :mas)
-  (:import-from :urbit/cell :head :tail)
+  (:import-from :urbit/atom :bump)
+  (:import-from :urbit/cell :cellp :head :tail)
   (:import-from :urbit/error :exit)
-  (:import-from :urbit/formula :formula)
+  (:import-from :urbit/formula :formula :nock)
   (:import-from :urbit/data/slimcell :scons)
   (:import-from :urbit/data/constant-atom :constant-atom :cnum)
   (:import-from :urbit/data/constant-cell :constant-cell
@@ -17,7 +19,9 @@
 (defmethod formula ((a constant-cell))
   (or (rawcode a)
       (setf (rawcode a)
-            (let ((form `(lambda (a) ,(qcell a))))
+            (let ((form `(lambda (a)
+                           (declare (ignorable a))
+                           ,(qcell a))))
               (compile nil form)))))
 
 (defun qf (a)
@@ -81,6 +85,9 @@
       (let ((subject (qf (chead a)))
             (formula (qf (ctail a))))
         `(nock ,subject ,formula))))
+
+(defun deep (a)
+  (if (cellp a) 0 1))
 
 (defun q3 (a)
   `(deep ,(qf a)))

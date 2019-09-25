@@ -3,7 +3,8 @@
   (:import-from :urbit/error :oops)
   (:import-from :urbit/mug :cached-mug :murmug :learn-mug)
   (:import-from :urbit/atom :atomp :to-integer :learn-integer)
-  (:import-from :urbit/equality :teach :atom= :unify))
+  (:import-from :urbit/equality :teach :atom= :unify)
+  (:import-from :urbit/data/bigatom :make-bigatom))
 
 (in-package :urbit/data/constant-atom)
 
@@ -21,6 +22,9 @@
 
 (defmethod to-integer ((a constant-atom))
   (cnum a))
+
+(defmethod bump ((a constant-atom))
+  (make-bigatom (1+ (cnum a))))
 
 (defmethod cached-mug ((a constant-atom))
   (cmug a))

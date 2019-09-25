@@ -2,7 +2,7 @@
   (:use :cl)
   (:import-from :urbit/noun :to-noun)
   (:import-from :urbit/mug :cached-mug :compute-mug :murmug :learn-mug)
-  (:import-from :urbit/atom :atomp :to-integer :learn-integer)
+  (:import-from :urbit/atom :atomp :bump :to-integer :learn-integer)
   (:import-from :urbit/equality :teach :atom=))
 
 (in-package :urbit/data/bigatom)
@@ -16,11 +16,17 @@
         :type (unsigned-byte 31)))
   (:documentation "wrapping around bignum to cache mug"))
 
+(defun make-bigatom (n)
+  (make-instance 'bigatom :num n) )
+
 (defmethod atomp ((a bigatom))
   t)
 
 (defmethod to-integer ((a bigatom))
   (bnum a))
+
+(defmethod bump ((a bigatom))
+  (make-bigatom (1+ (bnum a))))
 
 (defmethod learn-integer ((a bigatom) (i integer))
   (setf (bnum a) i))
@@ -56,7 +62,7 @@
         (setf (bmug a) (bmug b)))))
 
 (defmethod to-noun ((a bignum))
-  (make-instance 'bigatom :num a))
+  (make-bigatom a))
 
 (defmethod print-object ((a bigatom) out)
   (write (bnum a)))

@@ -5,6 +5,7 @@
 (in-package :urbit/formula)
 
 (defun crash (subject)
+  (declare (ignore subject))
   (error 'exit))
 
 (defgeneric formula (a))

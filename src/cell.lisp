@@ -1,6 +1,6 @@
-(defpackage urbit/cell
+(defpackage #:urbit/cell
   (:use :cl)
-  (:import-from :urbit/atom :atomp)
+  (:import-from :urbit/atom :atomp :bump)
   (:import-from :urbit/error :exit :oops))
 
 (in-package :urbit/cell)
@@ -14,6 +14,12 @@
 ; trying to fragment an atom is defined in nock as !! (exit)
 (defun bad-cell (a)
   (if (atomp a)
+      (error 'exit)
+      (error 'oops)))
+
+; fallback defined here because we need cellp
+(defmethod bump ((a t))
+  (if (cellp a)
       (error 'exit)
       (error 'oops)))
 

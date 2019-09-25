@@ -17,11 +17,11 @@
                  (:file "mug")
                  (:file "formula")
                  (:file "equality")
+                 (:file "data/bigatom")
                  (:file "data/constant-atom")
                  (:file "data/constant-cell")
                  (:file "context")
                  (:file "data/slimcell")
-                 (:file "data/bigatom")
                  (:file "data/fixnum")
                  (:file "compiler"))))
   :description "nock runtime and urbit worker process (http://urbit.org)"
