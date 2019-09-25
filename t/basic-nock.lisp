@@ -1,6 +1,7 @@
 (defpackage urbit/tests/basic-nock
   (:use :cl :prove :urbit/syntax :urbit/tests/util)
   (:import-from urbit/noun :noun)
+  (:import-from urbit/error :exit)
   (:import-from urbit/cell :head :tail)
   (:import-from urbit/formula :nock)
   (:import-from urbit/data/constant-cell :constant-cell)
@@ -10,7 +11,7 @@
 (in-package :urbit/tests/basic-nock)
 (enable-brackets)
 
-(plan 7)
+(plan 10)
 
 (with-context (make-context)
   (subtest "autocons"
@@ -48,6 +49,21 @@
   (subtest "same"
     (is= (nock [42 42] [5 [0 2] 0 3]) 0)
     (is= (nock [42 43] [5 [0 2] 0 3]) 1)
-    (is= (nock 0 [5 [1 42] 1 42]) 0)))
+    (is= (nock 0 [5 [1 42] 1 42]) 0))
+  (subtest "if"
+    (subtest "basic"
+      (let ((forty-or-two [6 [0 1] [1 40] 1 2]))
+        (is= (nock 0 forty-or-two) 40)
+        (is= (nock 1 forty-or-two) 2)
+        (is-error (nock 2 forty-or-two) 'exit)
+        (is-error (nock [0 0] forty-or-two) 'exit)))
+    (subtest "funky"
+      (let ((funky [6 [0 1] 1 1 42]))
+        (is= (nock 1 funky) 42)
+        (is-error (nock 0 funky) 'exit))))
+  (subtest "comp"
+    (is-same (nock [[1 2] 3] [7 [0 2] [0 3] 0 2]) [2 1]))
+  (subtest "push"
+    (is-same (nock 0 [8 [1 42] [0 3] 0 2]) [0 42])))
 
 (finalize)

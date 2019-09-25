@@ -125,7 +125,7 @@
   (or (nc a)
       (let ((one (qf (chead a)))
             (two (qf (ctail a))))
-        `(let ((a (dcons ,one a)))
+        `(let ((a (scons ,one a)))
            ,two))))
 
 (defun q9 (a)
