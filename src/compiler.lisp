@@ -95,6 +95,9 @@
 (defun q4 (a)
   `(bump ,(qf a)))
 
+(defun same (a b)
+  (if (urbit/equality:same a b) 0 1))
+
 (defun q5 (a)
   (or (nc a)
       `(same ,(qf (chead a)) ,(qf (ctail a)))))

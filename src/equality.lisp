@@ -2,7 +2,8 @@
   (:use :cl)
   (:import-from :urbit/mug :cached-mug)
   (:import-from :urbit/atom :atomp :to-integer)
-  (:import-from :urbit/cell :cellp :head :tail :get-constant-cell))
+  (:import-from :urbit/cell :cellp :head :tail :get-constant-cell)
+  (:export :same))
 
 (in-package :urbit/equality)
 

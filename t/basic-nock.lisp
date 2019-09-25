@@ -10,7 +10,7 @@
 (in-package :urbit/tests/basic-nock)
 (enable-brackets)
 
-(plan 6)
+(plan 7)
 
 (with-context (make-context)
   (subtest "autocons"
@@ -44,6 +44,10 @@
   (subtest "bump"
     (is= (nock 0 [4 0 1]) 1)
     (is= (nock 41 [4 0 1]) 42)
-    (is-same (nock most-positive-fixnum [4 0 1]) [(1+ most-positive-fixnum)])))
+    (is-same (nock most-positive-fixnum [4 0 1]) [(1+ most-positive-fixnum)]))
+  (subtest "same"
+    (is= (nock [42 42] [5 [0 2] 0 3]) 0)
+    (is= (nock [42 43] [5 [0 2] 0 3]) 1)
+    (is= (nock 0 [5 [1 42] 1 42]) 0)))
 
 (finalize)
