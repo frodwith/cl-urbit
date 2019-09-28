@@ -7,62 +7,54 @@
 
 (in-package :urbit/data/bigatom)
 
-(defclass bigatom ()
-  ((num :initarg :num
-        :accessor bnum
-        :type bignum)
-   (mug :initform nil
-        :accessor bmug
-        :type (unsigned-byte 31)))
-  (:documentation "wrapping around bignum to cache mug"))
-
-(defun make-bigatom (n)
-  (make-instance 'bigatom :num n) )
+(defstruct (bigatom (:constructor make-bigatom (num)))
+  (num nil :type bignum)
+  (mug nil :type (or null (unsigned-byte 31))))
 
 (defmethod atomp ((a bigatom))
   t)
 
 (defmethod to-integer ((a bigatom))
-  (bnum a))
+  (bigatom-num a))
 
 (defmethod bump ((a bigatom))
-  (make-bigatom (1+ (bnum a))))
+  (make-bigatom (1+ (bigatom-num a))))
 
-(defmethod learn-integer ((a bigatom) (i integer))
-  (setf (bnum a) i))
+(defmethod learn-integer ((a bigatom) i)
+  (setf (bigatom-num a) i))
 
-(defmethod learn-mug ((a bigatom) (m fixnum))
-  (setf (bmug a) m))
+(defmethod learn-mug ((a bigatom) m)
+  (setf (bigatom-mug a) m))
 
 (defmethod cached-mug ((a bigatom))
-  (bmug a))
+  (bigatom-mug a))
 
 (defmethod compute-mug ((a bigatom))
-  (setf (bmug a) (murmug (bnum a))))
+  (setf (bigatom-mug a) (murmug (bigatom-num a))))
 
 (defmethod atom= ((a bigatom) (b bigatom))
-  (when (= (bnum a) (bnum b))
-    (setf (bnum b) (bnum a))
-    (if (bmug a)
-        (setf (bmug b) (bmug a))
-        (when (bmug b)
-          (setf (bmug a) (bmug b))))
+  (when (= (bigatom-num a) (bigatom-num b))
+    (setf (bigatom-num b) (bigatom-num a))
+    (if (bigatom-mug a)
+        (setf (bigatom-mug b) (bigatom-mug a))
+        (when (bigatom-mug b)
+          (setf (bigatom-mug a) (bigatom-mug b))))
     t))
 
 (defmethod teach ((a bigatom) (b t))
-  (learn-integer b (bnum a))
-  (when (bmug a)
-    (learn-mug b (bmug a))))
+  (learn-integer b (bigatom-num a))
+  (when (bigatom-mug a)
+    (learn-mug b (bigatom-mug a))))
 
 (defmethod unify ((a bigatom) (b bigatom))
-  (setf (bnum b) (bnum a))
-  (if (bmug a)
-      (setf (bmug b) (bmug a))
-      (when (bmug b)
-        (setf (bmug a) (bmug b)))))
+  (setf (bigatom-num b) (bigatom-num a))
+  (if (bigatom-mug a)
+      (setf (bigatom-mug b) (bigatom-mug a))
+      (when (bigatom-mug b)
+        (setf (bigatom-mug a) (bigatom-mug b)))))
 
 (defmethod to-noun ((a bignum))
   (make-bigatom a))
 
 (defmethod print-object ((a bigatom) out)
-  (write (bnum a)))
+  (write (bigatom-num a)))
