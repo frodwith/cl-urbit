@@ -3,6 +3,7 @@
   (:import-from :murmurhash :murmurhash)
   (:import-from :urbit/error :oops)
   (:import-from :urbit/noun :sum :noun)
+  (:import-from :urbit/cell :cell)
   (:import-from :urbit/atom :atomp)
   (:import-from :urbit/math :mix :end :rsh))
 
@@ -42,5 +43,5 @@
   (the (or null mug) (or (cached-mug a) (and (atomp a) (compute-mug a)))))
 
 (defun mug-cell (a)
-  (declare (type noun a))
+  (declare (type cell a))
   (the mug (sum a #'mug-cell-fast #'murmug-two)))

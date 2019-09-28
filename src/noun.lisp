@@ -1,8 +1,8 @@
 (defpackage #:urbit/noun
   (:use :cl)
   (:import-from :urbit/error :oops)
-  (:import-from :urbit/atom :atomp)
-  (:import-from :urbit/cell :cellp :head :tail))
+  (:import-from :urbit/atom :atomp :natom)
+  (:import-from :urbit/cell :cell :cellp :head :tail))
 
 (in-package :urbit/noun)
 
@@ -10,7 +10,7 @@
   (or (atomp a) (cellp a)))
 
 (deftype noun () 
-  `(satisfies nounp))
+  `(or natom cell))
 
 (defgeneric to-noun (a))
 
