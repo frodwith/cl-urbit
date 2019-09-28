@@ -5,6 +5,7 @@
   (:import-from :urbit/mug :mug :cached-mug :murmug-two :learn-mug)
   (:import-from :urbit/cell :cellp :head :tail
                 :get-constant-cell :learn-constant-cell :print-cell)
+  (:import-from :urbit/data/constant-atom :constant-atom)
   (:import-from :urbit/equality :teach))
 
 (in-package :urbit/data/constant-cell)
@@ -15,9 +16,9 @@
 
 (defstruct (constant-cell (:constructor make-constant-cell (head tail mug))
                           (:print-object print-constant-cell))
-  (head nil :type noun :read-only t)
-  (tail nil :type noun :read-only t)
-  (mug nil :type (or null (unsigned-byte 31)))
+  (head nil :type (or fixnum constant-atom constant-cell) :read-only t)
+  (tail nil :type (or fixnum constant-atom constant-cell) :read-only t)
+  (mug  nil :type (or null (unsigned-byte 31)))
   (nock nil :type (or null nock-meta)))
 
 (defmethod cellp ((a constant-cell))
