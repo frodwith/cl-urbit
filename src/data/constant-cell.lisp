@@ -18,7 +18,7 @@
                           (:print-object print-constant-cell))
   (head nil :type (or fixnum constant-atom constant-cell) :read-only t)
   (tail nil :type (or fixnum constant-atom constant-cell) :read-only t)
-  (mug  nil :type (or null (unsigned-byte 31)))
+  (mug  nil :type (or null mug))
   (nock nil :type (or null nock-meta)))
 
 (defmethod cellp ((a constant-cell))

@@ -5,7 +5,7 @@
   (:import-from :urbit/formula :formula)
   (:import-from :urbit/context :intern-noun)
   (:import-from :urbit/cell :cellp :head :tail :learn-head :learn-tail :print-cell)
-  (:import-from :urbit/mug :cached-mug :compute-mug :murmug :learn-mug :mug-cell)
+  (:import-from :urbit/mug :cached-mug :compute-mug :murmug :learn-mug :mug-cell :mug)
   (:import-from :urbit/data/constant-cell :constant-cell :constant-cell-head :constant-cell-tail))
 
 (in-package :urbit/data/slimcell)
@@ -14,7 +14,7 @@
                      (:print-object print-slimcell))
   (head nil :type noun)
   (tail nil :type noun)
-  (meta nil :type (or null (unsigned-byte 31) constant-cell)))
+  (meta nil :type (or null mug constant-cell)))
 
 (defmethod cellp ((a slimcell))
   t)
@@ -36,28 +36,28 @@
     (let ((m (slimcell-meta a)))
       (etypecase m
         (null (in a))
-        (fixnum (in a m))
+        (mug (in a m))
         (constant-cell m)))))
 
 (defmethod cached-mug ((a slimcell))
   (let ((m (slimcell-meta a)))
     (etypecase m
       (null nil)
-      (fixnum m)
+      (mug m)
       (constant-cell (cached-mug m)))))
 
 (defmethod compute-mug ((a slimcell))
   (let ((m (slimcell-meta a)))
     (etypecase m
       (null (setf (slimcell-meta a) (mug-cell a)))
-      (fixnum nil)
+      (mug nil)
       (constant-cell (compute-mug m)))))
 
 (defmethod learn-mug ((a slimcell) mug)
   (let ((m (slimcell-meta a)))
     (etypecase m
       (null (setf (slimcell-meta a) mug))
-      (fixnum nil)
+      (mug nil)
       (constant-cell (learn-mug m mug)))))
 
 (defmethod learn-head ((a slimcell) (head t))
@@ -73,14 +73,14 @@
   (let ((m (slimcell-meta a)))
     (etypecase m
       (null nil)
-      (fixnum nil)
+      (mug nil)
       (constant-cell m))))
 
 (defun teach-meta (a b)
   (let ((m (slimcell-meta a)))
     (etypecase m
       (null nil)
-      (fixnum (learn-mug b m))
+      (mug (learn-mug b m))
       (constant-cell (teach m b)))))
 
 (defmethod teach ((a slimcell) (b t))

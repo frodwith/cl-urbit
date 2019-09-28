@@ -1,7 +1,7 @@
 (defpackage #:urbit/data/constant-atom
   (:use :cl)
   (:import-from :urbit/error :oops)
-  (:import-from :urbit/mug :cached-mug :murmug :learn-mug)
+  (:import-from :urbit/mug :mug :cached-mug :murmug :learn-mug)
   (:import-from :urbit/atom :atomp :to-integer :learn-integer)
   (:import-from :urbit/equality :teach :atom= :unify)
   (:import-from :urbit/data/bigatom :make-bigatom))
@@ -10,8 +10,8 @@
 
 (defstruct (constant-atom (:constructor make-constant-atom (num mug))
                           (:print-object print-constant-atom))
-  (num nil :type bignum)
-  (mug nil :type (or null (unsigned-byte 31))))
+  (num nil :type bignum :read-only t)
+  (mug nil :type (or null mug)))
 
 (defmethod atomp ((a constant-atom))
   t)
@@ -40,4 +40,4 @@
   (error 'oops))
 
 (defun print-constant-atom (a out)
-  (write (constant-atom-num a)))
+  (write (constant-atom-num a) :stream out))
