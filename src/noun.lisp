@@ -28,6 +28,9 @@
 ;  quick should give an answer with no further noun traversal, or nil
 ;  combine should take the answers from two sides and combine them
 (defun sum (a quick combine)
+  (declare (type noun a))
+  (declare (type (function (noun) t) quick))
+  (declare (type (function (noun noun) t) combine))
   (loop with stack = (list (cons 0 a))
         with r     = nil
         for top    = (pop stack)

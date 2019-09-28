@@ -23,9 +23,13 @@
 (defmethod learn-mug (a m)
   nil)
 
+; forcing to single value context (working around values too complex to check)
+(defmacro one (&body body)
+  `(nth-value 0 ,@body))
+
 (defun mug (a)
   (declare (type noun a))
-  (the mug (or (cached-mug a) (compute-mug a))))
+  (the mug (one (or (cached-mug a) (compute-mug a)))))
 
 (defun murmug (key)
   (declare (type integer key))
@@ -40,8 +44,9 @@
 
 (defun mug-cell-fast (a)
   (declare (type noun a))
-  (the (or null mug) (or (cached-mug a) (and (atomp a) (compute-mug a)))))
+  (the (or null mug)
+       (one (or (cached-mug a) (and (atomp a) (compute-mug a))))))
 
 (defun mug-cell (a)
   (declare (type cell a))
-  (the mug (sum a #'mug-cell-fast #'murmug-two)))
+  (the mug (one (sum a #'mug-cell-fast #'murmug-two))))
