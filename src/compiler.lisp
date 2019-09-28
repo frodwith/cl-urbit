@@ -6,7 +6,7 @@
   (:import-from :urbit/error :exit)
   (:import-from :urbit/formula :formula :nock)
   (:import-from :urbit/data/slimcell :scons)
-  (:import-from :urbit/data/constant-atom :constant-atom :cnum)
+  (:import-from :urbit/data/constant-atom :constant-atom :constant-atom-num)
   (:import-from :urbit/data/constant-cell :constant-cell
                 :constant-cell-head :constant-cell-tail :constant-cell-nock
                 :make-nock-meta :nock-meta-func :nock-meta-form))
@@ -73,7 +73,7 @@
 (defun q0 (a)
   (etypecase a
     (fixnum (qax a 'a))
-    (constant-atom (qax (cnum a) 'a))
+    (constant-atom (qax (constant-atom-num a) 'a))
     (constant-cell +crash+)))
 
 (defun q1 (a)

@@ -7,7 +7,8 @@
 
 (in-package :urbit/data/bigatom)
 
-(defstruct (bigatom (:constructor make-bigatom (num)))
+(defstruct (bigatom (:constructor make-bigatom (num))
+                    (:print-object print-bigatom))
   (num nil :type bignum)
   (mug nil :type (or null (unsigned-byte 31))))
 
@@ -56,5 +57,5 @@
 (defmethod to-noun ((a bignum))
   (make-bigatom a))
 
-(defmethod print-object ((a bigatom) out)
+(defun print-bigatom (a out)
   (write (bigatom-num a)))
