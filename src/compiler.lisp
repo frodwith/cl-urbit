@@ -1,6 +1,5 @@
 (defpackage #:urbit/compiler
   (:use :cl)
-  (:import-from :urbit/noun :to-noun)
   (:import-from :urbit/math :cap :mas)
   (:import-from :urbit/atom :bump)
   (:import-from :urbit/cell :cellp :head :tail)
@@ -9,20 +8,47 @@
   (:import-from :urbit/data/slimcell :scons)
   (:import-from :urbit/data/constant-atom :constant-atom :cnum)
   (:import-from :urbit/data/constant-cell :constant-cell
-                :rawcode :rawform :chead :ctail))
+                :constant-cell-head :constant-cell-tail :constant-cell-nock
+                :make-nock-meta :nock-meta-func :nock-meta-form))
 
 (in-package :urbit/compiler)
 
-;logically defconstant, bad standard + sbcl conformance = annoying warnings
 (defparameter +crash+ '(error 'exit))
 
 (defmethod formula ((a constant-cell))
-  (or (rawcode a)
-      (setf (rawcode a)
-            (let ((form `(lambda (a)
-                           (declare (ignorable a))
-                           ,(qcell a))))
-              (compile nil form)))))
+  (let ((meta (nock-meta a)))
+    (or (nock-meta-func meta)
+        (setf (nock-meta-func meta)
+              (let ((form `(lambda (a)
+                             (declare (ignorable a))
+                             ,(qcell a))))
+                (compile nil form))))))
+
+(defun nock-meta (a)
+  (or (constant-cell-nock a)
+      (setf (constant-cell-nock a)
+            (make-nock-meta
+              (let ((op (constant-cell-head a))
+                    (ar (constant-cell-tail a)))
+                (etypecase op
+                  (constant-atom +crash+)
+                  (constant-cell (qcons op ar))
+                  (fixnum
+                    (case op
+                      (0  (q0  ar))
+                      (1  (q1  ar))
+                      (2  (q2  ar))
+                      (3  (q3  ar))
+                      (4  (q4  ar))
+                      (5  (q5  ar))
+                      (6  (q6  ar))
+                      (7  (q7  ar))
+                      (8  (q8  ar))
+                      (9  (q9  ar))
+                      (10 (q10 ar))
+                      (11 (q11 ar))
+                      (12 (q12 ar))
+                      (t +crash+)))))))))
 
 (defun qf (a)
   (etypecase a
@@ -30,29 +56,7 @@
     ((or fixnum constant-atom) +crash+)))
 
 (defun qcell (a)
-  (or (rawform a)
-      (setf (rawform a)
-            (let ((op (chead a))
-                  (ar (ctail a)))
-              (etypecase op
-                (constant-atom +crash+)
-                (constant-cell (qcons op ar))
-                (fixnum
-                  (case op
-                    (0  (q0  ar))
-                    (1  (q1  ar))
-                    (2  (q2  ar))
-                    (3  (q3  ar))
-                    (4  (q4  ar))
-                    (5  (q5  ar))
-                    (6  (q6  ar))
-                    (7  (q7  ar))
-                    (8  (q8  ar))
-                    (9  (q9  ar))
-                    (10 (q10 ar))
-                    (11 (q11 ar))
-                    (12 (q12 ar))
-                    (t +crash+))))))))
+  (nock-meta-form (nock-meta a)))
 
 (defun qcons (head tail)
   `(scons ,(qcell head) ,(qf tail)))
@@ -82,8 +86,8 @@
 
 (defun q2 (a)
   (or (nc a)
-      (let ((subject (qf (chead a)))
-            (formula (qf (ctail a))))
+      (let ((subject (qf (constant-cell-head a)))
+            (formula (qf (constant-cell-tail a))))
         `(nock ,subject ,formula))))
 
 (defun deep (a)
@@ -100,15 +104,15 @@
 
 (defun q5 (a)
   (or (nc a)
-      `(same ,(qf (chead a)) ,(qf (ctail a)))))
+      `(same ,(qf (constant-cell-head a)) ,(qf (constant-cell-tail a)))))
 
 (defun q6 (a)
   (or (nc a)
-      (let ((bran (ctail a)))
+      (let ((bran (constant-cell-tail a)))
         (or (nc bran)
-            (let ((test (qf (chead a)))
-                  (yes  (qf (chead bran)))
-                  (no   (qf (ctail bran))))
+            (let ((test (qf (constant-cell-head a)))
+                  (yes  (qf (constant-cell-head bran)))
+                  (no   (qf (constant-cell-tail bran))))
               `(case ,test
                  (0 ,yes)
                  (1 ,no)
@@ -116,15 +120,15 @@
 
 (defun q7 (a)
   (or (nc a)
-      (let ((one (qf (chead a)))
-            (two (qf (ctail a))))
+      (let ((one (qf (constant-cell-head a)))
+            (two (qf (constant-cell-tail a))))
         `(let ((a ,one))
            ,two))))
 
 (defun q8 (a)
   (or (nc a)
-      (let ((one (qf (chead a)))
-            (two (qf (ctail a))))
+      (let ((one (qf (constant-cell-head a)))
+            (two (qf (constant-cell-tail a))))
         `(let ((a (scons ,one a)))
            ,two))))
 
