@@ -186,8 +186,17 @@
                   (t (qed-root ax little big))))))))
 
 (defun q11 (a)
-  (declare (ignore a))
-  +crash+)
+  (splash a (hint next-formula)
+    (let ((next (qf next-formula)))
+      (etypecase hint
+        ; no currently supported static hints
+        ((or fixnum constant-atom) next)
+        ; no dynamic hints either
+        (constant-cell
+          (split hint (tag clue-formula)
+            (declare (ignore tag))
+            (let ((clue (qf clue-formula)))
+              `(progn ,clue ,next))))))))
 
 (defun q12 (a)
   (declare (ignore a))

@@ -11,7 +11,7 @@
 (in-package :urbit/tests/basic-nock)
 (enable-brackets)
 
-(plan 12)
+(plan 13)
 
 (with-context (make-context)
   (subtest "autocons"
@@ -55,12 +55,12 @@
       (let ((forty-or-two [6 [0 1] [1 40] 1 2]))
         (is= (nock 0 forty-or-two) 40)
         (is= (nock 1 forty-or-two) 2)
-        (is-error (nock 2 forty-or-two) 'exit)
-        (is-error (nock [0 0] forty-or-two) 'exit)))
+        (is-error (nock 2 forty-or-two) 'exit "two loobean")
+        (is-error (nock [0 0] forty-or-two) 'exit "cell loobean")))
     (subtest "funky"
       (let ((funky [6 [0 1] 1 1 42]))
-        (is= (nock 1 funky) 42)
-        (is-error (nock 0 funky) 'exit))))
+        (is= (nock 1 funky) 42 "valid side")
+        (is-error (nock 0 funky) 'exit "invalid side"))))
   (subtest "comp"
     (is-same (nock [[1 2] 3] [7 [0 2] [0 3] 0 2]) [2 1]))
   (subtest "push"
@@ -68,12 +68,16 @@
   (subtest "pull"
     (is= (nock 0 [9 2 1 [0 6] 42 0]) 42))
   (subtest "edit"
-    (is-same (nock [1 2 3] [10 [6 4 0 6] 0 1]) [1 3 3])
+    (is-same (nock [1 2 3] [10 [6 4 0 6] 0 1]) [1 3 3] "edit sample")
     (let ((set-head [10 [2 1 42] 0 1]))
-      (is-same (nock [0 0] set-head) [42 0])
-      (is-error (nock 0 set-head) 'exit))
+      (is-same (nock [0 0] set-head) [42 0] "edit cell head")
+      (is-error (nock 0 set-head) 'exit "edit atom head"))
     (is-error (nock 0 [10 [0 1 42] 0 1]) 'exit "edit zero crash")
     (is= (nock [0 0 0] [10 [1 1 42] 0 1]) 42 "edit whole")
-    (is-error (nock 0 [10 [1 1 42] 0 0]) 'exit "edit whole crash")))
+    (is-error (nock 0 [10 [1 1 42] 0 0]) 'exit "edit whole crash"))
+  (subtest "hint"
+    (is= (nock 42 [11 1 0 1]) 42 "static")
+    (is= (nock 42 [11 [1 1 1] 0 1]) 42 "dynamic")
+    (is-error (nock 42 [11 [1 0 0] 0 1]) 'exit "dynamic crash")))
 
 (finalize)
