@@ -11,7 +11,7 @@
 (in-package :urbit/tests/basic-nock)
 (enable-brackets)
 
-(plan 10)
+(plan 11)
 
 (with-context (make-context)
   (subtest "autocons"
@@ -64,6 +64,8 @@
   (subtest "comp"
     (is-same (nock [[1 2] 3] [7 [0 2] [0 3] 0 2]) [2 1]))
   (subtest "push"
-    (is-same (nock 0 [8 [1 42] [0 3] 0 2]) [0 42])))
+    (is-same (nock 0 [8 [1 42] [0 3] 0 2]) [0 42]))
+  (subtest "pull"
+    (is= (nock 0 [9 2 1 [0 6] 42 0]) 42)))
 
 (finalize)

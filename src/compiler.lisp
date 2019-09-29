@@ -79,6 +79,11 @@
 (defun q1 (a)
   `(quote ,a))
 
+(defun na (a)
+  (etypecase a
+    (constant-cell +crash+)
+    ((or fixnum constant-atom) nil)))
+
 (defun nc (a)
   (etypecase a
     (constant-cell nil)
@@ -133,8 +138,10 @@
            ,two))))
 
 (defun q9 (a)
-  (declare (ignore a))
-  +crash+)
+  (let ((frag (q0 (constant-cell-head a)))
+        (core (qf (constant-cell-tail a))))
+    `(let ((a ,core))
+       (nock a ,frag))))
 
 (defun q10 (a)
   (declare (ignore a))
