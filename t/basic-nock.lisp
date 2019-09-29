@@ -11,7 +11,7 @@
 (in-package :urbit/tests/basic-nock)
 (enable-brackets)
 
-(plan 11)
+(plan 12)
 
 (with-context (make-context)
   (subtest "autocons"
@@ -66,6 +66,14 @@
   (subtest "push"
     (is-same (nock 0 [8 [1 42] [0 3] 0 2]) [0 42]))
   (subtest "pull"
-    (is= (nock 0 [9 2 1 [0 6] 42 0]) 42)))
+    (is= (nock 0 [9 2 1 [0 6] 42 0]) 42))
+  (subtest "edit"
+    (is-same (nock [1 2 3] [10 [6 4 0 6] 0 1]) [1 3 3])
+    (let ((set-head [10 [2 1 42] 0 1]))
+      (is-same (nock [0 0] set-head) [42 0])
+      (is-error (nock 0 set-head) 'exit))
+    (is-error (nock 0 [10 [0 1 42] 0 1]) 'exit "edit zero crash")
+    (is= (nock [0 0 0] [10 [1 1 42] 0 1]) 42 "edit whole")
+    (is-error (nock 0 [10 [1 1 42] 0 0]) 'exit "edit whole crash")))
 
 (finalize)
