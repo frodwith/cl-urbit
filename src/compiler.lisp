@@ -146,31 +146,44 @@
     `(let ((a ,(qf core)))
        (nock a ,(q0 frag)))))
 
-(defun qed (a little big)
+(defun qed (a little big kons)
   (case a
-    (2 `(scons ,little (tail ,big)))
-    (3 `(scons (head ,big) ,little))
-    (t (let ((bs (gensym)))
+    (2 (funcall kons little `(tail ,big)))
+    (3 (funcall kons `(head ,big) little))
+    (t (let* ((bigsym (gensym))
+              (mutant (qed (mas a) little bigsym
+                       (lambda (head tail) `(scons ,head ,tail)))))
          (ecase (cap a)
-           (2 `(let ((,bs (head ,big)))
-                 (scons ,(qed (mas a) little bs) (tail ,big))))
-           (3 `(let ((,bs (tail ,big)))
-                 (scons (head ,big) ,(qed (mas a) little bs)))))))))
+           (2 `(let ((,bigsym (head ,big)))
+                 ,(funcall kons mutant `(tail ,big))))
+           (3 `(let ((,bigsym (tail ,big)))
+                 ,(funcall kons `(head ,big) mutant))))))))
+
+(defun econs (ax big head tail)
+  (declare (ignore ax big))
+  (scons head tail))
+
+(defun qed-root (ax little big)
+  (let* ((bigsym  (gensym))
+         (bigform (qf big))
+         (body    (qed ax (qf little) bigsym
+                       (lambda (head tail)
+                         `(econs ,ax ,bigsym ,head ,tail)))))
+    `(let ((,bigsym ,bigform))
+       ,body)))
 
 (defun q10 (a)
   (splash a (spec big)
     (splash spec (ax little)
       (etypecase ax
         (constant-cell +crash+)
-        (constant-atom (qed (constant-atom-num ax) (qf little) (qf big)))
+        (constant-atom (qed-root (constant-atom-num ax) little big))
         (fixnum (case ax
                   (0 +crash+)
                   (1 `(progn
                         ,(qf big)
                         ,(qf little)))
-                  (t (let ((bs (gensym)))
-                       `(let ((,bs ,(qf big)))
-                          ,(qed ax (qf little) bs))))))))))
+                  (t (qed-root ax little big))))))))
 
 (defun q11 (a)
   (declare (ignore a))

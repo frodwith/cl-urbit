@@ -50,6 +50,7 @@
         (setf (gethash key table)
               (make-constant-cell head tail mug)))))
 
+; XX: use noun/sum?
 (defun intern-noun (n &optional mug)
   (if (atomp n)
       (if (typep n 'constant-atom)
