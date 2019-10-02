@@ -11,6 +11,8 @@
                  (:test-file "syntax")
                  (:test-file "interner")
                  (:test-file "noun")
+                 (:test-file "axis-map")
+                 (:test-file "chunker")
                  (:test-file "basic-nock"))))
   :perform (test-op :after (op c)
     (funcall (intern #.(string :run) :prove) c)))

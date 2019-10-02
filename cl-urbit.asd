@@ -23,6 +23,8 @@
                  (:file "context")
                  (:file "data/slimcell")
                  (:file "data/fixnum")
+                 (:file "axis-map")
+                 (:file "chunker")
                  (:file "compiler"))))
   :description "nock runtime and urbit worker process (http://urbit.org)"
   :long-description

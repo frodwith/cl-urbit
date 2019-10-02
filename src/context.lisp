@@ -51,6 +51,9 @@
               (make-constant-cell head tail mug)))))
 
 ; XX: use noun/sum?
+; also, do we have to intern left and right every time?
+; can't we do something with mug/equality?
+; maybe not - equality is still traversal?
 (defun intern-noun (n &optional mug)
   (if (atomp n)
       (if (typep n 'constant-atom)
