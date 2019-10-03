@@ -21,6 +21,7 @@
                  (:file "data/constant-atom")
                  (:file "data/constant-cell")
                  (:file "context")
+                 (:file "data/core")
                  (:file "data/slimcell")
                  (:file "data/fixnum")
                  (:file "axis-map")

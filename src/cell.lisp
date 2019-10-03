@@ -44,7 +44,11 @@
   nil)
 
 (defgeneric learn-constant-cell (a k))
-(defmethod learn-constant-cell ((a t) (k t))
+(defmethod learn-constant-cell (a k)
+  nil)
+
+(defgeneric learn-core (a core))
+(defmethod learn-core (a)
   nil)
 
 (defparameter *print-cell-tail* nil)
@@ -57,3 +61,8 @@
   (let ((*print-cell-tail* t))
     (prin1 tail out))
   (unless *print-cell-tail* (write-char #\] out)))
+
+(defmacro slot-etypecase (obj accessor (name) &body forms)
+  `(let ((,name (,accessor ,obj)))
+     (etypecase ,name
+       ,@forms)))

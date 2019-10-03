@@ -4,9 +4,13 @@
   (:import-from :urbit/equality :teach)
   (:import-from :urbit/formula :formula)
   (:import-from :urbit/context :intern-noun)
-  (:import-from :urbit/cell :cellp :head :tail :learn-head :learn-tail :print-cell)
-  (:import-from :urbit/mug :cached-mug :compute-mug :murmug :learn-mug :mug-cell :mug)
-  (:import-from :urbit/data/constant-cell :constant-cell :constant-cell-head :constant-cell-tail))
+  (:import-from :urbit/cell :cellp :head :tail :learn-head :learn-tail
+                :learn-core :print-cell :slot-etypecase)
+  (:import-from :urbit/mug :cached-mug :compute-mug :murmug :learn-mug :mug
+                :mug-cell)
+  (:import-from :urbit/data/core :core)
+  (:import-from :urbit/data/constant-cell :constant-cell
+                :constant-cell-head :constant-cell-tail))
 
 (in-package :urbit/data/slimcell)
 
@@ -14,7 +18,7 @@
                      (:print-object print-slimcell))
   (head nil :type noun)
   (tail nil :type noun)
-  (meta nil :type (or null mug constant-cell)))
+  (meta nil :type (or null mug core constant-cell)))
 
 (defmethod cellp ((a slimcell))
   t)
@@ -25,74 +29,72 @@
 (defmethod tail ((a slimcell))
   (slimcell-tail a))
 
-(defun in (a &optional mug)
+(defun slin (a &optional mug)
   (let ((i (intern-noun a mug)))
-    (setf (slimcell-head a) (constant-cell-head i))
-    (setf (slimcell-tail a) (constant-cell-tail i))
-    (setf (slimcell-meta a) i)))
+    (learn-constant-cell a i)))
+
+(defmacro smeta (slimcell (name) &body forms)
+  `(slot-etypecase ,slimcell slimcell-meta (,name) ,@forms))
 
 (defmethod formula ((a slimcell))
   (formula
-    (let ((m (slimcell-meta a)))
-      (etypecase m
-        (null (in a))
-        (mug (in a m))
-        (constant-cell m)))))
+    (smeta a (m)
+      (null (slin a))
+      (mug (slin a m))
+      (constant-cell m)
+      (core (slin a (cached-mug m))))))
 
 (defmethod cached-mug ((a slimcell))
-  (let ((m (slimcell-meta a)))
-    (etypecase m
-      (null nil)
-      (mug m)
-      (constant-cell (cached-mug m)))))
+  (smeta a (m)
+    (null nil)
+    (mug m)
+    ((or core constant-cell) (cached-mug m))))
 
 (defmethod compute-mug ((a slimcell))
-  (let ((m (slimcell-meta a)))
-    (etypecase m
-      (null (setf (slimcell-meta a) (mug-cell a)))
-      (mug nil)
-      (constant-cell (compute-mug m)))))
+  (smeta a (m)
+    (null (setf (slimcell-meta a) (mug-cell a)))
+    (mug nil)
+    ((or core constant-cell) (compute-mug m))))
 
 (defmethod learn-mug ((a slimcell) mug)
-  (let ((m (slimcell-meta a)))
-    (etypecase m
-      (null (setf (slimcell-meta a) mug))
-      (mug nil)
-      (constant-cell (learn-mug m mug)))))
+  (smeta a (m)
+    (null (setf (slimcell-meta a) mug))
+    (mug nil)
+    ((or core constant-cell) (learn-mug m mug))))
 
-(defmethod learn-head ((a slimcell) (head t))
+(defmethod learn-head ((a slimcell) head)
   (setf (slimcell-head a) head))
 
-(defmethod learn-tail ((a slimcell) (tail t))
+(defmethod learn-tail ((a slimcell) tail)
   (setf (slimcell-tail a) tail))
 
 (defmethod learn-constant-cell ((a slimcell) (k constant-cell))
+  (setf (slimcell-head a) (constant-cell-head k))
+  (setf (slimcell-tail a) (constant-cell-tail k))
   (setf (slimcell-meta a) k))
 
 (defmethod get-constant-cell ((a slimcell))
-  (let ((m (slimcell-meta a)))
-    (etypecase m
-      (null nil)
-      (mug nil)
-      (constant-cell m))))
+  (smeta a (m)
+    ((or null mug) nil)
+    (core (get-constant-cell m))
+    (constant-cell m)))
 
-(defun teach-meta (a b)
-  (let ((m (slimcell-meta a)))
-    (etypecase m
-      (null nil)
-      (mug (learn-mug b m))
-      (constant-cell (teach m b)))))
+(defun teach-smeta (a b)
+  (smeta a (m)
+    (null nil)
+    (mug (learn-mug b m))
+    ((or core constant-cell) (teach m b))))
 
-(defmethod teach ((a slimcell) (b t))
+(defmethod teach ((a slimcell) b)
   (learn-head b (slimcell-head a))
   (learn-tail b (slimcell-tail a))
-  (teach-meta a b))
+  (teach-smeta a b))
 
 (defmethod unify ((a slimcell) (b slimcell))
   (setf (slimcell-head b) (slimcell-head a))
   (setf (slimcell-tail b) (slimcell-tail a))
-  (teach-meta a b)
-  (teach-meta b a))
+  (teach-smeta a b)
+  (teach-smeta b a))
 
 (defmethod to-noun ((a cons))
   (let* ((head (car a))
