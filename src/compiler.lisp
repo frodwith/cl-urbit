@@ -143,8 +143,14 @@
 
 (defun q9 (a)
   (splash a (frag core)
-    `(let ((a ,(qf core)))
-       (nock a ,(q0 frag)))))
+    (or (na frag)
+        (case frag
+          (0 +crash+)
+          (1 `(let ((a ,(qf core)) (nock a a))))
+          (t (ecase (cap frag)
+               (2 `(kick ,frag ,(qf core)))
+               (3 `(let ((a ,(qf core)))
+                     (nock a ,(q0 frag))))))))))
 
 (defun qed (a little big kons)
   (case a

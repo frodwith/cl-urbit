@@ -29,19 +29,15 @@
 (defmethod tail ((a core))
   (core-tail a))
 
-(defun cin (a &optional mug)
-  (let ((i (intern-noun a mug)))
-    (learn-constant-cell a i)))
-
 (defmacro cmeta (core (name) &body forms)
   `(slot-etypecase ,core core-meta (,name) ,@forms))
 
 (defmethod formula ((a core))
   (formula
     (cmeta a (m)
-      (null (cin a))
-      (mug (cin a m))
-      (constant-cell m))))
+      (constant-cell m)
+      (null (setf (core-meta a) (intern-noun a)))
+      (mug  (setf (core-meta a) (intern-noun a m))))))
 
 (defmethod cached-mug ((a core))
   (cmeta a (m)

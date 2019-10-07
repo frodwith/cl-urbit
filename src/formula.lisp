@@ -14,3 +14,7 @@
 
 (defun nock (subject formula)
   (funcall (formula formula) subject))
+
+(defgeneric battery (core))
+(defmethod battery (core)
+  (error 'exit))

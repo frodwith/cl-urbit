@@ -29,20 +29,16 @@
 (defmethod tail ((a slimcell))
   (slimcell-tail a))
 
-(defun slin (a &optional mug)
-  (let ((i (intern-noun a mug)))
-    (learn-constant-cell a i)))
-
 (defmacro smeta (slimcell (name) &body forms)
   `(slot-etypecase ,slimcell slimcell-meta (,name) ,@forms))
 
 (defmethod formula ((a slimcell))
   (formula
     (smeta a (m)
-      (null (slin a))
-      (mug (slin a m))
       (constant-cell m)
-      (core (slin a (cached-mug m))))))
+      (null (setf (slimcell-meta a) (intern-noun a)))
+      (mug  (setf (slimcell-meta a) (intern-noun a m)))
+      (core (setf (slimcell-meta a) (intern-noun a (cached-mug m)))))))
 
 (defmethod cached-mug ((a slimcell))
   (smeta a (m)
@@ -72,6 +68,13 @@
   (setf (slimcell-head a) (constant-cell-head k))
   (setf (slimcell-tail a) (constant-cell-tail k))
   (setf (slimcell-meta a) k))
+
+(defmethod learn-core ((a slimcell) (c core))
+  (smeta a (m)
+    ((or core constant-cell) nil)
+    ((or null mug) (setf (slimcell-head a) (core-head c))
+                   (setf (slimcell-tail a) (core-tail c))
+                   (setf (slimcell-meta a) c))))
 
 (defmethod get-constant-cell ((a slimcell))
   (smeta a (m)
