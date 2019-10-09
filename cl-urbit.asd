@@ -17,6 +17,7 @@
                  (:file "mug")
                  (:file "formula")
                  (:file "equality")
+                 (:file "axis-map")
                  (:file "data/bigatom")
                  (:file "data/constant-atom")
                  (:file "data/constant-cell")
@@ -24,7 +25,6 @@
                  (:file "data/core")
                  (:file "data/slimcell")
                  (:file "data/fixnum")
-                 (:file "axis-map")
                  (:file "chunker")
                  (:file "compiler"))))
   :description "nock runtime and urbit worker process (http://urbit.org)"

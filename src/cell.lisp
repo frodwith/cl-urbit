@@ -48,7 +48,7 @@
   nil)
 
 (defgeneric learn-core (a core))
-(defmethod learn-core (a)
+(defmethod learn-core (a core)
   nil)
 
 (defparameter *print-cell-tail* nil)

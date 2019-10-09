@@ -2,7 +2,7 @@
   (:use :cl)
   (:import-from :urbit/noun :noun)
   (:import-from :urbit/equality :teach)
-  (:import-from :urbit/formula :formula)
+  (:import-from :urbit/formula :formula :battery)
   (:import-from :urbit/context :intern-noun)
   (:import-from :urbit/cell :cellp :head :tail :learn-head :learn-tail
                 :learn-core :print-cell :slot-etypecase)
@@ -13,11 +13,10 @@
 
 (in-package :urbit/data/core)
 
-(defstruct (core (:constructor make-core (head tail))
+(defstruct (core (:constructor make-core (head tail meta))
                  (:print-object print-core)) 
   (head nil :type constant-cell :read-only t)
   (tail nil :type noun)
-  (battery nil) ; :type battery-info
   (meta nil :type (or null mug constant-cell)))
 
 (defmethod cellp ((a core))
@@ -85,6 +84,9 @@
   (setf (core-tail b) (core-tail a))
   (teach-cmeta a b)
   (teach-cmeta b a))
+
+(defmethod battery ((a core))
+  (core-head a))
 
 (defun print-core (a out)
   (print-cell (core-head a) (core-tail a) out))

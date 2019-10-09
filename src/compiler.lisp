@@ -4,27 +4,57 @@
   (:import-from :urbit/atom :bump)
   (:import-from :urbit/cell :cellp :head :tail)
   (:import-from :urbit/error :exit)
-  (:import-from :urbit/formula :formula :nock)
+  (:import-from :urbit/axis-map :axis-map :lookup :insert)
+  (:import-from :urbit/formula :formula :battery :nock)
   (:import-from :urbit/data/slimcell :scons)
   (:import-from :urbit/data/constant-atom :constant-atom :constant-atom-num)
   (:import-from :urbit/data/constant-cell :constant-cell
                 :constant-cell-head :constant-cell-tail :constant-cell-nock
-                :make-nock-meta :nock-meta-func :nock-meta-form))
+                :make-nock-meta :nock-meta-func :nock-meta-form
+                :make-battery-meta :battery-meta-arms :nock-meta-battery))
 
 (in-package :urbit/compiler)
 
 (defparameter +crash+ '(error 'exit))
 
+(defmacro cache-field (obj accessor &body forms)
+  (let ((objname (gensym)))
+    `(let ((,objname ,obj))
+       (or (,accessor ,objname)
+           (setf (,accessor ,objname) ,@forms)))))
+
 (defmethod formula ((a constant-cell))
-  (let ((meta (nock-meta a)))
-    (or (nock-meta-func meta)
-        (setf (nock-meta-func meta)
-              ; ignore unused (i.e. quote only function)
-              ; delete unreachable is note (code after crash) (SBCL ONLY)
-              (let ((form `(lambda (a)
-                             (declare (ignorable a) (sb-ext:muffle-conditions sb-ext:compiler-note))
-                             ,(qcell a))))
-                (compile nil form))))))
+  (cache-field (nock-meta a) nock-meta-func
+    (compile nil `(lambda (a)
+                    (declare (ignorable a) ; ignore unused subject (i.e. [1 1])
+                             ; delete unreachable note (code after crash) (SBCL ONLY)
+                             (sb-ext:muffle-conditions sb-ext:compiler-note))
+                    ,(qcell a)))))
+
+(defun compile-arm (battery axis)
+  (let ((body (qcell (frag battery axis))))
+    (compile nil `(lambda (subject axis)
+                    (declare (ignore axis)
+                             (sb-ext:muffle-conditions sb-ext:compiler-note))
+                    (let ((a (make-core (quote ,battery) (tail subject))))
+                      (locally (ignorable a))
+                      ,@body)))))
+
+(defun frag (k axis)
+  (declare (type constant-cell k))
+  (let ((axis (etypecase axis
+                (fixnum axis)
+                (constant-atom (constant-atom-num axis)))))
+   (if (zerop axis)
+      (error 'exit)
+      (loop until (= axis 1)
+            with c = k
+            unless (typep c 'constant-cell)
+              do (error 'exit)
+            do (setq c (if (= 2 (cap axis))
+                           (constant-cell-head c)
+                           (constant-cell-tail c)))
+            do (setq axis (mas axis))))))
 
 (defmacro split (cell-expr (head tail) &body forms)
   (let ((s (gensym)))
@@ -40,29 +70,28 @@
            (split ,s (,head ,tail) ,@forms)))))
 
 (defun nock-meta (a)
-  (or (constant-cell-nock a)
-      (setf (constant-cell-nock a)
-            (make-nock-meta
-              (split a (op ar)
-                (etypecase op
-                  (constant-atom +crash+)
-                  (constant-cell (qcons op ar))
-                  (fixnum
-                    (case op
-                      (0  (q0  ar))
-                      (1  (q1  ar))
-                      (2  (q2  ar))
-                      (3  (q3  ar))
-                      (4  (q4  ar))
-                      (5  (q5  ar))
-                      (6  (q6  ar))
-                      (7  (q7  ar))
-                      (8  (q8  ar))
-                      (9  (q9  ar))
-                      (10 (q10 ar))
-                      (11 (q11 ar))
-                      (12 (q12 ar))
-                      (t +crash+)))))))))
+  (cache-field a constant-cell-nock
+    (make-nock-meta
+      (split a (op ar)
+        (etypecase op
+          (constant-atom +crash+)
+          (constant-cell (qcons op ar))
+          (fixnum
+            (case op
+              (0  (q0  ar))
+              (1  (q1  ar))
+              (2  (q2  ar))
+              (3  (q3  ar))
+              (4  (q4  ar))
+              (5  (q5  ar))
+              (6  (q6  ar))
+              (7  (q7  ar))
+              (8  (q8  ar))
+              (9  (q9  ar))
+              (10 (q10 ar))
+              (11 (q11 ar))
+              (12 (q12 ar))
+              (t +crash+))))))))
 
 (defun qf (a)
   (etypecase a
@@ -140,6 +169,20 @@
   (splash a (one two)
     `(let ((a (scons ,(qf one) a)))
        ,(qf two))))
+
+(defun constant-cell-battery (battery)
+  (cache-field (nock-meta battery) nock-meta-battery
+    (make-battery-meta nil nil)))
+
+(defun kick (axis core)
+  (let* ((batt (battery core))
+         (arms (battery-meta-arms (constant-cell-battery batt)))
+         (arm  (or (lookup arms axis)
+                   (let ((func (compile-arm batt axis)))
+                     (setf (battery-meta-arms batt) (insert arms axis func))
+                     func))))
+    (format t "kicking axis ~a in battery ~a" axis (urbit/mug::mug batt))
+    (funcall arm core axis)))
 
 (defun q9 (a)
   (splash a (frag core)

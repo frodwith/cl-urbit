@@ -13,6 +13,8 @@
   (left nil :type (or null node) :read-only t)
   (right nil :type (or null node) :read-only t))
 
+(deftype axis-map () '(or null node))
+
 (defun value (node)
   (and node (node-value node)))
 

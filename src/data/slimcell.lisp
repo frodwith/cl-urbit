@@ -8,7 +8,7 @@
                 :learn-core :print-cell :slot-etypecase)
   (:import-from :urbit/mug :cached-mug :compute-mug :murmug :learn-mug :mug
                 :mug-cell)
-  (:import-from :urbit/data/core :core)
+  (:import-from :urbit/data/core :core :core-head :core-tail :make-core)
   (:import-from :urbit/data/constant-cell :constant-cell
                 :constant-cell-head :constant-cell-tail))
 
@@ -75,6 +75,18 @@
     ((or null mug) (setf (slimcell-head a) (core-head c))
                    (setf (slimcell-tail a) (core-tail c))
                    (setf (slimcell-meta a) c))))
+
+(defun find-battery (a &optional mug)
+  (let ((k (intern-noun (slimcell-head a))))
+    (setf (slimcell-head a) k)
+    (setf (slimcell-meta a) (make-core k (slimcell-tail a) mug))
+    k))
+
+(defmethod battery ((a slimcell))
+  (smeta a (m)
+    (null (find-battery a))
+    (mug (find-battery a m))
+    ((or core constant-cell) (battery m))))
 
 (defmethod get-constant-cell ((a slimcell))
   (smeta a (m)

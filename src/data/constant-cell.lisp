@@ -2,6 +2,7 @@
   (:use :cl)
   (:import-from :urbit/noun :noun)
   (:import-from :urbit/error :oops)
+  (:import-from :urbit/axis-map :axis-map)
   (:import-from :urbit/mug :mug :cached-mug :murmug-two :learn-mug)
   (:import-from :urbit/cell :cellp :head :tail
                 :get-constant-cell :learn-constant-cell :print-cell)
@@ -10,9 +11,15 @@
 
 (in-package :urbit/data/constant-cell)
 
+(defstruct (battery-meta (:constructor make-battery-meta (discovery match)))
+  (arms nil :type axis-map)
+  (discovery nil); :type hashboard-entry)
+  (match nil)); :type registry-entry))
+
 (defstruct (nock-meta (:constructor make-nock-meta (form)))
   (form nil :type (or list symbol))
-  (func nil :type (or null (function (noun) noun))))
+  (func nil :type (or null (function (noun) noun)))
+  (battery nil :type (or null battery-meta)))
 
 (defstruct (constant-cell (:constructor make-constant-cell (head tail mug))
                           (:print-object print-constant-cell))
