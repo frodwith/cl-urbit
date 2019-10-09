@@ -3,7 +3,7 @@
   (:import-from :urbit/noun :noun)
   (:import-from :urbit/error :oops)
   (:import-from :urbit/axis-map :axis-map)
-  (:import-from :urbit/mug :mug :cached-mug :murmug-two :learn-mug)
+  (:import-from :urbit/mug :mug :compute-mug :cached-mug :murmug-two :learn-mug)
   (:import-from :urbit/cell :cellp :head :tail
                 :get-constant-cell :learn-constant-cell :print-cell)
   (:import-from :urbit/data/constant-atom :constant-atom)

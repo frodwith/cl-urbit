@@ -4,9 +4,11 @@
   (:import-from :urbit/atom :bump)
   (:import-from :urbit/cell :cellp :head :tail)
   (:import-from :urbit/error :exit)
+  (:import-from :urbit/mug :cached-mug)
   (:import-from :urbit/axis-map :axis-map :lookup :insert)
   (:import-from :urbit/formula :formula :battery :nock)
   (:import-from :urbit/data/slimcell :scons)
+  (:import-from :urbit/data/core :make-core)
   (:import-from :urbit/data/constant-atom :constant-atom :constant-atom-num)
   (:import-from :urbit/data/constant-cell :constant-cell
                 :constant-cell-head :constant-cell-tail :constant-cell-nock
@@ -31,14 +33,19 @@
                              (sb-ext:muffle-conditions sb-ext:compiler-note))
                     ,(qcell a)))))
 
+(defmethod battery ((a constant-cell))
+  (constant-cell-head a))
+
 (defun compile-arm (battery axis)
-  (let ((body (qcell (frag battery axis))))
+  (let ((body (qcell (frag battery (mas axis)))))
     (compile nil `(lambda (subject axis)
                     (declare (ignore axis)
                              (sb-ext:muffle-conditions sb-ext:compiler-note))
-                    (let ((a (make-core (quote ,battery) (tail subject))))
-                      (locally (ignorable a))
-                      ,@body)))))
+                    (let ((a (make-core (quote ,battery)
+                                        (tail subject)
+                                        (cached-mug subject))))
+                      (declare (ignorable a))
+                      ,body)))))
 
 (defun frag (k axis)
   (declare (type constant-cell k))
@@ -54,7 +61,8 @@
             do (setq c (if (= 2 (cap axis))
                            (constant-cell-head c)
                            (constant-cell-tail c)))
-            do (setq axis (mas axis))))))
+            do (setq axis (mas axis))
+            finally (return c)))))
 
 (defmacro split (cell-expr (head tail) &body forms)
   (let ((s (gensym)))
@@ -174,14 +182,14 @@
   (cache-field (nock-meta battery) nock-meta-battery
     (make-battery-meta nil nil)))
 
-(defun kick (axis core)
-  (let* ((batt (battery core))
-         (arms (battery-meta-arms (constant-cell-battery batt)))
+(defun pull (axis core)
+  (let* ((noun (battery core))
+         (meta (constant-cell-battery noun))
+         (arms (battery-meta-arms meta))
          (arm  (or (lookup arms axis)
-                   (let ((func (compile-arm batt axis)))
-                     (setf (battery-meta-arms batt) (insert arms axis func))
+                   (let ((func (compile-arm noun axis)))
+                     (setf (battery-meta-arms meta) (insert arms axis func))
                      func))))
-    (format t "kicking axis ~a in battery ~a" axis (urbit/mug::mug batt))
     (funcall arm core axis)))
 
 (defun q9 (a)
@@ -191,7 +199,7 @@
           (0 +crash+)
           (1 `(let ((a ,(qf core)) (nock a a))))
           (t (ecase (cap frag)
-               (2 `(kick ,frag ,(qf core)))
+               (2 `(pull ,frag ,(qf core)))
                (3 `(let ((a ,(qf core)))
                      (nock a ,(q0 frag))))))))))
 
