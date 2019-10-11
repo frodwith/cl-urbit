@@ -12,6 +12,7 @@
                  (:test-file "interner")
                  (:test-file "noun")
                  (:test-file "axis-map")
+                 (:test-file "kernels")
                  (:test-file "chunker")
                  (:test-file "basic-nock"))))
   :perform (test-op :after (op c)

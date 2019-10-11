@@ -2,6 +2,7 @@
   (:use :cl)
   (:import-from :urbit/error :oops)
   (:import-from :urbit/atom :atomp :natom)
+  (:import-from :urbit/math :cap :mas)
   (:import-from :urbit/cell :cell :cellp :head :tail))
 
 (in-package :urbit/noun)
@@ -23,6 +24,18 @@
 
 (defun noun (&rest args)
   (to-noun args))
+
+(defun frag (noun axis)
+  (declare (type integer axis))
+  (if (zerop axis)
+      (error 'exit)
+      (loop until (= axis 1)
+            with o = noun
+            do (setq o (if (= 2 (cap axis))
+                           (head o)
+                           (tail o)))
+            do (setq axis (mas axis))
+            finally (return o))))
 
 ; explicit stack traversal of a noun
 ;  quick should give an answer with no further noun traversal, or nil
