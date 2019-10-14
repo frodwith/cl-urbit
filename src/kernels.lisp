@@ -5,7 +5,7 @@
 
 (in-package :urbit/kernels)
 
-(defstruct (kernel (:constructor make-kernel (name &optional hooks)))
+(defstruct kernel 
   (name nil :type keyword)
   (hooks nil :type (or null hash-table)))
 
@@ -65,4 +65,3 @@
                   (error 'oops))
               (frag core (or (kernel-parent-axis kernel)
                              (error 'oops)))))))
-
