@@ -8,7 +8,7 @@
 (in-package :urbit/tests/kernels)
 (enable-brackets)
 
-(plan 13)
+(plan 4)
 
 (let* ((k141  (root
                 :k141 141
