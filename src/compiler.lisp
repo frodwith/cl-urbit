@@ -1,5 +1,6 @@
 (defpackage #:urbit/compiler
   (:use :cl)
+  (:import-from :urbit/util :cache-field)
   (:import-from :urbit/math :cap :mas)
   (:import-from :urbit/atom :bump)
   (:import-from :urbit/cell :cellp :head :tail)
@@ -18,12 +19,6 @@
 (in-package :urbit/compiler)
 
 (defparameter +crash+ '(error 'exit))
-
-(defmacro cache-field (obj accessor &body forms)
-  (let ((objname (gensym)))
-    `(let ((,objname ,obj))
-       (or (,accessor ,objname)
-           (setf (,accessor ,objname) ,@forms)))))
 
 (defmethod formula ((a constant-cell))
   (cache-field (nock-meta a) nock-meta-func
