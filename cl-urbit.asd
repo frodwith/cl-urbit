@@ -22,6 +22,7 @@
                  (:file "data/bigatom")
                  (:file "data/constant-atom")
                  (:file "data/constant-cell")
+                 (:file "util")
                  (:file "context")
                  (:file "data/core")
                  (:file "data/slimcell")

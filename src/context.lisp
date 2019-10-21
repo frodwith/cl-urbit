@@ -1,12 +1,15 @@
 (defpackage #:urbit/context
   (:use :cl)
-  (:import-from :urbit/util :cache-hash)
   (:import-from :urbit/noun :noun)
+  (:import-from :urbit/error :exit)
+  (:import-from :urbit/equality :same)
+  (:import-from :urbit/util :cache-hash)
   (:import-from :urbit/atom :atomp :learn-integer :to-integer)
   (:import-from :urbit/cell :learn-constant-cell :get-constant-cell :head :tail)
-  (:import-from :urbit/kernels :kernel :static-kernel :hooks :root :static :child)
-  (:import-from :urbit/formula :formula)
-  (:import-from :urbit/data/constant-cell :make-constant-cell)
+  (:import-from :urbit/kernels :kernel :child-kernel :static-kernel :parent-core
+                               :hooks :root :static :child)
+  (:import-from :urbit/formula :formula :battery)
+  (:import-from :urbit/data/constant-cell :make-constant-cell :constant-cell)
   (:import-from :urbit/data/constant-atom :make-constant-atom :constant-atom))
 
 (in-package :urbit/context)
@@ -17,7 +20,7 @@
   `(let ((*context* ,c))
      ,@body))
 
-(defstruct (context (:constructor cons-context (atoms cells roots)))
+(defstruct (context (:constructor cons-context (atoms cells warm)))
   (atoms nil :type hash-table)
   (cells nil :type hash-table)
   (warm  nil :type hash-table))
@@ -69,7 +72,7 @@
   (children nil :type hash-table)
   (stencils nil :type hash-table))
 
-(defun make-warm-node (kernel parent)
+(defun make-warm-node (kernel &optional parent)
   (cons-warm kernel parent
              (make-hash-table :test 'equal :weakness :value)
              (make-hash-table :test 'equal :weakness :value)))
@@ -95,21 +98,32 @@
             (static name parent phooks)
             (child name axis parent phooks))))))
 
-(defstruct stencil ((:constructor make-stencil (kernel noun parent)))
+(defstruct (stencil (:constructor make-stencil (node noun parent)))
   (node nil :type warm-node)
   (noun nil :type constant-cell)
   (parent nil :type (or null stencil)))
 
 (defun find-stencil (node core)
   (let ((kernel (warm-node-kernel node)))
-    (multiple-value-bind (noun &optional parent)
+    (multiple-value-bind (noun parent)
       (etypecase kernel
         (static-kernel (intern-noun core))
         (child-kernel  (values (battery core)
-                               (stencil (parent-core kernel core)))))
+                               (find-stencil 
+                                 (warm-node-parent node)
+                                 (parent-core kernel core)))))
       (cache-hash (if parent (cons noun parent) noun)
                   (warm-node-stencils node)
                   (make-stencil node noun parent)))))
+
+; XX - move - cores.lisp? (battery, stencil stuff...)
+(defgeneric cached-stencil (core))
+(defmethod cached-stencil (obj) 
+  nil)
+
+(defgeneric learn-stencil (core stencil))
+(defmethod learn-stencil (obj stencil)
+  nil)
 
 (defun check-inner (stencil core)
   (let ((cached (cached-stencil core)))
@@ -117,16 +131,15 @@
         (eq cached stencil)
         (let ((kernel (warm-node-kernel (stencil-node stencil)))
               (noun   (stencil-noun stencil)))
-          (and (etypecase kernel
-                 (static-kernel (same noun core))
-                 (child-kernel
-                   (and (same noun (head core))
-                        (check-inner (stencil-parent stencil)
-                                     (parent-core kernel core)))))
-               (progn
-                 (learn-stencil core stencil)
-                 t))))))
+          (when (etypecase kernel
+                  (static-kernel (same noun core))
+                  (child-kernel
+                    (and (same noun (head core))
+                         (check-inner (stencil-parent stencil)
+                                      (parent-core kernel core)))))
+              (learn-stencil core stencil)
+              t)))))
 
 (defun check-stencil (stencil core)
   (handler-case (check-inner stencil core)
-    (exit (e) nil)))
+    (exit () nil)))

@@ -48,6 +48,9 @@
 (defmethod kernel-parent-axis ((c child-kernel))
   (child-kernel-axis c))
 
+(defun parent-core (kernel core)
+  (frag core (kernel-parent-axis kernel)))
+
 ; list of (keyword . function)
 (defun hooks (pairs)
   (loop with m = (make-hash-table :test 'eq)
@@ -60,8 +63,7 @@
          (hook (and hooks (gethash name hooks))))
     (if hook
         (funcall hook core)
-        (hook name
-              (or (kernel-parent kernel)
-                  (error 'oops))
-              (frag core (or (kernel-parent-axis kernel)
-                             (error 'oops)))))))
+        (typecase kernel
+          (root-kernel (error 'oops))
+          (otherwise (hook name (kernel-parent kernel)
+                           (parent-core kernel core)))))))
