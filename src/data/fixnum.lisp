@@ -1,6 +1,7 @@
 (defpackage urbit/data/fixnum
   (:use :cl)
   (:import-from :urbit/mug :murmug :compute-mug)
+  (:import-from :urbit/interner :unique)
   (:import-from :urbit/noun :to-noun)
   (:import-from :urbit/atom :atomp :bump :to-integer)
   (:import-from :urbit/equality :atom=))
@@ -11,6 +12,9 @@
   t)
 
 (defmethod to-integer ((a fixnum))
+  a)
+
+(defmethod unique ((a fixnum))
   a)
 
 (defmethod bump ((a fixnum))

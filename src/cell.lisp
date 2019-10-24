@@ -27,6 +27,25 @@
 (defmethod head ((a t))
   (bad-cell a))
 
+; unconditionally returned interned head (core batteries)
+(defgeneric constant-head (a))
+(defmethod constant-head ((a t))
+  (bad-cell a))
+
+; unconditionally returned interned version of this cell
+(defgeneric constant-cell (a))
+(defmethod constant-cell (a)
+  (bad-cell a))
+
+(defgeneric cached-constant-cell (a))
+(defmethod cached-constant-cell (a)
+  nil)
+
+(defgeneric learn-constant-cell (a k))
+(defmethod learn-constant-cell (a k)
+  nil)
+
+
 (defgeneric tail (a))
 (defmethod tail ((a t))
   (bad-cell a))
@@ -37,14 +56,6 @@
 
 (defgeneric learn-tail (a tal))
 (defmethod learn-tail ((a t) (tl t))
-  nil)
-
-(defgeneric get-constant-cell (a))
-(defmethod get-constant-cell ((a t))
-  nil)
-
-(defgeneric learn-constant-cell (a k))
-(defmethod learn-constant-cell (a k)
   nil)
 
 (defgeneric learn-core (a core))

@@ -1,6 +1,7 @@
 (defpackage #:urbit/data/bigatom
   (:use :cl)
   (:import-from :urbit/noun :to-noun)
+  (:import-from :urbit/context :context-intern)
   (:import-from :urbit/mug :mug :cached-mug :compute-mug :murmug :learn-mug)
   (:import-from :urbit/atom :atomp :bump :to-integer :learn-integer)
   (:import-from :urbit/equality :teach :atom=))
@@ -10,7 +11,7 @@
 (defstruct (bigatom (:constructor make-bigatom (num))
                     (:print-object print-bigatom))
   (num nil :type bignum)
-  (mug nil :type (or null mug)))
+  (meta nil :type (or null mug constant-atom)))
 
 (defmethod atomp ((a bigatom))
   t)
@@ -18,10 +19,18 @@
 (defmethod to-integer ((a bigatom))
   (bigatom-num a))
 
+(defmethod unique ((a bigatom))
+  (etypecase (bigatom-meta a)
+    (null (setf (bigatom-meta a))
+      
+      )
+    (mug)
+    (constant-atom)))
+
 (defmethod bump ((a bigatom))
   (make-bigatom (1+ (bigatom-num a))))
 
-(defmethod learn-integer ((a bigatom) i)
+(defmethod learn-unique ((a bigatom) i)
   (setf (bigatom-num a) i))
 
 (defmethod learn-mug ((a bigatom) m)

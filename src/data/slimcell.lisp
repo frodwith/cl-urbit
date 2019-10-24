@@ -3,9 +3,9 @@
   (:import-from :urbit/noun :to-noun :noun)
   (:import-from :urbit/equality :teach)
   (:import-from :urbit/formula :formula)
-  (:import-from :urbit/context :intern-noun)
+  (:import-from :urbit/context :context-intern)
   (:import-from :urbit/cell :cellp :head :tail :learn-head :learn-tail
-                :learn-core :print-cell :slot-etypecase)
+                :constant-head :learn-core :print-cell :slot-etypecase)
   (:import-from :urbit/mug :cached-mug :compute-mug :murmug :learn-mug :mug
                 :mug-cell)
   (:import-from :urbit/data/core :core :core-head :core-tail :make-core)
@@ -77,16 +77,16 @@
                    (setf (slimcell-meta a) c))))
 
 (defun find-battery (a &optional mug)
-  (let ((k (intern-noun (slimcell-head a))))
+  (let ((k (context-intern (slimcell-head a))))
     (setf (slimcell-head a) k)
     (setf (slimcell-meta a) (make-core k (slimcell-tail a) mug))
     k))
 
-(defmethod battery ((a slimcell))
+(defmethod constant-head ((a slimcell))
   (smeta a (m)
     (null (find-battery a))
     (mug (find-battery a m))
-    ((or core constant-cell) (battery m))))
+    ((or core constant-cell) (constant-head m))))
 
 (defmethod get-constant-cell ((a slimcell))
   (smeta a (m)

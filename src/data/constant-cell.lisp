@@ -4,8 +4,8 @@
   (:import-from :urbit/error :oops)
   (:import-from :urbit/axis-map :axis-map)
   (:import-from :urbit/mug :mug :compute-mug :cached-mug :murmug-two :learn-mug)
-  (:import-from :urbit/cell :cellp :head :tail
-                :get-constant-cell :learn-constant-cell :print-cell)
+  (:import-from :urbit/cell :cellp :head :tail :print-cell
+                :get-constant-cell :learn-constant-cell :constant-head)
   (:import-from :urbit/data/constant-atom :constant-atom)
   (:import-from :urbit/equality :teach))
 
@@ -32,6 +32,9 @@
   t)
 
 (defmethod head ((a constant-cell))
+  (constant-cell-head a))
+
+(defmethod constant-head ((a constant-cell))
   (constant-cell-head a))
 
 (defmethod tail ((a constant-cell))

@@ -2,7 +2,7 @@
   (:use :cl)
   (:import-from :urbit/noun :noun)
   (:import-from :urbit/equality :teach)
-  (:import-from :urbit/formula :formula :battery)
+  (:import-from :urbit/formula :formula)
   (:import-from :urbit/context :intern-noun)
   (:import-from :urbit/cell :cellp :head :tail :learn-head :learn-tail
                 :learn-core :print-cell :slot-etypecase)
@@ -23,6 +23,9 @@
   t)
 
 (defmethod head ((a core))
+  (core-head a))
+
+(defmethod constant-head ((a core))
   (core-head a))
 
 (defmethod tail ((a core))
@@ -84,9 +87,6 @@
   (setf (core-tail b) (core-tail a))
   (teach-cmeta a b)
   (teach-cmeta b a))
-
-(defmethod battery ((a core))
-  (core-head a))
 
 (defun print-core (a out)
   (print-cell (core-head a) (core-tail a) out))
