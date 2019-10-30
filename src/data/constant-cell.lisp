@@ -41,9 +41,7 @@
   (constant-cell-tail a))
 
 (defmethod compute-mug ((a constant-cell))
-  (setf (constant-cell-mug a)
-        (murmug-two (mug (constant-cell-head a))
-                    (mug (constant-cell-tail a)))))
+  (setf (constant-cell-mug a) (mug-cell a)))
 
 (defmethod cached-mug ((a constant-cell))
   (constant-cell-mug a))

@@ -1,12 +1,7 @@
-(defpackage #:urbit/atom
-  (:use :cl)
-  (:import-from :urbit/error :oops))
+(in-package #:urbit/atom)
 
-(in-package :urbit/atom)
-
-(defgeneric atomp (a))
-(defmethod atomp ((a t))
-  nil)
+(defgeneric atomp (a)
+  (:method (obj) nil))
 
 (deftype natom () `(satisfies atomp))
 

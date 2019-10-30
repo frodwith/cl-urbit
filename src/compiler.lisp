@@ -20,16 +20,23 @@
 
 (defparameter +crash+ '(error 'exit))
 
-(defmethod formula ((a constant-cell))
-  (cache-field (nock-meta a) nock-meta-func
-    (compile nil `(lambda (a)
-                    (declare (ignorable a) ; ignore unused subject (i.e. [1 1])
-                             ; delete unreachable note (code after crash) (SBCL ONLY)
-                             (sb-ext:muffle-conditions sb-ext:compiler-note))
-                    ,(qcell a)))))
+(defun crash-fn (a)
+  (declare (ignore a))
+  (error 'exit))
 
-(defmethod battery ((a constant-cell))
-  (constant-cell-head a))
+(defun formula (noun)
+  (if (atomp noun)
+      #'crash-fn
+      (let ((u (unique noun)))
+        (cache-field (nock-meta u) nock-meta-func
+          (compile nil `(lambda (a)
+                          (declare (ignorable a) ; ignore unused subject (i.e. [1 1])
+                              ; delete unreachable note (code after crash) (SBCL ONLY)
+                              (sb-ext:muffle-conditions sb-ext:compiler-note))
+                          ,(qcell u)))))))
+
+(defun nock (subject formula)
+  (funcall (formula formula) subject))
 
 (defun compile-arm (battery axis)
   (let ((body (qcell (frag battery (mas axis)))))
@@ -178,7 +185,7 @@
     (make-battery-meta nil nil)))
 
 (defun pull (axis core)
-  (let* ((noun (battery core))
+  (let* ((noun (unique-head core))
          (meta (constant-cell-battery noun))
          (arms (battery-meta-arms meta))
          (arm  (or (lookup arms axis)

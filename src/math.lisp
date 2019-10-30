@@ -1,8 +1,4 @@
-(defpackage #:urbit/math
-  (:use :cl)
-  (:import-from :urbit/error :exit))
-
-(in-package :urbit/math)
+(in-package #:urbit/math)
 
 ; these all work on regular lisp numbers, not atoms.
 (defun mask (bits)

@@ -1,10 +1,3 @@
-(defpackage #:urbit/equality
-  (:use :cl)
-  (:import-from :urbit/mug :cached-mug)
-  (:import-from :urbit/atom :atomp :to-integer)
-  (:import-from :urbit/cell :cellp :head :tail :get-constant-cell)
-  (:export :same))
-
 (in-package :urbit/equality)
 
 ; tell an equal object everything you know
@@ -38,8 +31,8 @@
           (if (atomp b)
               (if (atom= a b) 'yes 'no)
               'no)
-          (let ((ka (get-constant-cell a))
-                (kb (get-constant-cell b)))
+          (let ((ka (cached-unique a))
+                (kb (cached-unique b)))
             (if (and ka kb)
                 (if (eq ka kb) 'yes 'no)
                 (let ((ca (cached-mug a))

@@ -1,17 +1,13 @@
-(defpackage #:urbit/data/bigatom
-  (:use :cl)
-  (:import-from :urbit/noun :to-noun)
-  (:import-from :urbit/context :context-intern)
-  (:import-from :urbit/mug :mug :cached-mug :compute-mug :murmug :learn-mug)
-  (:import-from :urbit/atom :atomp :bump :to-integer :learn-integer)
-  (:import-from :urbit/equality :teach :atom=))
-
-(in-package :urbit/data/bigatom)
+(in-package #:urbit/data/bigatom)
 
 (defstruct (bigatom (:constructor make-bigatom (num))
                     (:print-object print-bigatom))
   (num nil :type bignum)
   (meta nil :type (or null mug constant-atom)))
+
+(defmacro bcase (bigatom (name) &body clauses)
+  `(meta-case (bigatom-meta ,bigatom) (,name)
+     ,@clauses))
 
 (defmethod atomp ((a bigatom))
   t)
@@ -19,28 +15,47 @@
 (defmethod to-integer ((a bigatom))
   (bigatom-num a))
 
-(defmethod unique ((a bigatom))
-  (etypecase (bigatom-meta a)
-    (null (setf (bigatom-meta a))
-      
-      )
-    (mug)
-    (constant-atom)))
+(defmethod cached-unique ((a bigatom))
+  (bcase a (meta)
+    ((or null mug) nil)
+    (constant-atom meta)))
+
+(defmethod compute-unique ((a bigatom))
+  (bcase a (meta)
+    (null (unique-integer (bigatom-num a)))
+    (mug (unique-integer (bigatom-num a) meta))))
+
+(defmethod learn-unique ((a bigatom) (k constant-atom))
+  (bcase a (meta)
+    (null (setf (bigatom-meta a) k)
+          (setf (bigatom-num a) (constant-atom-num k)))
+    (mug (learn-mug k meta)
+         (setf (bigatom-meta a) k)
+         (setf (bigatom-num a) (constant-atom-num k)))
+    (constant-atom nil)))
+
+(defmethod learn-integer ((a bigatom) i)
+  (bcase a (meta)
+    ((or null mug) (setf (bigatom-num a) i))
+    (constant-atom nil)))
 
 (defmethod bump ((a bigatom))
   (make-bigatom (1+ (bigatom-num a))))
 
-(defmethod learn-unique ((a bigatom) i)
-  (setf (bigatom-num a) i))
-
-(defmethod learn-mug ((a bigatom) m)
-  (setf (bigatom-mug a) m))
-
 (defmethod cached-mug ((a bigatom))
-  (bigatom-mug a))
+  (bcase a (meta)
+    (null nil)
+    (mug meta)
+    (constant-atom (constant-atom-mug meta))))
 
 (defmethod compute-mug ((a bigatom))
-  (setf (bigatom-mug a) (murmug (bigatom-num a))))
+  (murmug (bigatom-num a)))
+
+(defmethod learn-mug ((a bigatom) (fixnum m))
+  (bcase a (meta)
+    (null (setf (bigatom-meta a) m))
+    (mug nil)
+    (constant-atom (learn-mug meta m))))
 
 (defmethod atom= ((a bigatom) (b bigatom))
   (when (= (bigatom-num a) (bigatom-num b))
@@ -51,17 +66,12 @@
           (setf (bigatom-mug a) (bigatom-mug b))))
     t))
 
-(defmethod teach ((a bigatom) (b t))
-  (learn-integer b (bigatom-num a))
-  (when (bigatom-mug a)
-    (learn-mug b (bigatom-mug a))))
-
-(defmethod unify ((a bigatom) (b bigatom))
-  (setf (bigatom-num b) (bigatom-num a))
-  (if (bigatom-mug a)
-      (setf (bigatom-mug b) (bigatom-mug a))
-      (when (bigatom-mug b)
-        (setf (bigatom-mug a) (bigatom-mug b)))))
+(defmethod teach ((a bigatom) b)
+  (bcase a (meta)
+    (null nil)
+    (mug (learn-mug b (bigatom-mug a)))
+    (constant-atom (teach meta b)))
+  (learn-integer b (bigatom-num a)))
 
 (defmethod to-noun ((a bignum))
   (make-bigatom a))

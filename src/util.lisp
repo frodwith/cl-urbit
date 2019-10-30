@@ -1,7 +1,4 @@
-(defpackage #:urbit/util
-  (:use :cl))
-
-(in-package :urbit/util)
+(in-package #:urbit/util)
 
 (defmacro cachef (accessor-form &body builder-forms)
   `(or ,accessor-form
@@ -18,3 +15,8 @@
     `(let ((,keyname ,key)
            (,tablename ,table))
        (cachef (gethash ,keyname ,tablename) ,@builder-forms))))
+
+(defmacro slot-etypecase (obj accessor (name) &body forms)
+  `(let ((,name (,accessor ,obj)))
+     (etypecase ,name
+       ,@forms)))

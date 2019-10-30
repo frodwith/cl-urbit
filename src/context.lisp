@@ -1,9 +1,4 @@
-(defpackage #:urbit/context
-  (:use :cl :urbit/interner)
-  (:import-from :urbit/kernels :warm-root :make-warm-table)
-  (:export :make-context :with-context :context-intern :context-warm))
-
-(in-package :urbit/context)
+(in-package #:urbit/context)
 
 (defparameter *context* nil)
 
@@ -18,8 +13,13 @@
 (defun make-context ()
   (cons-context (make-noun-interner) (make-warm-table)))
 
-(defun context-intern (noun &optional mug)
-  (intern-with (context-interner *context*) noun mug))
+(defun unique-cons (head tail &optional mug)
+  (hash-cons (context-interner *context*) head tail mug))
+
+(defun unique-integer (i &optional mug)
+  (find-integer (context-interner *context*) i mug))
 
 (defun context-warm (root-name root-constant &optional hooks)
   (warm-root (context-warm-tree *context*) root-name root-constant hooks))
+
+

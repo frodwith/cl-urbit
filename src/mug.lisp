@@ -1,35 +1,12 @@
-(defpackage #:urbit/mug
-  (:use :cl)
-  (:import-from :murmurhash :murmurhash)
-  (:import-from :urbit/error :oops)
-  (:import-from :urbit/noun :sum :noun)
-  (:import-from :urbit/cell :cell)
-  (:import-from :urbit/atom :atomp)
-  (:import-from :urbit/math :mix :end :rsh))
-
-(in-package :urbit/mug)
+(in-package #:urbit/mug)
 
 (deftype mug () '(unsigned-byte 31))
 
-(defgeneric cached-mug (a))
-(defmethod cached-mug ((a t))
-  nil)
-
-(defgeneric compute-mug (a))
-(defmethod compute-mug ((a t))
-  (error 'oops))
-
-(defgeneric learn-mug (a m))
-(defmethod learn-mug (a m)
-  nil)
+(defnoun-meta mug)
 
 ; forcing to single value context (working around values too complex to check)
 (defmacro one (&body body)
   `(nth-value 0 ,@body))
-
-(defun mug (a)
-  (declare (type noun a))
-  (the mug (one (or (cached-mug a) (compute-mug a)))))
 
 (defun murmug (key)
   (declare (type integer key))

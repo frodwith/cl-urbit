@@ -1,9 +1,4 @@
-(defpackage #:urbit/cell
-  (:use :cl)
-  (:import-from :urbit/atom :atomp :bump)
-  (:import-from :urbit/error :exit :oops))
-
-(in-package :urbit/cell)
+(in-package #:urbit/cell)
 
 (defgeneric cellp (a))
 (defmethod cellp ((a t))
@@ -72,8 +67,3 @@
   (let ((*print-cell-tail* t))
     (prin1 tail out))
   (unless *print-cell-tail* (write-char #\] out)))
-
-(defmacro slot-etypecase (obj accessor (name) &body forms)
-  `(let ((,name (,accessor ,obj)))
-     (etypecase ,name
-       ,@forms)))

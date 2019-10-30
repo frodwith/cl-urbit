@@ -3,9 +3,10 @@
   (:import-from :urbit/noun :noun)
   (:import-from :urbit/equality :teach)
   (:import-from :urbit/formula :formula)
+  (:import-from :urbit/util :slot-etypecase)
   (:import-from :urbit/context :intern-noun)
   (:import-from :urbit/cell :cellp :head :tail :learn-head :learn-tail
-                :learn-core :print-cell :slot-etypecase)
+                :learn-core :print-cell)
   (:import-from :urbit/mug :cached-mug :compute-mug :murmug :learn-mug :mug
                 :mug-cell)
   (:import-from :urbit/data/constant-cell :constant-cell 
@@ -19,27 +20,31 @@
   (tail nil :type noun)
   (meta nil :type (or null mug constant-cell)))
 
+(defmacro cmeta (core (name) &body forms)
+  `(slot-etypecase ,core core-meta (,name) ,@forms))
+
 (defmethod cellp ((a core))
   t)
+
+(defun in (core &optional mug)
+  (let ((payload (unique (core-tail core))))
+    (setf (core-tail core) payload)
+    (setf (core-meta core) (intern-cons (core-head core) payload mug))))
+
+(defmethod unique ((a core))
+  (cmeta a (m)
+    (null (in core))
+    (mug (in core m))
+    (constant-cell m)))
+
+(defmethod unique-head ((a core))
+  (core-head core))
 
 (defmethod head ((a core))
   (core-head a))
 
-(defmethod constant-head ((a core))
-  (core-head a))
-
 (defmethod tail ((a core))
   (core-tail a))
-
-(defmacro cmeta (core (name) &body forms)
-  `(slot-etypecase ,core core-meta (,name) ,@forms))
-
-(defmethod formula ((a core))
-  (formula
-    (cmeta a (m)
-      (constant-cell m)
-      (null (setf (core-meta a) (intern-noun a)))
-      (mug  (setf (core-meta a) (intern-noun a m))))))
 
 (defmethod cached-mug ((a core))
   (cmeta a (m)
