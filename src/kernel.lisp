@@ -1,9 +1,4 @@
-(defpackage #:urbit/kernel
-  (:use :cl)
-  (:import-from :urbit/error :oops)
-  (:import-from :urbit/noun :frag))
-
-(in-package :urbit/kernel)
+(in-package #:urbit/kernel)
 
 ;; abstract nested cores with hooks 
 

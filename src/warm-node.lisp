@@ -1,8 +1,4 @@
-(defpackage #:urbit/warm-node
-  (:use :cl)
-  (:import-from :urbit/kernel :kernel))
-
-(in-package :urbit/warm-node)
+(in-package #:urbit/warm-node)
 
 ; weakness is SBCL-only
 (defun make-warm-table ()

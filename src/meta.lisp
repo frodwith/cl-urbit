@@ -11,13 +11,32 @@
 (defun spfx (prefix suffix)
   (intern (format nil "~a-~a" prefix suffix)))
 
+; TODO move to util
+(defmacro if-let ((name test-form) true-form false-form)
+  `(let ((,name ,test-form))
+     (if ,name
+         ,true-form
+         ,false-form)))
+
+(defmacro when-let ((name test-form) &body forms)
+  `(if-let ((,name ,test-form))
+     (progn ,@forms)
+     nil))
+
+(defmacro unless-let ((name test-form) &body forms)
+  `(if-let ((,name ,test-form))
+     nil
+     (progn ,@forms)))
+
 (defmacro defnoun-meta (name)
   (let* ((arg (gensym))
+         (arg2 (gensym))
          (temp (gensym))
          (suffix (symbol-name name))
          (learn-name (spfx "LEARN" suffix)) 
          (cached-name (spfx "CACHED" suffix))
-         (compute-name (spfx "COMPUTE" suffix)))
+         (compute-name (spfx "COMPUTE" suffix))
+         (unify-name (spfx "UNIFY" suffix)))
     `(progn
        (defgeneric ,cached-name (noun)
          (:method (obj) nil))
@@ -25,9 +44,14 @@
          (:method (obj data) nil))
        (defgeneric ,compute-name (noun)
          (:method (obj) (error 'oops)))
+       (defun ,unify-name (,arg ,arg2)
+         `(if-let (,temp (,cached-name ,arg))
+            (,learn-name ,arg2 ,temp)
+            (when-let (,temp (,cached-name ,arg2))
+              (,learn-name ,arg ,temp))))
        (defun ,name (,arg)
          (or (,cached-name ,arg)
-             (let (,temp (,compute-name ,arg))
+             (let ((,temp (,compute-name ,arg)))
                (,learn-name ,arg ,temp)
                ,temp))))))
 

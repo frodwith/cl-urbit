@@ -1,44 +1,14 @@
-(defpackage #:urbit/data/core
-  (:use :cl)
-  (:import-from :urbit/noun :noun)
-  (:import-from :urbit/equality :teach)
-  (:import-from :urbit/formula :formula)
-  (:import-from :urbit/util :slot-etypecase)
-  (:import-from :urbit/context :intern-noun)
-  (:import-from :urbit/cell :cellp :head :tail :learn-head :learn-tail
-                :learn-core :print-cell)
-  (:import-from :urbit/mug :cached-mug :compute-mug :murmug :learn-mug :mug
-                :mug-cell)
-  (:import-from :urbit/data/constant-cell :constant-cell 
-                :constant-cell-head :constant-cell-tail))
+(in-package #:urbit/data/core)
 
-(in-package :urbit/data/core)
-
-(defstruct (core (:constructor make-core (head tail meta))
+(defstruct (core (:constructor make-core (head tail stencil meta))
                  (:print-object print-core)) 
   (head nil :type constant-cell :read-only t)
   (tail nil :type noun)
+  (stencil nil :type stencil)
   (meta nil :type (or null mug constant-cell)))
-
-(defmacro cmeta (core (name) &body forms)
-  `(slot-etypecase ,core core-meta (,name) ,@forms))
 
 (defmethod cellp ((a core))
   t)
-
-(defun in (core &optional mug)
-  (let ((payload (unique (core-tail core))))
-    (setf (core-tail core) payload)
-    (setf (core-meta core) (intern-cons (core-head core) payload mug))))
-
-(defmethod unique ((a core))
-  (cmeta a (m)
-    (null (in core))
-    (mug (in core m))
-    (constant-cell m)))
-
-(defmethod unique-head ((a core))
-  (core-head core))
 
 (defmethod head ((a core))
   (core-head a))
@@ -46,52 +16,65 @@
 (defmethod tail ((a core))
   (core-tail a))
 
+(defmacro core-case (core (name) &body forms)
+  `(meta-case (core-meta ,core) (,name) ,@forms))
+
+(defmethod cached-unique ((a core))
+  (core-case a (meta)
+    (constant-cell meta)
+    ((or null mug) nil)))
+
+(defmethod compute-unique ((a core))
+  (unique-cons (core-head core) 
+               (unique (core-tail core))
+               (cached-mug a)))
+
+(defmethod learn-unique ((a core) (k constant-cell))
+  (setf (core-tail a) (constant-cell-tail k))
+  (unify-mug k a)
+  (learn-stencil k (core-stencil a))
+  (setf (core-meta a) k))
+
+(defmethod unique-head ((a core))
+  (core-head core))
+
 (defmethod cached-mug ((a core))
-  (cmeta a (m)
+  (core-case a (meta)
     (null nil)
-    (mug m)
+    (mug meta)
     (constant-cell (cached-mug m))))
 
 (defmethod compute-mug ((a core))
-  (cmeta a (m)
-    (null (setf (core-meta a) (mug-cell a)))
-    (mug nil)
-    (constant-cell (compute-mug m))))
+  (mug-cell a))
 
-(defmethod learn-mug ((a core) mug)
-  (cmeta a (m)
-    (null (setf (core-meta a) mug))
+(defmethod learn-mug ((a core) (m fixnum))
+  (core-case a (meta)
+    (null (setf (core-meta a) m))
     (mug nil)
-    (constant-cell (learn-mug m mug))))
+    (constant-cell (learn-mug meta m))))
+
+(defmethod cached-stencil ((a core))
+  (core-stencil a))
 
 (defmethod learn-tail ((a core) tail)
   (setf (core-tail a) tail))
 
-(defmethod learn-constant-cell ((a core) (k constant-cell))
-  (setf (core-tail a) (constant-cell-tail k))
-  (setf (core-meta a) k))
-
-(defmethod get-constant-cell ((a core))
-  (cmeta a (m)
-    ((or null mug) nil)
-    (constant-cell m)))
-
 (defun teach-cmeta (a b)
-  (cmeta a (m) 
+  (core-case a (meta)
     (null nil)
-    (mug (learn-mug b m))
-    (constant-cell (teach m b))))
+    (mug (learn-mug b meta))
+    (constant-cell (teach meta b))))
 
 (defmethod teach ((a core) b)
   (learn-head b (core-head a))
   (learn-tail b (core-tail a))
-  (learn-core b a)
+  (learn-stencil b a)
   (teach-cmeta a b))
 
 (defmethod unify ((a core) (b core))
-  (setf (core-tail b) (core-tail a))
   (teach-cmeta a b)
-  (teach-cmeta b a))
+  (teach-cmeta b a)
+  (setf (core-tail b) (core-tail a)))
 
 (defun print-core (a out)
   (print-cell (core-head a) (core-tail a) out))

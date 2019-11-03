@@ -1,22 +1,19 @@
-(defpackage #:urbit/warm-tree
-  (:use :cl)
-  (:import-from :urbit/noun :noun)
-  (:import-from :urbit/util :cache-hash)
-  (:import-from :urbit/interner :unique :unique-head)
-  (:import-from :urbit/compiler :formula) 
-  (:import-from :urbit/kernel :hooks :root :static :child :static-kernel)
-  (:import-from :urbit/warm-data :make-warm-node :warm-node-kernel
-                :warm-node-children)
-  (:export :warm-root :warm-child))
+(in-package #:urbit/warm)
 
-; warm-tree uses the compiler, which uses warm-data
-; but the compiler does not depend on warm-tree
-;  arrgghh...  but doesn't it, via context??! the code it generates clearly
-;  needs to be able to call context-root, which needs to call warm-root...
+(defun make-warm-table ()
+  (make-hash-table :test 'equal :weakness :value))
 
-; i was dodging this via the formula generic before.
+(defstruct (warm-node
+             (:constructor cons-warm (kernel parent children stencils)))
+  (kernel nil :type kernel)
+  (parent nil :type (or null warm-node))
+  (children nil :type hash-table)
+  (stencils nil :type hash-table))
 
-(in-package :urbit/warm-tree)
+(defun make-warm-node (kernel &optional parent)
+  (cons-warm kernel parent
+             (make-warm-table)
+             (make-warm-table)))
 
 ; hooks is a list of (keyword nock-val) pairs
 ;   nock-val is something you can pass to (noun)
@@ -42,3 +39,49 @@
         (if (and (= axis 3) (typep parent 'static-kernel))
             (static name parent phooks)
             (child name axis parent phooks))))))
+
+(defnoun-meta stencil)
+
+(defstruct (stencil (:constructor cons-stencil (node noun parent)))
+  (node nil :type warm-node)
+  (noun nil :type constant-cell)
+  (parent nil :type (or null stencil)))
+
+(defun check-inner (stencil core)
+  (let ((cached (cached-stencil core)))
+    (if cached
+        (eq cached stencil)
+        (let ((kernel (warm-node-kernel (stencil-node stencil)))
+              (noun   (stencil-noun stencil)))
+          (when (etypecase kernel
+                  (static-kernel (same noun core))
+                  (child-kernel
+                    (and (same noun (head core))
+                         (check-inner (stencil-parent stencil)
+                                      (parent-core kernel core)))))
+              (learn-stencil core stencil)
+              t)))))
+
+(defun check-stencil (stencil core)
+  (handler-case (check-inner stencil core)
+    (exit () nil)))
+
+
+; could be find-static-stencil, give me unique core, node
+;          find-child-stencil, give me unique battery, node, parent stencil
+
+(defun find-stencil (node core)
+  (let ((kernel (warm-node-kernel node)))
+    (multiple-value-bind (noun parent)
+      (etypecase kernel
+        (static-kernel (unique core))
+        (child-kernel
+          (values (unique-head core)
+                  (let ((par (parent-core kernel core)))
+                    (or (cached-stencil par)
+                        (let ((found (find-stencil (warm-node-parent node) par)))
+                          (learn-stencil par found)
+                          found))))))
+      (cache-hash (if parent (cons noun parent) noun)
+                  (warm-node-stencils node)
+                  (cons-stencil node noun parent)))))

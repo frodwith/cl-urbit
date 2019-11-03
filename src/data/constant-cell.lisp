@@ -1,15 +1,4 @@
-(defpackage #:urbit/data/constant-cell
-  (:use :cl)
-  (:import-from :urbit/noun :noun)
-  (:import-from :urbit/error :oops)
-  (:import-from :urbit/axis-map :axis-map)
-  (:import-from :urbit/mug :mug :compute-mug :cached-mug :murmug-two :learn-mug)
-  (:import-from :urbit/cell :cellp :head :tail :print-cell
-                :get-constant-cell :learn-constant-cell :constant-head)
-  (:import-from :urbit/data/constant-atom :constant-atom)
-  (:import-from :urbit/equality :teach))
-
-(in-package :urbit/data/constant-cell)
+(in-package #:urbit/data/constant-cell)
 
 (defstruct (battery-meta (:constructor make-battery-meta (discovery match)))
   (arms nil :type axis-map)

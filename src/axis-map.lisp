@@ -1,10 +1,4 @@
-(defpackage #:urbit/axis-map
-  (:use :cl)
-  (:import-from :urbit/error :oops)
-  (:import-from :urbit/math :cap :mas)
-  (:export :value :left :right :insert :lookup))
-
-(in-package :urbit/axis-map)
+(in-package #:urbit/axis-map)
 
 ; could save space by representing empty bits in the nodes
 

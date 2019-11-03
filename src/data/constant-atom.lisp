@@ -1,12 +1,4 @@
-(defpackage #:urbit/data/constant-atom
-  (:use :cl)
-  (:import-from :urbit/error :oops)
-  (:import-from :urbit/mug :mug :cached-mug :murmug :learn-mug)
-  (:import-from :urbit/atom :atomp :to-integer :learn-integer)
-  (:import-from :urbit/equality :teach :atom= :unify)
-  (:import-from :urbit/data/bigatom :make-bigatom))
-
-(in-package :urbit/data/constant-atom)
+(in-package #:urbit/data/constant-atom)
 
 (defstruct (constant-atom (:constructor make-constant-atom (num mug))
                           (:print-object print-constant-atom))

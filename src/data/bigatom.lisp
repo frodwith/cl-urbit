@@ -51,7 +51,7 @@
 (defmethod compute-mug ((a bigatom))
   (murmug (bigatom-num a)))
 
-(defmethod learn-mug ((a bigatom) (fixnum m))
+(defmethod learn-mug ((a bigatom) (m fixnum))
   (bcase a (meta)
     (null (setf (bigatom-meta a) m))
     (mug nil)

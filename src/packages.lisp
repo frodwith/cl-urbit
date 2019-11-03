@@ -1,10 +1,14 @@
-(in-package #:common-lisp)
+(in-package #:common-lisp-user)
 
 ; here to soak up all the random symbols from the bare style
 (defpackage #:urbit/packages
   (:use #:cl))
 
 (in-package #:urbit/packages)
+
+(defmacro export-to (target &rest symbols)
+  `(eval-when (:compile-toplevel)
+     (import (quote ,symbols) (quote ,target))))
 
 (defpackage urbit/util
   (:use cl)
@@ -52,7 +56,7 @@
   (:import-from urbit/atom atomp)
   (:import-from urbit/math mix end rsh)
   (:import-from urbit/meta defnoun-meta)
-  (:export mug murmug mug-cell cached-mug compute-mug learn-mug))
+  (:export mug murmug mug-cell cached-mug compute-mug learn-mug unify-mug))
 
 (defpackage urbit/unique
   (:use cl)
@@ -81,6 +85,30 @@
 ;  (:import-from urbit/warm-data make-warm-table)
   (:export make-context with-context unique-cons unique-integer))
 
+(defpackage urbit/axis-map
+  (:use cl)
+  (:import-from urbit/error oops)
+  (:import-from urbit/math cap mas)
+  (:export axis-map value left right insert lookup))
+
+(defpackage urbit/kernel
+  (:use cl)
+  (:import-from urbit/error oops)
+  (:import-from urbit/noun frag)
+  (:export kernel parent-core hooks root static child static-kernel))
+
+(defpackage urbit/warm
+  (:use cl)
+  (:import-from urbit/noun noun)
+  (:import-from urbit/util cache-hash)
+  (:import-from urbit/meta defnoun-meta)
+  (:import-from urbit/unique unique unique-head)
+  (:import-from urbit/kernel hooks root static child static-kernel)
+  (:export warm-node stencil make-warm-table make-warm-node 
+           cached-stencil compute-stencil learn-stencil  
+           warm-root warm-child find-stencil 
+           stencil-node stencil-noun stencil-parent check-stencil))
+
 (defpackage urbit/data/constant-atom
   (:use cl)
   (:import-from urbit/error oops)
@@ -102,14 +130,7 @@
   (:import-from urbit/data/constant-atom constant-atom constant-atom-num)
   (:export make-bigatom))
 
-(eval-when (:compile-toplevel)
-  (import 'urbit/data/bigatom:make-bigatom 'urbit/data/constant-cell))
-
-(defpackage urbit/axis-map
-  (:use cl)
-  (:import-from urbit/error oops)
-  (:import-from urbit/math cap mas)
-  (:export axis-map value left right insert lookup))
+(export-to urbit/data/constant-atom urbit/data/bigatom:make-bigatom)
 
 (defpackage urbit/data/constant-cell
   (:use cl)
@@ -123,37 +144,12 @@
   (:import-from urbit/data/constant-atom constant-atom)
   (:export constant-cell make-constant-cell constant-cell-head constant-cell-tail))
 
-(eval-when (:compile-toplevel)
-  (import '(urbit/data/constant-atom:make-constant-atom
-             urbit/data/constant-cell:make-constant-cell)
-          'urbit/unique))
-
-(defpackage urbit/kernel
-  (:use cl)
-  (:import-from urbit/error oops)
-  (:import-from urbit/noun frag)
-  (:export kernel parent-core))
-
-(defpackage urbit/warm-node
-  (:use cl)
-  (:import-from urbit/kernel kernel)
-  (:export warm-node warm-node-kernel warm-node-parent warm-node-stencils))
-
-(defpackage urbit/stencil
-  (:use cl)
-  (:import-from urbit/error exit)
-  (:import-from urbit/cell head)
-  (:import-from urbit/equality same)
-  (:import-from urbit/util cache-hash)
-  (:import-from urbit/kernel parent-core)
-  (:import-from urbit/unique unique unique-head)
-  (:import-from urbit/data/constant-cell constant-cell)
-  (:import-from urbit/warm-node warm-node warm-node-kernel
-                warm-node-parent warm-node-stencils)
-  (:export stencil cached-stencil compute-stencil learn-stencil))
+(export-to urbit/unique urbit/data/constant-atom:make-constant-atom
+                  urbit/data/constant-cell:make-constant-cell)
 
 (defpackage urbit/data/slimcell
   (:use cl)
+  (:import-from urbit/meta meta-case)
   (:import-from urbit/cell cellp head tail learn-head learn-tail print-cell)
   (:import-from urbit/stencil stencil cached-stencil compute-stencil learn-stencil)
   (:import-from urbit/unique cached-unique compute-unique learn-unique 
@@ -163,20 +159,42 @@
   (:import-from urbit/context unique-cons)
   (:import-from urbit/mug mug mug-cell cached-mug compute-mug learn-mug)
   (:import-from urbit/data/constant-cell constant-cell
-                constant-cell-head constant-cell-tail))
+                constant-cell-head constant-cell-tail)
+  (:export scons))
 
 (defpackage urbit/data/core
   (:use cl)
   (:import-from urbit/noun noun)
   (:import-from urbit/equality teach)
-  (:import-from urbit/util slot-etypecase)
   (:import-from urbit/context unique-cons)
+  (:import-from urbit/stencil stencil cached-stencil)
   (:import-from urbit/cell cellp head tail learn-head learn-tail print-cell)
+  (:import-from urbit/meta meta-case)
   (:import-from urbit/mug cached-mug compute-mug murmug learn-mug mug
-                mug-cell)
+                unify-mug mug-cell)
   (:import-from urbit/data/constant-cell constant-cell 
                 constant-cell-head constant-cell-tail)
   (:export core core-head core-tail make-core))
+
+(defpackage urbit/compiler
+  (:use cl)
+  (:import-from urbit/util cache-field)
+  (:import-from urbit/math cap mas)
+  (:import-from urbit/atom bump)
+  (:import-from urbit/cell cellp head tail)
+  (:import-from urbit/error exit)
+  (:import-from urbit/mug cached-mug)
+  (:import-from urbit/axis-map axis-map lookup insert)
+  (:import-from urbit/data/slimcell scons)
+  (:import-from urbit/data/core make-core)
+  (:import-from urbit/data/constant-atom constant-atom constant-atom-num)
+  (:import-from urbit/data/constant-cell constant-cell
+                constant-cell-head constant-cell-tail constant-cell-nock
+                make-nock-meta nock-meta-func nock-meta-form
+                make-battery-meta battery-meta-arms nock-meta-battery)
+  (:export formula nock))
+
+(export-to urbit/warm urbit/compiler:formula)
 
 ;
 ;
