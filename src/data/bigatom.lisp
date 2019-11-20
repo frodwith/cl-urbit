@@ -57,19 +57,10 @@
     (mug nil)
     (constant-atom (learn-mug meta m))))
 
-(defmethod atom= ((a bigatom) (b bigatom))
-  (when (= (bigatom-num a) (bigatom-num b))
-    (setf (bigatom-num b) (bigatom-num a))
-    (if (bigatom-mug a)
-        (setf (bigatom-mug b) (bigatom-mug a))
-        (when (bigatom-mug b)
-          (setf (bigatom-mug a) (bigatom-mug b))))
-    t))
-
 (defmethod teach ((a bigatom) b)
   (bcase a (meta)
     (null nil)
-    (mug (learn-mug b (bigatom-mug a)))
+    (mug (learn-mug b meta))
     (constant-atom (teach meta b)))
   (learn-integer b (bigatom-num a)))
 

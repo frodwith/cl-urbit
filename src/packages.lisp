@@ -12,7 +12,7 @@
 
 (defpackage urbit/util
   (:use cl)
-  (:export cachef cache-hash cache-field slot-etypecase))
+  (:export cachef cache-hash cache-field if-let when-let unless-let))
 
 (defpackage urbit/error
   (:use cl)
@@ -104,8 +104,8 @@
   (:import-from urbit/meta defnoun-meta)
   (:import-from urbit/unique unique unique-head)
   (:import-from urbit/kernel hooks root static child static-kernel)
-  (:export warm-node stencil make-warm-table make-warm-node 
-           cached-stencil compute-stencil learn-stencil  
+  (:export warm-node stencil essence gnosis make-warm-table make-warm-node 
+           cached-essence compute-essence learn-essence 
            warm-root warm-child find-stencil 
            stencil-node stencil-noun stencil-parent check-stencil))
 
@@ -116,7 +116,7 @@
   (:import-from urbit/mug mug murmug cached-mug compute-mug learn-mug)
   (:import-from urbit/equality teach atom= unify)
   (:import-from urbit/unique cached-unique)
-  (:export constant-atom make-constant-atom constant-atom-num))
+  (:export constant-atom make-constant-atom constant-atom-num constant-atom-mug))
 
 (defpackage urbit/data/bigatom
   (:use cl)
@@ -127,7 +127,8 @@
   (:import-from urbit/equality teach atom=)
   (:import-from urbit/unique compute-unique cached-unique learn-unique)
   (:import-from urbit/context unique-integer)
-  (:import-from urbit/data/constant-atom constant-atom constant-atom-num)
+  (:import-from urbit/data/constant-atom constant-atom
+                constant-atom-num constant-atom-mug)
   (:export make-bigatom))
 
 (export-to urbit/data/constant-atom urbit/data/bigatom:make-bigatom)
@@ -137,37 +138,45 @@
   (:import-from urbit/noun noun)
   (:import-from urbit/error oops)
   (:import-from urbit/axis-map axis-map)
+  (:import-from urbit/util when-let)
   (:import-from urbit/cell cellp head tail print-cell)
   (:import-from urbit/mug mug mug-cell cached-mug compute-mug learn-mug)
+  (:import-from urbit/warm essence cached-essence compute-essence learn-essence)
   (:import-from urbit/equality teach) 
   (:import-from urbit/unique cached-unique unique-head)
   (:import-from urbit/data/constant-atom constant-atom)
-  (:export constant-cell make-constant-cell constant-cell-head constant-cell-tail))
+  (:export constant-cell make-constant-cell constant-cell-head constant-cell-tail
+           constant-cell-nock constant-cell-gnosis constant-cell-mug
+           make-nock-meta nock-meta-func nock-meta-form nock-meta-battery
+           make-battery-meta battery-meta-arms))
 
 (export-to urbit/unique urbit/data/constant-atom:make-constant-atom
-                  urbit/data/constant-cell:make-constant-cell)
+                        urbit/data/constant-cell:make-constant-cell)
 
 (defpackage urbit/data/slimcell
   (:use cl)
   (:import-from urbit/meta meta-case)
   (:import-from urbit/cell cellp head tail learn-head learn-tail print-cell)
-  (:import-from urbit/stencil stencil cached-stencil compute-stencil learn-stencil)
+  (:import-from urbit/warm essence cached-essence compute-essence learn-essence)
   (:import-from urbit/unique cached-unique compute-unique learn-unique 
                 unique-head)
   (:import-from urbit/noun to-noun noun)
   (:import-from urbit/equality teach)
   (:import-from urbit/context unique-cons)
   (:import-from urbit/mug mug mug-cell cached-mug compute-mug learn-mug)
-  (:import-from urbit/data/constant-cell constant-cell
-                constant-cell-head constant-cell-tail)
+  (:import-from urbit/data/constant-cell constant-cell constant-cell-mug
+                constant-cell-head constant-cell-tail constant-cell-gnosis)
   (:export scons))
 
 (defpackage urbit/data/core
   (:use cl)
   (:import-from urbit/noun noun)
   (:import-from urbit/equality teach)
+  (:import-from urbit/warm essence cached-essence compute-essence learn-essence)
+  (:import-from urbit/unique cached-unique compute-unique learn-unique 
+                unique-head)
   (:import-from urbit/context unique-cons)
-  (:import-from urbit/stencil stencil cached-stencil)
+  (:import-from urbit/warm essence cached-essence)
   (:import-from urbit/cell cellp head tail learn-head learn-tail print-cell)
   (:import-from urbit/meta meta-case)
   (:import-from urbit/mug cached-mug compute-mug murmug learn-mug mug

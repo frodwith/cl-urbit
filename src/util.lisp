@@ -16,7 +16,19 @@
            (,tablename ,table))
        (cachef (gethash ,keyname ,tablename) ,@builder-forms))))
 
-(defmacro slot-etypecase (obj accessor (name) &body forms)
-  `(let ((,name (,accessor ,obj)))
-     (etypecase ,name
-       ,@forms)))
+(defmacro if-let ((name test-form) true-form false-form)
+  `(let ((,name ,test-form))
+     (if ,name
+         ,true-form
+         ,false-form)))
+
+(defmacro when-let ((name test-form) &body forms)
+  `(if-let (,name ,test-form)
+     (progn ,@forms)
+     nil))
+
+(defmacro unless-let ((name test-form) &body forms)
+  `(if-let ((,name ,test-form))
+     nil
+     (progn ,@forms)))
+

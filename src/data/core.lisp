@@ -1,10 +1,10 @@
 (in-package #:urbit/data/core)
 
-(defstruct (core (:constructor make-core (head tail stencil meta))
+(defstruct (core (:constructor make-core (head tail essence meta))
                  (:print-object print-core)) 
   (head nil :type constant-cell :read-only t)
   (tail nil :type noun)
-  (stencil nil :type stencil)
+  (essence nil :type essence)
   (meta nil :type (or null mug constant-cell)))
 
 (defmethod cellp ((a core))
@@ -25,24 +25,24 @@
     ((or null mug) nil)))
 
 (defmethod compute-unique ((a core))
-  (unique-cons (core-head core) 
-               (unique (core-tail core))
+  (unique-cons (core-head a) 
+               (unique (core-tail a))
                (cached-mug a)))
 
 (defmethod learn-unique ((a core) (k constant-cell))
   (setf (core-tail a) (constant-cell-tail k))
   (unify-mug k a)
-  (learn-stencil k (core-stencil a))
+  (learn-essence k (core-essence a))
   (setf (core-meta a) k))
 
 (defmethod unique-head ((a core))
-  (core-head core))
+  (core-head a))
 
 (defmethod cached-mug ((a core))
   (core-case a (meta)
     (null nil)
     (mug meta)
-    (constant-cell (cached-mug m))))
+    (constant-cell (cached-mug meta))))
 
 (defmethod compute-mug ((a core))
   (mug-cell a))
@@ -53,8 +53,8 @@
     (mug nil)
     (constant-cell (learn-mug meta m))))
 
-(defmethod cached-stencil ((a core))
-  (core-stencil a))
+(defmethod cached-essence ((a core))
+  (core-essence a))
 
 (defmethod learn-tail ((a core) tail)
   (setf (core-tail a) tail))
@@ -68,7 +68,7 @@
 (defmethod teach ((a core) b)
   (learn-head b (core-head a))
   (learn-tail b (core-tail a))
-  (learn-stencil b a)
+  (learn-essence b a)
   (teach-cmeta a b))
 
 (defmethod unify ((a core) (b core))

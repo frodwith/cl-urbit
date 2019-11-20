@@ -21,5 +21,3 @@
 
 (defun context-warm (root-name root-constant &optional hooks)
   (warm-root (context-warm-tree *context*) root-name root-constant hooks))
-
-

@@ -1,22 +1,4 @@
-(defpackage #:urbit/compiler
-  (:use :cl)
-  (:import-from :urbit/util :cache-field)
-  (:import-from :urbit/math :cap :mas)
-  (:import-from :urbit/atom :bump)
-  (:import-from :urbit/cell :cellp :head :tail)
-  (:import-from :urbit/error :exit)
-  (:import-from :urbit/mug :cached-mug)
-  (:import-from :urbit/axis-map :axis-map :lookup :insert)
-  (:import-from :urbit/formula :formula :battery :nock)
-  (:import-from :urbit/data/slimcell :scons)
-  (:import-from :urbit/data/core :make-core)
-  (:import-from :urbit/data/constant-atom :constant-atom :constant-atom-num)
-  (:import-from :urbit/data/constant-cell :constant-cell
-                :constant-cell-head :constant-cell-tail :constant-cell-nock
-                :make-nock-meta :nock-meta-func :nock-meta-form
-                :make-battery-meta :battery-meta-arms :nock-meta-battery))
-
-(in-package :urbit/compiler)
+(in-package #:urbit/compiler)
 
 (defparameter +crash+ '(error 'exit))
 

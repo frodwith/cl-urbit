@@ -1,8 +1,8 @@
 (in-package #:urbit/data/slimcell)
 
-(defstruct (slimcore (:constructor make-slimcore (mug stencil)))
-  (mug nil :type (or null mug))
-  (stencil nil :type stencil))
+(defstruct (slimcore (:constructor make-slimcore (mug essence)))
+  (essence nil :type essence)
+  (mug nil :type (or null mug)))
 
 (defstruct (slimcell (:constructor scons (head tail))
                      (:print-object print-slimcell))
@@ -54,7 +54,7 @@
     (null nil)           
     (mug meta)
     (slimcore (slimcore-mug meta))
-    (constant-cell (constant-cell-mug a))))
+    (constant-cell (constant-cell-mug meta))))
 
 (defmethod compute-mug ((a slimcell))
   (mug-cell a))
@@ -66,22 +66,22 @@
     (slimcore (setf (slimcore-mug meta) m))
     (constant-cell (learn-mug meta m)))) 
 
-(defmethod cached-stencil ((a slimcell))
+(defmethod cached-essence ((a slimcell))
   (slim-case a (meta)
     ((or null mug) nil)
-    (slimcore (slimcore-stencil meta))
-    (constant-cell (constant-cell-stencil meta))))
+    (slimcore (slimcore-essence meta))
+    (constant-cell (constant-cell-gnosis meta))))
 
-(defmethod compute-stencil ((a slimcell))
-  ; completely wrong - spot here?
-  (find-stencil (unique-head a) (slimcell-tail a)))
+(defmethod compute-essence ((a slimcell))
+  ; FIXME: shim
+  t)
 
-(defmethod learn-stencil ((a slimcell) (s stencil))
+(defmethod learn-essence ((a slimcell) essence)
   (slim-case a (meta)
-    (null (setf (slimcell-meta a) (make-slimcore nil s)))
-    (mug (setf (slimcell-meta a) (make-slimcore meta s)))
+    (null (setf (slimcell-meta a) (make-slimcore nil essence)))
+    (mug (setf (slimcell-meta a) (make-slimcore meta essence)))
     (slimcore nil)
-    (constant-cell (learn-stencil meta s))))
+    (constant-cell (learn-essence meta essence))))
   
 (defmethod learn-head ((a slimcell) head)
   (slim-case a (meta)
