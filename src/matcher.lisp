@@ -39,14 +39,14 @@
 
 (define-condition inconsistent-registration (warning) ())
 
-(defun inconsistent (matcher)
+(defun inconsistent ()
   (warn 'inconsistent-registration)
-  matcher)
+  (error 'exit))
 
 (defun add-root (matcher stencil)
   (etypecase matcher
     ((or single-child multiple-children)
-     (inconsistent matcher))
+     (inconsistent))
     (no-registrations stencil)
     (single-root
       (let ((multi (make-hash-table :test 'eq)))
@@ -57,22 +57,28 @@
       (setf (gethash (root-stencil-constant stencil) matcher) stencil)
       multi)))
 
+(defun registered-axis (matcher)
+  (etypecase matcher
+    (no-registrations nil)
+    ((or single-root multiple-roots) 1)
+    ((or single-child multiple-children) (car matcher))))
+
 ; XX must make some reconciliation - kernel axis should always be in
 ; axis-in-payload, not axis-in-core, because of course they're not in the
 ; battery. save a bit.
 
 (defun add-child (matcher stencil)
   (if (typep matcher '(or single-root multiple-roots))
-      (inconsistent matcher) 
+      (inconsistent)
       (let* ((node (stencil-node stencil))
              (kernel (warm-node-kernel node))
              (axis (kernel-parent-axis kernel))
              (parent (stencil-parent stencil)))
         (if (typep matcher 'no-registrations)
             (cons axis (cons parent stencil))
-            (destructuring-bind (eaxis . more) matcher
-              (if (not (= axis eaxis))
-                  (inconsistent matcher)
+            (destructuring-bind (registered-axis . more) matcher
+              (if (not (= axis registered-axis))
+                  (inconsistent)
                   (let ((table (etypecase matcher
                                  (multiple-children more)
                                  (single-child

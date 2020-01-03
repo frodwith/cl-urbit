@@ -1,16 +1,32 @@
 (in-package #:urbit/data/constant-cell)
 
-(defstruct (battery-meta (:constructor make-battery-meta (discovery match)))
+(defstruct (assumption (:constructor make-assumption ()))
+  (is-valid t :type boolean))
+
+(defun invalidate (assumption)
+  (setf (assumption-is-valid assumption) nil))
+
+(defstruct (battery-meta
+             (:constructor make-battery-meta (stability discovery match)))
   (arms nil :type axis-map)
-  (discovery nil); :type hashboard-entry)
-  (match nil :type (or null match)))
+  (stability nil :type assumption)
+  (matcher nil :type matcher)
+  (discovery nil)); :type hashboard-entry))
+
+(defun battery-meta-destabilize (meta)
+  (setf (battery-meta-arms meta) nil)
+  (invalidate (battery-meta-stability meta))
+  (setf (battery-meta-stability meta) (make-assumption)))
 
 (defstruct (nock-meta (:constructor make-nock-meta (form)))
   (form nil :type (or list symbol))
   (func nil :type (or null (function (noun) noun)))
   (battery nil :type (or null battery-meta)))
 
-(deftype constant-noun () '(or fixnum constant-atom constant-cell))
+(defun battery-meta (nock)
+  (declare (type nock-meta nock))
+  (cache-field nock nock-meta-battery
+    (make-battery-meta (make-assumption) nil nil)))
 
 (defstruct (constant-cell (:constructor make-constant-cell (head tail mug))
                           (:print-object print-constant-cell))
@@ -19,6 +35,28 @@
   (mug  nil :type (or null mug))
   (nock nil :type (or null nock-meta))
   (gnosis nil :type gnosis))
+
+(deftype constant-noun () '(or constant-atom constant-cell))
+
+(defun nock-meta (a)
+  (declare (type constant-cell a))
+  (cache-field a constant-cell-nock (make-nock-meta (compile-raw a))))
+
+(defun constant-frag (k axis)
+  (declare (type constant-noun k)
+           (type constant-atom axis))
+  (let ((axis (constant-atom-num axis)))
+    (if (zerop axis)
+        (error 'exit)
+        (loop with c = k
+              until (= axis 1)
+              unless (typep c 'constant-cell)
+              do (error 'exit)
+              do (setq c (if (= 2 (cap axis))
+                             (constant-cell-head c)
+                             (constant-cell-tail c)))
+              do (setq axis (mas axis))
+              finally (return (the constant-noun c))))))
 
 (defmethod cellp ((a constant-cell))
   t)

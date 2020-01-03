@@ -1,62 +1,92 @@
 (in-package #:urbit/warm)
 
-(defun make-warm-table ()
-  (make-hash-table :test 'equal))
+(defun weak-vals ()
+  (make-hash-table :test 'equal :weakness :value))
+
+(defstruct (warm-tree (:constructor cons-tree (roots batteries)))
+  (roots nil :type hash-table)
+  (batteries nil :type hash-table))
+
+(defun make-warm-tree ()
+  (cons-tree (weak-vals) (make-hash-table :test 'eq)))
+
+; since warm tables are weak and the cells themselves are weakly interned, we
+; need to store references to registered batteries or they can be garbage
+; collected (thus losing the registration information).
+(defun save-battery (tree battery)
+  (setf (gethash battery tree) t))
 
 (defstruct (warm-node
              (:constructor cons-warm (kernel parent children stencils)))
   (kernel nil :type kernel)
-  (parent nil :type (or null warm-node))
+  (parent nil :type (or warm-tree warm-node))
   (children nil :type hash-table)
   (stencils nil :type hash-table))
 
-(defun make-warm-node (kernel &optional parent)
+(defun make-warm-node (parent kernel)
   (cons-warm kernel parent
-             (make-warm-table)
-             (make-warm-table)))
+             (weak-vals)
+             (weak-vals)))
 
 ; hooks is a list of (keyword nock-val) pairs
 ;   nock-val is something you can pass to (noun)
 ;               that compares correctly under (equal)
 ;   i.e. a list like '(9 2 0 1)
 (defun process-hooks (pairs)
-  (hooks 
+  (make-hooks
     (mapcar
       (lambda (p)
         (cons (car p)
               (formula (noun (cdr p)))))
       pairs)))
 
-(defun warm-root (table name constant &optional hooks)
-  (cache-hash (cons (cons name constant) hooks) table 
-    (make-warm-node (root name constant (process-hooks hooks)))))
+(defun warm-root-kernel (tree name constant &optional hooks)
+  (cache-hash (cons (cons name constant) hooks) (warm-tree-roots tree)
+    (make-warm-node tree
+                    (root name constant (process-hooks hooks)))))
 
-(defun warm-child (name axis parent-node &optional hooks)
+(defun warm-child-kernel (name axis parent-node &optional hooks)
   (cache-hash (cons (cons name axis) hooks) (warm-node-children parent-node)
     (let ((parent (warm-node-kernel parent-node))
           (phooks (process-hooks hooks)))
-      (make-warm-node
-        (if (and (= axis 3) (typep parent 'static-kernel))
-            (static name parent phooks)
-            (child name axis parent phooks))))))
+      (make-warm-node parent
+                      (if (and (= axis 1)
+                               (typep parent 'static-kernel))
+                          (static name parent phooks)
+                          (dynamic name axis parent phooks))))))
 
 (defstruct (stencil (:constructor cons-stencil (node noun parent)))
   (node nil :type warm-node)
   (noun nil :type constant-cell)
   (parent nil :type (or null stencil)))
 
-(deftype gnosis () '(or boolean stencil))
-(deftype essence () '(and (not null) gnosis))
-
-(defnoun-meta essence)
-
-(defun warm-node-static-stencil (node unique-core)
+(defun warm-static-stencil (node unique-core)
   (cache-hash unique-core (warm-node-stencils node)
     (cons-stencil node unique-core (warm-node-parent node))))
 
-(defun warm-node-dynamic-stencil (node unique-battery parent-stencil)
+(defun warm-dynamic-stencil (node unique-battery parent-stencil)
   (cache-hash (cons unique-battery parent-stencil) (warm-node-stencils node)
     (cons-stencil node unique-battery parent-stencil)))
+
+(defun root-stencil (tree unique-core name hooks)
+  (let* ((constant (to-integer (constant-cell-tail unique-core)))
+         (node (warm-root (warm-tree-roots tree) name constant hooks)))
+    (warm-static-stencil node unique-core)))
+
+(defun child-stencil (core name axis hooks)
+  (let* ((parent-core (frag core axis))
+         (parent-essence (essence parent-core)))
+    (if (eq t parent-essence)
+        (error 'exit)
+        (let* ((parent-node (stencil-node parent-essence))
+               (node (warm-child name axis parent-node hooks))
+               (kernel (warm-node-kernel node)))
+          (etypecase kernel
+            (static-child-kernel
+              (warm-static-stencil node (unique core)))
+            (dynamic-child-kernel
+              (warm-dynamic-stencil node (unique-head core)
+                                         parent-essence)))))))
 
 (defun check-inner (stencil core)
   (if-let (essence (cached-essence core))
@@ -67,7 +97,7 @@
            (match (etypecase kernel
                     (static-kernel
                       (same noun core))
-                    (child-kernel
+                    (dynamic-child-kernel
                       (and (same noun (head core))
                            (check-inner (stencil-parent essence)
                                         (parent-core kernel core)))))))
@@ -79,45 +109,105 @@
   (handler-case (check-inner stencil core)
     (exit () nil)))
 
-(deftype small-table (key-type value-type)
-  `(or null (cons ,key-type ,value-type) hash-table))
+(deftype unexamined () 'null) ; dictated by the noun-meta concept
+(deftype impossible () '(and boolean (not unexamined))) ; t
+(deftype strange () 'cons) ; non-empty list of assumptions
+(deftype familiar () 'stencil)
+(deftype essence () '(or impossible strange familiar))
+(deftype gnosis () '(or unexamined essence))
 
-(defun getsmall (small key)
-  (etypecase small
-    (null nil)
-    (cons (if (eq (car small) key) (cdr small)))
-    (hash-table (gethash key small))))
+(defnoun-meta essence)
 
-(defsetf getsmall (key small-place) (value)
-  (let ((have (gensym)))
-    `(let ((,have (,small-place)))
-       (etypecase ,have
-         (null (setf ,small-place (cons ,key ,value)))
-         (cons ,(let ((table (gensym)))
-                  `(let ((,table (make-hash-table :test 'eq)))
-                     (setf (gethash (car ,have) table) (cdr ,have))
-                     (setf (gethash ,key ,table) ,value))))
-         (hash-table (setf (gethash ,key ,have) ,value))))))
+(defun find-essence (unique-battery payload)
+  (let* ((battery (battery-meta (nock-meta unique-battery)))
+         (matcher (battery-meta-matcher battery)))
+    (or (if (atomp payload)
+            (match-root matcher (to-integer payload))
+            (match-child matcher payload))
+        (let ((axis (registered-axis matcher)))
+          (if (null axis)
+              (list (battery-meta-stability battery))
+              (let ((essence (handler-case (essence (frag payload axis))
+                               (oops () t)    ; non-cell object
+                               (exit () t)))) ; nothing at axis
+                (if (typep essence 'impossible)
+                    essence
+                    (cons (battery-meta-stability battery)
+                          (etypecase essence
+                            (strange essence)
+                            (familiar nil))))))))))
 
-(defstruct (match (:constructor make-match (axis))) 
-  (axis nil :type integer) ; axis within payload to find parent
-  (roots nil :type (small-table integer stencil))
-  (parents nil :type (small-table stencil stencil)))
+(defun register-root (tree core name hooks)
+  (if (or (atomp core)
+          (atomp (head core))
+          (cellp (tail core)))
+      (error 'exit)
+      (let* ((unique-core (unique core))
+             (noun (constant-cell-head unique-core))
+             (nock (constant-cell-nock-meta noun))
+             (battery (nock-meta-battery-meta nock))
+             (stencil (root-stencil table unique-core name hooks)))
+        (setf (battery-meta-match battery)
+              (add-root (battery-meta-match battery) stencil))
+        (learn-essence core stencil)
+        (battery-meta-destabilize battery)
+        (save-battery tree noun))))
 
-(defun match-add-root (match root-stencil)
-  (setf (getsmall (stencil-noun root-stencil) (match-roots match))
-        root-stencil))
+(defun register-child (tree core name axis hooks)
+  (if (or (atomp core)
+          (atomp (head core))
+          (atomp (tail core)))
+      (error 'exit)
+      (let* ((noun (unique-head core))
+             (battery (battery-meta (nock-meta noun)))
+             (match (battery-meta-match battery))
+             (stencil (child-stencil core name axis hooks)))
+        (setf (battery-meta-match battery)
+              (add-child (battery-meta-match battery) stencil))
+        (learn-essence core stencil)
+        (battery-meta-destabilize battery)
+        (save-battery tree noun))))
 
-(defun match-add-child (match child-stencil)
-  (setf (getsmall (stencil-parent child-stencil) (match-parents match))
-        child-stencil))
 
-(defun match-root (match payload)
-  (getsmall payload (match-roots match)))
+;(deftype small-table (key-type value-type)
+;  `(or null (cons ,key-type ,value-type) hash-table))
+;
+;(defun getsmall (small key)
+;  (etypecase small
+;    (null nil)
+;    (cons (if (eq (car small) key) (cdr small)))
+;    (hash-table (gethash key small))))
+;
+;(defsetf getsmall (key small-place) (value)
+;  (let ((have (gensym)))
+;    `(let ((,have (,small-place)))
+;       (etypecase ,have
+;         (null (setf ,small-place (cons ,key ,value)))
+;         (cons ,(let ((table (gensym)))
+;                  `(let ((,table (make-hash-table :test 'eq)))
+;                     (setf (gethash (car ,have) table) (cdr ,have))
+;                     (setf (gethash ,key ,table) ,value))))
+;         (hash-table (setf (gethash ,key ,have) ,value))))))
+;
+;(defstruct (match (:constructor make-match (axis)))
+;  (axis nil :type integer) ; axis within payload to find parent
+;  (roots nil :type (small-table integer stencil))
+;  (parents nil :type (small-table stencil stencil)))
 
-(defun match-child (match payload)
-  (getsmall (essence (frag payload (match-axis match)))
-            (match-stencils match)))
+;(defun match-add-root (match root-stencil)
+;  (setf (getsmall (stencil-noun root-stencil) (match-roots match))
+;        root-stencil))
+;
+;(defun match-add-child (match child-stencil)
+;  (setf (getsmall (stencil-parent child-stencil) (match-parents match))
+;        child-stencil))
+;
+;(defun match-root (match payload)
+;  (getsmall payload (match-roots match)))
+;
+;(defun match-child (match payload)
+;  (getsmall (essence (frag payload (match-axis match)))
+;            (match-stencils match)))
 
 ;; XX: you can't have a battery that's both a root and a child, that violates
 ;; (at least in principle) the unique axis to parent constraint. therefore the
@@ -128,35 +218,6 @@
 ;; multiple-parents axis + (hashtable)
 ;; single-root (cons integer stencil)
 ;; multiple-roots (hashtable)
-
-(defun register-root (table core name hooks)
-  (if (or (atomp core)
-          (atomp (head core))
-          (cellp (tail core)))
-      (error 'exit)
-      (let* ((unique-core (unique core))
-             (battery (constant-cell-head unique-core))
-             (match (constant-cell-match battery))
-             (stencil (root-stencil table unique-core name hooks)))
-        (when (null match)
-          (setf match (setf (constant-cell-match battery) (make-match 1))))
-        (match-add-root match stencil)
-        (learn-essence core stencil))))
-
-(defun register-child (core name axis hooks)
-  (if (or (atomp core)
-          (atomp (head core))
-          (atomp (tail core)))
-      (error 'exit)
-      (let* ((battery (unique-head core))
-             (match (constant-cell-match battery)))
-        (when (null match)
-          (setf match (setf (constant-cell-match battery) (make-match axis))))
-        (if (not (= axis (match-axis match)))
-            (error 'exit)
-            (let ((stencil (child-stencil core name axis hooks)))
-              (match-add-child match stencil)
-              (learn-essence core stencil))))))
 
   
 ;      defun constant-cell-match (calls constant-cell-battery from compiler??)
@@ -233,27 +294,3 @@
 ; of configurable restart - to proceed silently, audit the clue, or maybe even
 ; double-check hashboard.
 
-(defun root-stencil (table unique-core name hooks)
-  (let* ((constant (to-integer (constant-cell-tail unique-core)))
-         (node (warm-root table name constant hooks)))
-    (warm-node-static-stencil node unique-core)))
-
-(defun child-stencil (core name axis hooks)
-  (let* ((parent-core (frag core axis))
-         (parent-essence (essence parent-core)))
-    (if (eq t parent-essence)
-        (error 'exit)
-        (let* ((parent-node (stencil-node parent-essence))
-               (node (warm-child name axis parent-node hooks))
-               (kernel (warm-node-kernel node)))
-          (etypecase kernel
-            (static-kernel (warm-node-static-stencil node (unique core)))
-            (child-kernel (warm-node-dynamic-stencil node (unique-head core)
-                                                     parent-essence)))))))
-
-(defun find-essence (unique-battery payload)
-  (or (when-let (match (constant-cell-match unique-battery))
-        (if (atomp payload)
-            (match-root match payload)
-            (match-child match payload)))
-      t))

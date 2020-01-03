@@ -15,15 +15,15 @@
                           (declare (ignorable a) ; ignore unused subject (i.e. [1 1])
                               ; delete unreachable note (code after crash) (SBCL ONLY)
                               (sb-ext:muffle-conditions sb-ext:compiler-note))
-                          ,(qcell u)))))))
+                          ,(compile-cell u)))))))
 
 (defun nock (subject formula)
   (funcall (formula formula) subject))
 
-(defun compile-arm (battery axis)
-  (let ((body (qcell (frag battery (mas axis)))))
-    (compile nil `(lambda (subject axis)
-                    (declare (ignore axis)
+(defun compile-arm (battery battery-axis)
+  (let ((body (compile-cell (constant-frag battery battery-axis))))
+    (compile nil `(lambda (subject battery-axis)
+                    (declare (ignore battery-axis)
                              (sb-ext:muffle-conditions sb-ext:compiler-note))
                     (let ((a (make-core (quote ,battery)
                                         (tail subject)
@@ -31,22 +31,15 @@
                       (declare (ignorable a))
                       ,body)))))
 
-(defun frag (k axis)
-  (declare (type constant-cell k))
-  (let ((axis (etypecase axis
-                (fixnum axis)
-                (constant-atom (constant-atom-num axis)))))
-   (if (zerop axis)
-      (error 'exit)
-      (loop until (= axis 1)
-            with c = k
-            unless (typep c 'constant-cell)
-              do (error 'exit)
-            do (setq c (if (= 2 (cap axis))
-                           (constant-cell-head c)
-                           (constant-cell-tail c)))
-            do (setq axis (mas axis))
-            finally (return c)))))
+(defun need-atom (a)
+  (etypecase a
+    (constant-cell +crash+)
+    (constant-atom nil)))
+
+(defun need-cell (a)
+  (etypecase a
+    (constant-cell nil)
+    (constant-atom +crash+)))
 
 (defmacro split (cell-expr (head tail) &body forms)
   (let ((s (gensym)))
@@ -58,141 +51,130 @@
 (defmacro splash (cell-expr (head tail) &body forms)
   (let ((s (gensym)))
     `(let ((,s ,cell-expr))
-       (or (nc ,s)
+       (or (need-cell ,s)
            (split ,s (,head ,tail) ,@forms)))))
 
-(defun nock-meta (a)
-  (cache-field a constant-cell-nock
-    (make-nock-meta
-      (split a (op ar)
-        (etypecase op
-          (constant-atom +crash+)
-          (constant-cell (qcons op ar))
-          (fixnum
-            (case op
-              (0  (q0  ar))
-              (1  (q1  ar))
-              (2  (q2  ar))
-              (3  (q3  ar))
-              (4  (q4  ar))
-              (5  (q5  ar))
-              (6  (q6  ar))
-              (7  (q7  ar))
-              (8  (q8  ar))
-              (9  (q9  ar))
-              (10 (q10 ar))
-              (11 (q11 ar))
-              (12 (q12 ar))
-              (t +crash+))))))))
+(defun compile-raw (formula)
+  (declare (type formula constant-cell))
+  (split formula (op ar)
+    (etypecase op
+      (constant-atom +crash+)
+      (constant-cell (compile-autocons op ar))
+      (fixnum
+        (case op
+          (0  (compile-0  ar))
+          (1  (compile-1  ar))
+          (2  (compile-2  ar))
+          (3  (compile-3  ar))
+          (4  (compile-4  ar))
+          (5  (compile-5  ar))
+          (6  (compile-6  ar))
+          (7  (compile-7  ar))
+          (8  (compile-8  ar))
+          (9  (compile-9  ar))
+          (10 (compile-10 ar))
+          (11 (compile-11 ar))
+          (12 (compile-12 ar))
+          (t +crash+))))))
 
-(defun qf (a)
+(defun compile-cell (a)
+  (nock-meta-form (constant-cell-nock-meta a)))
+
+(defun compile-noun (a)
   (etypecase a
-    (constant-cell (qcell a))
-    ((or fixnum constant-atom) +crash+)))
+    (constant-cell (compile-cell a))
+    (constant-atom +crash+)))
 
-(defun qcell (a)
-  (nock-meta-form (nock-meta a)))
+(defun compile-autocons (head tail)
+  `(scons ,(compile-cell head) ,(compile-noun tail)))
 
-(defun qcons (head tail)
-  `(scons ,(qcell head) ,(qf tail)))
-
-(defun qax (a s)
-  (case a
+(defun compile-fragment (axis-integer subject-symbol)
+  (case axis-integer
     (0 +crash+)
-    (1 s)
-    (t (let ((f (ecase (cap a)
-                  (2 'head)
-                  (3 'tail))))
-         (qax (mas a) (list f s))))))
+    (1 subject-symbol)
+    (t (let ((access-symbol (ecase (cap axis-integer)
+                              (2 'head)
+                              (3 'tail))))
+         (compile-fragment (mas axis-integer)
+                           (list access-symbol subject-symbol))))))
 
-(defun q0 (a)
-  (etypecase a
-    (fixnum (qax a 'a))
-    (constant-atom (qax (constant-atom-num a) 'a))
-    (constant-cell +crash+)))
-
-(defun q1 (a)
-  `(quote ,a))
-
-(defun na (a)
+(defun compile-0 (a)
   (etypecase a
     (constant-cell +crash+)
-    ((or fixnum constant-atom) nil)))
+    (constant-atom (compile-fragment (constant-atom-num a) 'a))))
 
-(defun nc (a)
-  (etypecase a
-    (constant-cell nil)
-    ((or fixnum constant-atom) +crash+)))
+(defun compile-1 (a)
+  `(quote ,a))
 
-(defun q2 (a)
+(defun compile-2 (a)
   (splash a (subject formula)
-    `(nock ,(qf subject) ,(qf formula))))
+    `(nock ,(compile-noun subject) ,(compile-noun formula))))
 
 (defun deep (a)
   (if (cellp a) 0 1))
 
-(defun q3 (a)
-  `(deep ,(qf a)))
+(defun compile-3 (a)
+  `(deep ,(compile-noun a)))
 
-(defun q4 (a)
-  `(bump ,(qf a)))
+(defun compile-4 (a)
+  `(bump ,(compile-noun a)))
 
 (defun same (a b)
   (if (urbit/equality:same a b) 0 1))
 
-(defun q5 (a)
+(defun compile-5 (a)
   (splash a (one two)
-    `(same ,(qf one) ,(qf two))))
+    `(same ,(compile-noun one) ,(compile-noun two))))
 
-(defun q6 (a)
-  (splash a (test bran)
-    (splash bran (yes no)
-      `(case ,(qf test)
-         (0 ,(qf yes))
-         (1 ,(qf no))
+(defun compile-6 (a)
+  (splash a (test branches)
+    (splash branches (yes no)
+      `(case ,(compile-noun test)
+         (0 ,(compile-noun yes))
+         (1 ,(compile-noun no))
          (t ,+crash+)))))
 
-(defun q7 (a)
+(defun compile-7 (a)
   (splash a (one two)
-    `(let ((a ,(qf one)))
-       ,(qf two))))
+    `(let ((a ,(compile-noun one)))
+       ,(compile-noun two))))
 
-(defun q8 (a)
+(defun compile-8 (a)
   (splash a (one two)
-    `(let ((a (scons ,(qf one) a)))
-       ,(qf two))))
+    `(let ((a (scons ,(compile-noun one) a)))
+       ,(compile-noun two))))
 
-(defun constant-cell-battery (battery)
-  (cache-field (nock-meta battery) nock-meta-battery
-    (make-battery-meta nil nil)))
+(defun pull (core battery-axis)
+  (let ((noun (unique-head core)))
+    (etypecase noun
+      (constant-atom (error 'exit))
+      (constant-cell
+        (let* ((meta (constant-cell-battery-meta noun))
+               (arms (battery-meta-arms meta))
+               (arm  (or (lookup arms battery-axis)
+                         (let ((func (compile-arm noun battery-axis)))
+                           (setf (battery-meta-arms meta)
+                                 (insert arms battery-axis func))
+                           func))))
+          (funcall arm core battery-axis))))))
 
-(defun pull (axis core)
-  (let* ((noun (unique-head core))
-         (meta (constant-cell-battery noun))
-         (arms (battery-meta-arms meta))
-         (arm  (or (lookup arms axis)
-                   (let ((func (compile-arm noun axis)))
-                     (setf (battery-meta-arms meta) (insert arms axis func))
-                     func))))
-    (funcall arm core axis)))
-
-(defun q9 (a)
+(defun compile-9 (a)
   (splash a (frag core)
-    (or (na frag)
+    (or (need-atom frag)
         (case frag
           (0 +crash+)
-          (1 `(let ((a ,(qf core)) (nock a a))))
+          (1 `(let ((a ,(compile-noun core)) (nock a a))))
           (t (ecase (cap frag)
-               (2 `(pull ,frag ,(qf core)))
-               (3 `(let ((a ,(qf core)))
-                     (nock a ,(q0 frag))))))))))
+               (2 `(pull ,(mas frag) ,(compile-noun core)))
+               (3 `(let ((a ,(compile-noun core)))
+                     (nock a ,(compile-0 frag))))))))))
 
-(defun qed (a little big kons)
+(defun compile-edit (a little big kons)
   (case a
     (2 (funcall kons little `(tail ,big)))
     (3 (funcall kons `(head ,big) little))
     (t (let* ((bigsym (gensym))
-              (mutant (qed (mas a) little bigsym
+              (mutant (compile-edit (mas a) little bigsym
                        (lambda (head tail) `(scons ,head ,tail)))))
          (ecase (cap a)
            (2 `(let ((,bigsym (head ,big)))
@@ -200,35 +182,35 @@
            (3 `(let ((,bigsym (tail ,big)))
                  ,(funcall kons `(head ,big) mutant))))))))
 
-(defun econs (ax big head tail)
+(defun edit-cons (ax big head tail)
   (declare (ignore ax big))
   (scons head tail))
 
-(defun qed-root (ax little big)
+(defun compile-edit-root (ax little big)
   (let* ((bigsym  (gensym))
-         (bigform (qf big))
-         (body    (qed ax (qf little) bigsym
+         (bigform (compile-noun big))
+         (body    (compile-edit ax (compile-noun little) bigsym
                        (lambda (head tail)
-                         `(econs ,ax ,bigsym ,head ,tail)))))
+                         `(edit-cons ,ax ,bigsym ,head ,tail)))))
     `(let ((,bigsym ,bigform))
        ,body)))
 
-(defun q10 (a)
+(defun compile-10 (a)
   (splash a (spec big)
     (splash spec (ax little)
       (etypecase ax
         (constant-cell +crash+)
-        (constant-atom (qed-root (constant-atom-num ax) little big))
+        (constant-atom (compile-edit-root (constant-atom-num ax) little big))
         (fixnum (case ax
                   (0 +crash+)
                   (1 `(progn
-                        ,(qf big)
-                        ,(qf little)))
-                  (t (qed-root ax little big))))))))
+                        ,(compile-noun big)
+                        ,(compile-noun little)))
+                  (t (compile-edit-root ax little big))))))))
 
-(defun q11 (a)
+(defun compile-11 (a)
   (splash a (hint next-formula)
-    (let ((next (qf next-formula)))
+    (let ((next (compile-noun next-formula)))
       (etypecase hint
         ; no currently supported static hints
         ((or fixnum constant-atom) next)
@@ -236,9 +218,9 @@
         (constant-cell
           (split hint (tag clue-formula)
             (declare (ignore tag))
-            (let ((clue (qf clue-formula)))
+            (let ((clue (compile-noun clue-formula)))
               `(progn ,clue ,next))))))))
 
-(defun q12 (a)
+(defun compile-12 (a)
   (declare (ignore a))
   +crash+)

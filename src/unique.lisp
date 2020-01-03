@@ -21,13 +21,18 @@
 (defun make-noun-interner ()
   (cons-interner (make-atom-table) (make-cell-table)))
 
-(defun find-integer (interner i &optional mug)
-  (cache-hash i (noun-interner-atoms interner)
-    ;to muffle the style-warning
-    ;(declare #+sbcl (sb-ext:muffle-conditions style-warning))
-    (make-constant-atom i mug)))
+(defun find-bignum (interner big &optional mug)
+  (declare (type bignum big))
+  (the constant-bigatom
+       (cache-hash big (noun-interner-atoms interner)
+                   ;to muffle the style-warning
+                   ;(declare #+sbcl (sb-ext:muffle-conditions style-warning))
+                   (make-constant-bigatom big mug))))
 
 ; call with unique (already internered) head and tail
 (defun hash-cons (interner head tail &optional mug)
-  (cache-hash (cons head tail) (noun-interner-cells interner)
-    (make-constant-cell head tail mug)))
+  (declare (type constant-noun head)
+           (type constant-noun tail))
+  (the constant-cell
+       (cache-hash (cons head tail) (noun-interner-cells interner)
+                   (make-constant-cell head tail mug))))

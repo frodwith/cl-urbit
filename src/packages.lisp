@@ -95,7 +95,9 @@
   (:use cl)
   (:import-from urbit/error oops)
   (:import-from urbit/noun frag)
-  (:export kernel parent-core hooks root static child static-kernel))
+  (:export kernel root-kernel static-child-kernel dynamic-child-kernel
+           static-kernel child-kernel make-root make-static make-dynamic
+           kernel-parent kernel-parent-axis parent-core make-hooks hook))
 
 (defpackage urbit/warm
   (:use cl)
@@ -103,20 +105,22 @@
   (:import-from urbit/util cache-hash)
   (:import-from urbit/meta defnoun-meta)
   (:import-from urbit/unique unique unique-head)
-  (:import-from urbit/kernel hooks root static child static-kernel)
+  (:import-from urbit/kernel make-root make-static make-child
+
+                make-hooks root static child static-kernel)
   (:export warm-node stencil essence gnosis make-warm-table make-warm-node 
            cached-essence compute-essence learn-essence 
            warm-root warm-child find-stencil 
            stencil-node stencil-noun stencil-parent check-stencil))
 
-(defpackage urbit/data/constant-atom
+(defpackage urbit/data/constant-bigatom
   (:use cl)
   (:import-from urbit/error oops)
   (:import-from urbit/atom atomp to-integer)
   (:import-from urbit/mug mug murmug cached-mug compute-mug learn-mug)
   (:import-from urbit/equality teach atom= unify)
   (:import-from urbit/unique cached-unique)
-  (:export constant-atom make-constant-atom constant-atom-num constant-atom-mug))
+  (:export constant-bigatom make-constant-bigatom constant-atom-num constant-atom-mug))
 
 (defpackage urbit/data/bigatom
   (:use cl)
