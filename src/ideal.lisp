@@ -1,12 +1,18 @@
-(defpackage #:urbit/world
-  (:use #:cl #:urbit/data))
+(defpackage #:urbit/ideal
+  (:use #:cl #:urbit/data)
+  (:export #:make-ideal-table #:find-ideal))
 
-(defstruct world
-  (ideal-table :type hash-table))
+(in-package #:urbit/ideal)
 
-; TODO: commit something
+; ideals - values which represent "ideal" noun values. while there may be many
+; cell objects in memory with a head of 0 and a tail of 0, there is only one
+; ideal [0 0]. Metadata which depends on the "ideal" value of a noun is stored
+; on its ideal, and the data protocol has a (cached-ideal) accessor for this
+; purpose. Use MAKE-IDEAL-TABLE to create a uniqueness context, and FIND-IDEAL
+; to find the ideal for any noun within that context.
+
+; TODO: get editor integration working again
 ;       switch tests to 5am
-;       get editor integration working again
 ;       write a data implementation (the lisp object interface maybe),
 ;       and test that we can deep/head/tail/cl-integer/mug on it. cool.
 ;       test this file (with no ideal noun impl)
@@ -72,12 +78,12 @@
                          (setq frame (icmf nil (icell-head i) (head n)))
                          (push frame stack)))))))))
 
-(defun hashmug (a)
+(defun ideal-hash (a)
   (typecase a
     (ideal (imug a))
     (t (mug a))))
 
-(defun hash= (a b)
+(defun ideal= (a b)
   (typecase a
     (iatom (typecase b
              (iatom (eq a b))
@@ -91,18 +97,18 @@
          (iatom (iatom=mugged b a))
          (icell (icell=mugged b a))))))
 
-(define-hash-table-test hash= hashmug)
+(define-hash-table-test ideal= ideal-hash)
 
-(defun new-world ()
-  (make-world
-    :ideal-table (make-hash-table :test 'hash= :weakness :key)))
+(defun make-ideal-table ()
+  "the context in which uniqueness is ensured"
+  (make-hash-table :test 'ideal= :weakness :key))
 
 (defun hashed-ideal (table noun)
   (let ((found (gethash noun table)))
     (when found (setf (cached-ideal noun) found))
     found))
 
-(defun iatom-for (table a)
+(defun put-iatom (table a)
   (let ((i (make-iatom :int (cl-integer a) :mug (mug a))))
     (setf (cached-ideal a) i)
     (setf (gethash i table) i)
@@ -110,7 +116,7 @@
 
 (defun make-ideal (table mugged)
   (if (not (deep mugged))
-    (iatom-for table mugged)
+    (put-iatom table mugged)
     (let ((accum nil)
           (frame (cons 0 mugged))
           (stack (list frame nil)))
@@ -131,7 +137,7 @@
                        (if h
                          (retn h)
                          (if (not (deep n))
-                           (retn (iatom-for table n))
+                           (retn (put-iatom table n))
                            (progn
                              (setf (car frame) 1)
                              (more (head n)))))))))
@@ -148,9 +154,8 @@
                      (setf (gethash i table) i)
                      (retn i))))))))))
 
-; this is recursive in the cache-miss case, could be explicit-stack
-(defun find-ideal (world noun)
+(defun find-ideal (table noun)
+  "find the ideal for an urbit/data noun within the uniqueness context table"
   (or (cached-ideal noun)
-      (let ((table (world-ideal-table world)))
-        (or (hashed-ideal table noun)
-            (make-ideal table noun)))))
+      (hashed-ideal table noun)
+      (make-ideal table noun))))

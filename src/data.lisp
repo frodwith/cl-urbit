@@ -1,8 +1,10 @@
 (defpackage #:urbit/data
   (:use #:cl)
+  (:import-from #:urbit/math 
   (:export #:noun-required #:atom-required #:cell-required
-           #:deep #:cl-integer #:head #:tail #:cached-mug
-           #:mug))
+           #:deep #:head #:tail #:cl-integer #:cached-mug #:mug))
+
+(in-package #:urbit/data)
 
 ; the data protocol: types which represent nouns should implement these methods
 
