@@ -1,6 +1,6 @@
 (defpackage #:urbit/ideal
   (:use #:cl #:urbit/data)
-  (:export #:make-ideal-table #:find-ideal))
+  (:export #:make-world #:ideal))
 
 (in-package #:urbit/ideal)
 
@@ -8,8 +8,8 @@
 ; cell objects in memory with a head of 0 and a tail of 0, there is only one
 ; ideal [0 0]. Metadata which depends on the "ideal" value of a noun is stored
 ; on its ideal, and the data protocol has a (cached-ideal) accessor for this
-; purpose. Use MAKE-IDEAL-TABLE to create a uniqueness context, and FIND-IDEAL
-; to find the ideal for any noun within that context.
+; purpose. Use MAKE-WORLD to create a uniqueness context, and IDEAL to find the
+; ideal for any noun within that context.
 
 ; TODO: get editor integration working again
 ;       switch tests to 5am
@@ -99,7 +99,7 @@
 
 (define-hash-table-test ideal= ideal-hash)
 
-(defun make-ideal-table ()
+(defun make-world ()
   "the context in which uniqueness is ensured"
   (make-hash-table :test 'ideal= :weakness :key))
 
@@ -154,8 +154,7 @@
                      (setf (gethash i table) i)
                      (retn i))))))))))
 
-(defun find-ideal (table noun)
-  "find the ideal for an urbit/data noun within the uniqueness context table"
+(defun ideal (world noun)
   (or (cached-ideal noun)
       (hashed-ideal table noun)
       (make-ideal table noun))))
