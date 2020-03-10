@@ -8,33 +8,7 @@
   :components ((:module "src"
                 :serial t
                 :components
-                ((:file "packages")
-                 (:file "util")
-                 (:file "error")
-                 (:file "math")
-                 (:file "atom")
-                 (:file "cell")
-                 (:file "noun")
-                 (:file "meta")
-                 (:file "mug")
-                 (:file "unique")
-                 (:file "equality")
-                 (:file "context")
-                 (:file "axis-map")
-                 (:file "kernel")
-                 (:file "warm")
-                 (:file "data/constant-atom")
-                 (:file "data/bigatom")
-                 (:file "data/constant-cell")
-                 (:file "data/slimcell")
-                 (:file "data/core")
-;                 (:file "syntax")
-;                 (:file "formula")
-;                 (:file "kernels")
-;                 (:file "data/fixnum")
-;                 (:file "chunker")
-;                 (:file "compiler"))))
-                                    )))
+                ((:file "math"))))
   :description "nock runtime and urbit worker process (http://urbit.org)"
   :long-description
   #.(uiop:read-file-string

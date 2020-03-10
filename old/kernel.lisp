@@ -6,24 +6,21 @@
   (name nil :type keyword)
   (hooks nil :type (or null hash-table)))
 
-(defstruct (root-kernel
-             (:include kernel)
-             (:constructor make-root (name constant &optional hooks)))
+(defstruct (root-kernel (:include kernel))
   (constant nil :type integer))
 
-(defstruct (static-child-kernel
-             (:include kernel)
-             (:constructor make-static (name parent &optional hooks)))
+(defstruct (static-child-kernel (:include kernel))
   (parent nil :type static-kernel))
 
-(defstruct (dynamic-child-kernel
-             (:include kernel)
-             (:constructor make-dynamic (name axis parent &optional hooks)))
+(defstruct (dynamic-child-kernel (:include kernel))
   (parent nil :type kernel)
   (axis nil :type integer))
 
-(deftype static-kernel () '(or root-kernel static-child-kernel))
-(deftype child-kernel () '(or dynamic-child-kernel static-child-kernel))
+(deftype static-kernel ()
+  '(or root-kernel static-child-kernel))
+
+(deftype child-kernel ()
+  '(or dynamic-child-kernel static-child-kernel))
 
 (defun kernel-parent (kernel)
   (etypecase kernel

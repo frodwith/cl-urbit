@@ -7,6 +7,13 @@
   :components ((:module "t"
                 :serial t
                 :components
-                ((:file "math"))))
+                ((:file "util")
+                 (:test-file "syntax")
+                 (:test-file "interner")
+                 (:test-file "noun")
+                 (:test-file "axis-map")
+                 (:test-file "kernels")
+                 (:test-file "chunker")
+                 (:test-file "basic-nock"))))
   :perform (test-op :after (op c)
     (funcall (intern #.(string :run) :prove) c)))

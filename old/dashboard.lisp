@@ -1,32 +1,37 @@
-(in-package #:urbit/warm)
+(in-package #:urbit/dashboard)
+
+; a dashboard measures the speed of cores
+(defstruct (dashboard (:constructor mkdash))
+  (roots nil :type hash-table)
+  (batteries nil :type hash-table))
 
 (defun weak-vals ()
   (make-hash-table :test 'equal :weakness :value))
 
-(defstruct (warm-tree (:constructor cons-tree (roots batteries)))
-  (roots nil :type hash-table)
-  (batteries nil :type hash-table))
+(defun make-dashboard (interner)
+  (mkdash :interner interner
+          :roots (weak-vals)
+          :batteries (make-hash-table :test 'eq)))
 
-(defun make-warm-tree ()
-  (cons-tree (weak-vals) (make-hash-table :test 'eq)))
+(defstruct (dnode (:constructor mknode))
+  (kernel nil :type kernel)
+  (parent nil :type (or dashboard dnode))
+  (children nil :type hash-table)
+  (stencils nil :type hash-table))
+
+(defun make-dnode (parent kernel)
+  (mknode :kernel kernel
+          :parent parent
+          :children (weak-vals)
+          :stencils (weak-vals)))
 
 ; since warm tables are weak and the cells themselves are weakly interned, we
 ; need to store references to registered batteries or they can be garbage
 ; collected (thus losing the registration information).
-(defun save-battery (tree battery)
-  (setf (gethash battery tree) t))
-
-(defstruct (warm-node
-             (:constructor cons-warm (kernel parent children stencils)))
-  (kernel nil :type kernel)
-  (parent nil :type (or warm-tree warm-node))
-  (children nil :type hash-table)
-  (stencils nil :type hash-table))
-
-(defun make-warm-node (parent kernel)
-  (cons-warm kernel parent
-             (weak-vals)
-             (weak-vals)))
+(defun save-battery (dashboard battery)
+  (declare (type constant-cell battery))
+  (setf (gethash battery (dashboard-batteries dashboard))
+        battery))
 
 ; hooks is a list of (keyword nock-val) pairs
 ;   nock-val is something you can pass to (noun)
@@ -40,47 +45,64 @@
               (formula (noun (cdr p)))))
       pairs)))
 
-(defun warm-root-kernel (tree name constant &optional hooks)
-  (cache-hash (cons (cons name constant) hooks) (warm-tree-roots tree)
-    (make-warm-node tree
-                    (root name constant (process-hooks hooks)))))
+(defun find-root-dnode (roots name constant hooks)
+  (cache-hash (cons (cons name constant) hooks) roots
+    (make-dnode dash (make-root-kernel 
+                       :name name
+                       :constant constant
+                       :hooks (process-hooks hooks)))))
 
-(defun warm-child-kernel (name axis parent-node &optional hooks)
-  (cache-hash (cons (cons name axis) hooks) (warm-node-children parent-node)
-    (let ((parent (warm-node-kernel parent-node))
+(defun find-child-dnode (parent name axis hooks)
+  (cache-hash (cons (cons name axis) hooks)
+              (dnode-children parent-node)
+    (let ((pkern (dnode-kernel parent))
           (phooks (process-hooks hooks)))
-      (make-warm-node parent
-                      (if (and (= axis 1)
-                               (typep parent 'static-kernel))
-                          (static name parent phooks)
-                          (dynamic name axis parent phooks))))))
+      (make-dnode parent
+                  (if (and (= axis 1)
+                           (typep parent 'static-kernel))
+                    (make-static-child-kernel 
+                      :name name
+                      :parent parent
+                      :hooks phooks)
+                    (make-dynamic-child-kernel
+                      :name name
+                      :parent parent
+                      :axis axis
+                      :hooks hooks))))))
 
-(defstruct (stencil (:constructor cons-stencil (node noun parent)))
-  (node nil :type warm-node)
+(defstruct stencil
+  (node nil :type dnode)
   (noun nil :type constant-cell)
   (parent nil :type (or null stencil)))
 
-(defun warm-static-stencil (node unique-core)
-  (cache-hash unique-core (warm-node-stencils node)
-    (cons-stencil node unique-core (warm-node-parent node))))
+(defun find-static-stencil (node unique-core parent-stencil)
+  (cache-hash unique-core (dnode-stencils node)
+    (make-stencil
+      :node node
+      :noun unique-core
+      :parent parent-stencil)))
 
-(defun warm-dynamic-stencil (node unique-battery parent-stencil)
-  (cache-hash (cons unique-battery parent-stencil) (warm-node-stencils node)
-    (cons-stencil node unique-battery parent-stencil)))
+(defun find-dynamic-stencil (node unique-battery parent-stencil)
+  (cache-hash (cons unique-battery parent-stencil)
+              (dnode-stencils node)
+    (make-stencil
+      :node node
+      :noun unique-battery
+      :parent parent-stencil)))
 
-(defun root-stencil (tree unique-core name hooks)
+(defun find-root-stencil (dash unique-core name hooks)
   (let* ((constant (to-integer (constant-cell-tail unique-core)))
-         (node (warm-root (warm-tree-roots tree) name constant hooks)))
-    (warm-static-stencil node unique-core)))
+         (node (find-root-dnode (dashboard-roots dash) name constant hooks)))
+    (find-static-stencil node unique-core nil)))
 
-(defun child-stencil (core name axis hooks)
+(defun find-child-stencil (core name axis hooks)
   (let* ((parent-core (frag core axis))
-         (parent-essence (essence parent-core)))
+         (parent-speed (essence parent-core)))
     (if (eq t parent-essence)
         (error 'exit)
         (let* ((parent-node (stencil-node parent-essence))
                (node (warm-child name axis parent-node hooks))
-               (kernel (warm-node-kernel node)))
+               (kernel (dnode-kernel node)))
           (etypecase kernel
             (static-child-kernel
               (warm-static-stencil node (unique core)))
@@ -93,7 +115,7 @@
     (eq essence stencil)
     (let* ((noun (stencil-noun essence)) 
            (node (stencil-node essence))
-           (kernel (warm-node-kernel node))
+           (kernel (dnode-kernel node))
            (match (etypecase kernel
                     (static-kernel
                       (same noun core))
@@ -109,14 +131,19 @@
   (handler-case (check-inner stencil core)
     (exit () nil)))
 
-(deftype unexamined () 'null) ; dictated by the noun-meta concept
-(deftype impossible () '(and boolean (not unexamined))) ; t
-(deftype strange () 'cons) ; non-empty list of assumptions
-(deftype familiar () 'stencil)
-(deftype essence () '(or impossible strange familiar))
-(deftype gnosis () '(or unexamined essence))
+(defstruct slow-core
+  (assumptions :type list)
+  (edits :type list))
 
-(defnoun-meta essence)
+(deftype fast-core () 'stencil)
+(deftype core-speed () '(or fast-core slow-core))
+
+(defnoun-meta core-speed)
+
+(defun measure (core)
+
+
+
 
 (defun find-essence (unique-battery payload)
   (let* ((battery (battery-meta (nock-meta unique-battery)))
