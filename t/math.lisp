@@ -1,76 +1,72 @@
 (defpackage #:urbit/tests/math
-  (:use #:cl #:prove #:urbit/math))
+  (:use #:cl #:fiveam #:urbit/tests #:urbit/math))
 
 (in-package #:urbit/tests/math)
 
-(subtest "met"
-  (is (met 0 8) 4)
-  (is (met 0 256) 9)
-  (is (met 3 8) 1)
-  (is (met 3 #xff) 1)
-  (is (met 3 #xffff) 2)
-  (is (met 3 #x10000) 3))
+(def-suite math-tests
+           :description "test the primitive math in urbit/math"
+           :in all-tests)
 
-(subtest "mix"
-  (is (mix #b100
-           #b001)
-           #b101)
-  (is (mix #b10010011001001
-           #b10000101010001)
-           #b00010110011000))
+(in-suite math-tests)
 
-(subtest "end"
-  (is (end 0 4 #b1110110) #b0110)
-  (is (end 1 1 #b1110110) #b10)
-  (is (end 3 1 #b11101101101111000101001) #b00101001)
-  (is (end 3 2 #b11101101101111000101001) #b1101111000101001))
+(test met-test
+  (is (= 4 (met 0 8)))
+  (is (= 9 (met 0 256)))
+  (is (= 1 (met 3 8)))
+  (is (= 1 (met 3 #xff)))
+  (is (= 2 (met 3 #xffff)))
+  (is (= 3 (met 3 #x10000))))
 
-(subtest "lsh"
-  (is (lsh 0 1 1) 2)
-  (is (lsh 0 2 1) 4)
-  (is (lsh 0 3 1) 8)
-  (is (lsh 3 1 2) #x200)
-  (is (lsh 3 2 8) #x80000)
-  (is (lsh 3 3 10) #xa000000))
+(test mix-test
+  (is (= #b101 (mix #b100 #b001)))
+  (is (= #b00010110011000 (mix #b10010011001001 #b10000101010001))))
 
-(subtest "rsh"
-  (is (rsh 0 1 2) 1)
-  (is (rsh 0 2 4) 1)
-  (is (rsh 0 3 8) 1)
-  (is (rsh 3 1 #x200) 2)
-  (is (rsh 3 2 #x80000) 8)
-  (is (rsh 3 3 #xa000000) 10)
-  (is (rsh 3 3 #xa111111) 10))
+(test end-test
+  (is (= #b0110 (end 0 4 #b1110110)))
+  (is (= #b10 (end 1 1 #b1110110)))
+  (is (= #b00101001 (end 3 1 #b11101101101111000101001)))
+  (is (= #b1101111000101001 (end 3 2 #b11101101101111000101001))))
 
-(subtest "mas"
-  (is (mas 2) 1)
-  (is (mas 3) 1)
-  (is (mas 4) 2)
-  (is (mas 5) 3)
-  (is (mas 6) 2)
-  (is (mas 7) 3)
-  (is (mas 8) 4))
+(test lsh-test
+  (is (= 2 (lsh 0 1 1)))
+  (is (= 4 (lsh 0 2 1)))
+  (is (= 8 (lsh 0 3 1)))
+  (is (= #x200 (lsh 3 1 2)))
+  (is (= #x80000 (lsh 3 2 8)))
+  (is (= #xa000000 (lsh 3 3 10))))
 
-(subtest "tax"
-  (ok (not (tax 2)))
-  (ok (tax 3))
-  (ok (not (tax 4)))
-  (ok (not (tax 5)))
-  (ok (tax 6))
-  (ok (tax 7))
-  (ok (not (tax 8))))
+(test rsh-test
+  (is (= 1 (rsh 0 1 2)))
+  (is (= 1 (rsh 0 2 4)))
+  (is (= 1 (rsh 0 3 8)))
+  (is (= 2 (rsh 3 1 #x200)))
+  (is (= 8 (rsh 3 2 #x80000)))
+  (is (= 10 (rsh 3 3 #xa000000)))
+  (is (= 10 (rsh 3 3 #xa111111))))
 
-(subtest "pax"
-  (is (pax 2) '(nil))
-  (is (pax 3) '(t))
-  (is (pax 4) '(nil nil))
-  (is (pax 5) '(nil t))
-  (is (pax 6) '(t nil))
-  (is (pax 7) '(t t))
-  (is (pax 8) '(nil nil nil)))
+(test mas-test
+  (is (= 1 (mas 2)))
+  (is (= 1 (mas 3)))
+  (is (= 2 (mas 4)))
+  (is (= 3 (mas 5)))
+  (is (= 2 (mas 6)))
+  (is (= 3 (mas 7)))
+  (is (= 4 (mas 8))))
 
-(subtest "mug"
-  (is (murmug 0) 2046756072)
-  (is (murmug 10) 1174754992)
-  (is (murmug #xdeadbeef) 2140226851)
-  (is (murmugs (murmug 0) (murmug 42)) 1392748553))
+(test tax-test
+  (is-false (tax 2))
+  (is-true (tax 3))
+  (is-false (tax 4))
+  (is-false (tax 5))
+  (is-true (tax 6))
+  (is-true (tax 7))
+  (is-false (tax 8)))
+
+(test pax-test
+  (is (equal '(nil) (pax 2)))
+  (is (equal '(t) (pax 3)))
+  (is (equal '(nil nil) (pax 4)))
+  (is (equal '(nil t) (pax 5)))
+  (is (equal '(t nil) (pax 6)))
+  (is (equal '(t t) (pax 7)))
+  (is (equal '(nil nil nil) (pax 8))))

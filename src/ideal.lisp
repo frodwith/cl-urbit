@@ -4,16 +4,22 @@
 
 (in-package #:urbit/ideal)
 
-; ideals - values which represent "ideal" noun values. while there may be many
-; cell objects in memory with a head of 0 and a tail of 0, there is only one
-; ideal [0 0]. Metadata which depends on the "ideal" value of a noun is stored
-; on its ideal, and the data protocol has a (cached-ideal) accessor for this
-; purpose. Use MAKE-WORLD to create a uniqueness context, and IDEAL to find the
+; TL;DR: Use MAKE-WORLD to create a uniqueness context, and IDEAL to find the
 ; ideal for any noun within that context.
 
-; TODO: get editor integration working again
-;       switch tests to 5am
-;       write a data implementation (the lisp object interface maybe),
+; ideals - values which represent "ideal" noun values. while there may be many
+; cell objects in memory with a head of 0 and a tail of 0, there is only one
+; ideal [0 0]. It is often valuable to use an ideal as the key in an eq
+; hashtable, and certain kinds of metadata (particularly compiled nock formulae
+; / battery information) are stored directly on ideals because looking them up
+; is in the interpreter hot code path. The data protocol has a CACHED-IDEAL
+; accessor to give this system a place to cache its lookups.
+
+; in particular, core speed is generally not accessed through the ideal
+; (though this is possible) because ideal-finding is expensive when not cached,
+; and so not suitable for values with varying parts (i.e. the samples of gates)
+
+; TODO: write a data implementation (the lisp object interface maybe),
 ;       and test that we can deep/head/tail/cl-integer/mug on it. cool.
 ;       test this file (with no ideal noun impl)
 ;       write an ideal noun impl and test it
@@ -33,10 +39,10 @@
 (defun imug (i)
   (declare (ideal i))
   (the mug
-    (etypecase i
-      (fixnum (murmug i))
-      (iatom (iatom-mug i))
-      (icell (icell-mug i)))))
+       (etypecase i
+         (fixnum (murmug i))
+         (iatom (iatom-mug i))
+         (icell (icell-mug i)))))
 
 (defun iatom=mugged (i n)
   (declare (iatom i))
@@ -49,9 +55,9 @@
 (defstruct (icell=mugged-frame
              (:constructor icmf (waiting ideal noun))
              (:conc-name icmf)
-  (waiting :type boolean)
-  (ideal :type ideal :read-only t)
-  (noun :read-only t))
+             (waiting :type boolean)
+             (ideal :type ideal :read-only t)
+             (noun :read-only t)))
 
 (defun icell=mugged (i n)
   (declare (icell i))
@@ -63,20 +69,20 @@
                            (icmf t i n)
                            nil)))
          (do () ((null frame) t)
-           (let ((i (icmf-ideal frame))
-                 (n (icmf-noun frame)))
-             (if (icmf-waiting frame)
-               (progn (setf (cached-ideal n) i)
-                      (pop stack)
-                      (setq frame (car stack)))
-               (etypecase i
-                 (fixnum (unless (= i n) (return nil)))
-                 (iatom  (unless (iatom=mugged i n) (return nil)))
-                 (icell  (unless (= (icell-mug i) (mug n)) (return nil))
-                         (setf (icmf-waiting frame) t)
-                         (push (icmf nil (icell-tail i) (tail n)) stack)
-                         (setq frame (icmf nil (icell-head i) (head n)))
-                         (push frame stack)))))))))
+             (let ((i (icmf-ideal frame))
+                   (n (icmf-noun frame)))
+               (if (icmf-waiting frame)
+                   (progn (setf (cached-ideal n) i)
+                          (pop stack)
+                          (setq frame (car stack)))
+                   (etypecase i
+                     (fixnum (unless (= i n) (return nil)))
+                     (iatom  (unless (iatom=mugged i n) (return nil)))
+                     (icell  (unless (= (icell-mug i) (mug n)) (return nil))
+                             (setf (icmf-waiting frame) t)
+                             (push (icmf nil (icell-tail i) (tail n)) stack)
+                             (setq frame (icmf nil (icell-head i) (head n)))
+                             (push frame stack)))))))))
 
 (defun ideal-hash (a)
   (typecase a
@@ -114,47 +120,47 @@
     (setf (gethash i table) i)
     i))
 
-(defun make-ideal (table mugged)
+(defun create-ideal (table mugged)
   (if (not (deep mugged))
-    (put-iatom table mugged)
-    (let ((accum nil)
-          (frame (cons 0 mugged))
-          (stack (list frame nil)))
-      (flet ((more (n)
-               (setq frame (cons 0 n))
-               (push frame stack))
-             (retn (i)
-               (setq accum i)
-               (pop stack)
-               (setq frame (car stack))))
-        (do ((null frame) accum)
-          (ecase (car frame)
-            ((0) (let* ((n (cdr frame))
-                        (c (cached-ideal n)))
-                   (if c
-                     (retn c)
-                     (let ((h (hashed-ideal table n)))
-                       (if h
-                         (retn h)
-                         (if (not (deep n))
-                           (retn (put-iatom table n))
-                           (progn
-                             (setf (car frame) 1)
-                             (more (head n)))))))))
-            ((1) (let ((n (cdr frame)))
-                   (setf (car frame) 2)
-                   (setf (cdr frame) (cons n accum))
-                   (more (tail n))))
-            ((2) (destructuring-bind (cdr frame) (n . ideal-head)
-                   (let ((i (make-icell :head ideal-head
-                                        :tail accum
-                                        :mug (murmugs (imug ideal-head)
-                                                      (imug accum)))))
-                     (setf (cached-ideal n) i)
-                     (setf (gethash i table) i)
-                     (retn i))))))))))
+      (put-iatom table mugged)
+      (let ((accum nil)
+            (frame (cons 0 mugged))
+            (stack (list frame nil)))
+        (flet ((more (n)
+                 (setq frame (cons 0 n))
+                 (push frame stack))
+               (retn (i)
+                 (setq accum i)
+                 (pop stack)
+                 (setq frame (car stack))))
+          (do ((null frame) accum)
+              (ecase (car frame)
+                ((0) (let* ((n (cdr frame))
+                            (c (cached-ideal n)))
+                       (if c
+                           (retn c)
+                           (let ((h (hashed-ideal table n)))
+                             (if h
+                                 (retn h)
+                                 (if (not (deep n))
+                                     (retn (put-iatom table n))
+                                     (progn
+                                       (setf (car frame) 1)
+                                       (more (head n)))))))))
+                ((1) (let ((n (cdr frame)))
+                       (setf (car frame) 2)
+                       (setf (cdr frame) (cons n accum))
+                       (more (tail n))))
+                ((2) (destructuring-bind (cdr frame) (n . ideal-head)
+                       (let ((i (make-icell :head ideal-head
+                                            :tail accum
+                                            :mug (murmugs (imug ideal-head)
+                                                          (imug accum)))))
+                         (setf (cached-ideal n) i)
+                         (setf (gethash i table) i)
+                         (retn i))))))))))
 
 (defun ideal (world noun)
   (or (cached-ideal noun)
       (hashed-ideal table noun)
-      (make-ideal table noun))))
+      (create-ideal table noun)))

@@ -1,9 +1,7 @@
 (defpackage #:urbit/math
   (:use #:cl)
-  (:import-from #:murmurhash #:murmurhash)
-  (:export #:met #:mix #:end #:lsh #:rsh
-           #:mas #:tax #:pax
-           #:mug #:murmug #:murmugs))
+  (:export #:uint #:met #:mix #:end #:lsh #:rsh
+           #:mas #:tax #:pax))
 
 (in-package #:urbit/math)
 
@@ -29,13 +27,13 @@
 (defun met (b a)
   (declare (uint b a))
   (the uint
-    (let ((bits (integer-length a)))
-      (if (zerop b)
-          bits
-          (let ((full (ash bits (- b))))
-            (if (> bits (ash full b))
-              (1+ full)
-              full))))))
+       (let ((bits (integer-length a)))
+         (if (zerop b)
+           bits
+           (let ((full (ash bits (- b))))
+             (if (> bits (ash full b))
+               (1+ full)
+               full))))))
 
 (defun mix (a b)
   (declare (uint a b))
@@ -58,32 +56,20 @@
 (deftype decomposable-axis () '(integer 2))
 
 (defun mas (a)
+  "strips the first path element from axis"
   (declare (decomposable-axis a))
   (the uint
-    (let ((len (- (integer-length a) 2)))
-      (logxor (ash 1 len) (low-bits len a)))))
+       (let ((len (- (integer-length a) 2)))
+         (logxor (ash 1 len) (low-bits len a)))))
 
 (defun tax (a)
+  "boolean - is axis in tail?"
   (declare (decomposable-axis a))
   (the boolean (logbitp (- (integer-length a) 2) a)))
 
 (defun pax (a)
+  "list of path elements (t=tail, nil=head) for axis"
   (declare (decomposable-axis a))
   (the list
-    (loop for i downfrom (- (integer-length a) 2) to 0
-          collecting (logbitp i a))))
-
-; murmur3 hash computation
-(deftype mug () '(unsigned-byte 31))
-
-(defun murmug (a)
-  (declare (uint a))
-  (the mug
-    (loop for syd upfrom #xcafebabe
-          for haz = (murmurhash a :seed syd)
-          for ham = (mix (rsh 0 31 haz) (end 0 31 haz))
-          unless (zerop ham) return ham)))
-
-(defun murmugs (a b)
-  (declare (mug a b))
-  (the mug (murmug (mix a (mix #x7fffffff b)))))
+       (loop for i downfrom (- (integer-length a) 2) to 0
+             collecting (logbitp i a))))
