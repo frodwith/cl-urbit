@@ -1,5 +1,5 @@
 (defpackage #:urbit/ideal
-  (:use #:cl #:urbit/data)
+  (:use #:cl #:urbit/data #:urbit/mug)
   (:export #:make-world #:ideal))
 
 (in-package #:urbit/ideal)
@@ -25,14 +25,14 @@
 ;       write an ideal noun impl and test it
 ;       add battery/formula slots, write nock.lisp (nock/pull)
 
-(defstruct icell
-  (head :read-only t :type ideal)
-  (tail :read-only t :type ideal)
-  (mug :read-only t :type mug))
+(defstruct (iatom (:constructor mkiatom (int mug)))
+  (int nil :read-only t :type bignum)
+  (mug nil :read-only t :type mug))
 
-(defstruct iatom
-  (int :read-only t :type bignum)
-  (mug :read-only t :type mug))
+(defstruct (icell (:constructor icons (head tail mug)))
+  (head nil :read-only t :type ideal)
+  (tail nil :read-only t :type ideal)
+  (mug nil :read-only t :type mug))
 
 (deftype ideal () '(or fixnum iatom icell))
 
@@ -46,7 +46,7 @@
 
 (defun iatom=mugged (i n)
   (declare (iatom i))
-  (when (and (not deep n)
+  (when (and (not (deep n))
              (= (iatom-mug i) (mug n))
              (= (iatom-int i) (cl-integer n)))
     (setf (cached-ideal n) i)
@@ -54,10 +54,10 @@
 
 (defstruct (icell=mugged-frame
              (:constructor icmf (waiting ideal noun))
-             (:conc-name icmf)
-             (waiting :type boolean)
-             (ideal :type ideal :read-only t)
-             (noun :read-only t)))
+             (:conc-name icmf-))
+  (waiting nil :type boolean)
+  (ideal nil :type ideal :read-only t)
+  (noun nil :read-only t))
 
 (defun icell=mugged (i n)
   (declare (icell i))
@@ -103,29 +103,29 @@
          (iatom (iatom=mugged b a))
          (icell (icell=mugged b a))))))
 
-(define-hash-table-test ideal= ideal-hash)
+(sb-ext:define-hash-table-test ideal= ideal-hash)
 
 (defun make-world ()
   "the context in which uniqueness is ensured"
   (make-hash-table :test 'ideal= :weakness :key))
 
-(defun hashed-ideal (table noun)
-  (let ((found (gethash noun table)))
+(defun hashed-ideal (world noun)
+  (let ((found (gethash noun world)))
     (when found (setf (cached-ideal noun) found))
     found))
 
-(defun put-iatom (table a)
-  (let ((i (make-iatom :int (cl-integer a) :mug (mug a))))
+(defun put-iatom (world a)
+  (let ((i (mkiatom (cl-integer a) (mug a))))
     (setf (cached-ideal a) i)
-    (setf (gethash i table) i)
+    (setf (gethash i world) i)
     i))
 
-(defun create-ideal (table mugged)
+(defun create-ideal (world mugged)
   (if (not (deep mugged))
-      (put-iatom table mugged)
-      (let ((accum nil)
-            (frame (cons 0 mugged))
-            (stack (list frame nil)))
+      (put-iatom world mugged)
+      (let* ((accum nil)
+             (frame (cons 0 mugged))
+             (stack (list frame nil)))
         (flet ((more (n)
                  (setq frame (cons 0 n))
                  (push frame stack))
@@ -133,34 +133,33 @@
                  (setq accum i)
                  (pop stack)
                  (setq frame (car stack))))
-          (do ((null frame) accum)
+          (do () ((null frame) accum)
               (ecase (car frame)
-                ((0) (let* ((n (cdr frame))
-                            (c (cached-ideal n)))
+                (0 (let* ((n (cdr frame))
+                          (c (cached-ideal n)))
                        (if c
                            (retn c)
-                           (let ((h (hashed-ideal table n)))
+                           (let ((h (hashed-ideal world n)))
                              (if h
                                  (retn h)
                                  (if (not (deep n))
-                                     (retn (put-iatom table n))
+                                     (retn (put-iatom world n))
                                      (progn
                                        (setf (car frame) 1)
                                        (more (head n)))))))))
-                ((1) (let ((n (cdr frame)))
+                (1 (let ((n (cdr frame)))
                        (setf (car frame) 2)
                        (setf (cdr frame) (cons n accum))
                        (more (tail n))))
-                ((2) (destructuring-bind (cdr frame) (n . ideal-head)
-                       (let ((i (make-icell :head ideal-head
-                                            :tail accum
-                                            :mug (murmugs (imug ideal-head)
-                                                          (imug accum)))))
+                (2 (destructuring-bind (n . ideal-head) (cdr frame)
+                       (let ((i (icons ideal-head accum
+                                       (murmugs (imug ideal-head)
+                                                (imug accum)))))
                          (setf (cached-ideal n) i)
-                         (setf (gethash i table) i)
+                         (setf (gethash i world) i)
                          (retn i))))))))))
 
 (defun ideal (world noun)
   (or (cached-ideal noun)
-      (hashed-ideal table noun)
-      (create-ideal table noun)))
+      (hashed-ideal world noun)
+      (create-ideal world noun)))
