@@ -132,10 +132,14 @@
     found))
 
 (defun put-iatom (world a)
-  (let ((i (make-iatom (cl-integer a) (mug a))))
-    (setf (cached-ideal a) i)
-    (setf (gethash i (world-atoms world)) i)
-    i))
+  (let ((int (cl-integer a)))
+    (etypecase int
+      (fixnum (setf (cached-ideal a) int)
+              int)
+      (bignum (let ((big (make-iatom int (mug a))))
+                (setf (cached-ideal a) big)
+                (setf (gethash big (world-atoms world) big))
+                big)))))
 
 (defun create-ideal (world deep mugged)
   (if (not deep)
@@ -178,7 +182,7 @@
                        (retn i))))))))))
 
 (defun ideal (world noun)
-  (or (cached-ideal noun) ; filters out fixnums
+  (or (cached-ideal noun)
       (let ((deep (deep noun)))
         (or (hashed-ideal world deep noun)
             (create-ideal world deep noun)))))
