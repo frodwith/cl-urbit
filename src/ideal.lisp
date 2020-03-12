@@ -1,6 +1,8 @@
 (defpackage #:urbit/ideal
   (:use #:cl #:urbit/data #:urbit/mug)
-  (:export #:make-world #:ideal))
+  (:export #:make-world #:ideal #:imug
+           #:iatom #:iatom-mug #:iatom-int #:iatom=mugatom
+           #:icell #:icell-mug #:icell-head #:icell-tail #:icell=mugcell))
 
 (in-package #:urbit/ideal)
 
@@ -16,13 +18,13 @@
 ; accessor to give this system a place to cache its lookups.
 
 ; in particular, core speed is generally not accessed through the ideal
-; (though this is possible) because ideal-finding is expensive when not cached,
-; and so not suitable for values with varying parts (i.e. the samples of gates)
+; (though this is possible) because ideal-finding is expensive (a hashtable
+; lookup+) when not cached, and so not suitable for values with varying parts
+; (i.e. the samples of gates)
 
-; TODO: write a data implementation (the lisp object interface maybe),
-;       and test that we can deep/head/tail/cl-integer/mug on it. cool.
-;       test this file (with no ideal noun impl)
-;       write an ideal noun impl and test it
+; TODO: write data interface tests and pass them lisp objects
+;       test this file (with no ideal data impl)
+;       write an ideal data impl and test it
 ;       add battery/formula slots, write nock.lisp (nock/pull)
 
 (defstruct (iatom (:constructor make-iatom (int mug)))
@@ -124,65 +126,65 @@
   (atoms (make-hash-table :test 'atoms= :weakness :key) :read-only t)
   (cells (make-hash-table :test 'cells= :weakness :key) :read-only t))
 
-(defun hashed-ideal (world deep noun)
-  (let ((found (gethash noun (if deep
-                                 (world-cells world)
-                                 (world-atoms world)))))
+(defun hashed-ideal (table noun)
+  (let ((found (gethash noun table)))
     (when found (setf (cached-ideal noun) found))
     found))
 
-(defun put-iatom (world a)
+(defun create-iatom (atoms a)
   (let ((int (cl-integer a)))
     (etypecase int
       (fixnum (setf (cached-ideal a) int)
               int)
       (bignum (let ((big (make-iatom int (mug a))))
                 (setf (cached-ideal a) big)
-                (setf (gethash big (world-atoms world) big))
+                (setf (gethash big atoms) big)
                 big)))))
 
-(defun create-ideal (world deep mugged)
-  (if (not deep)
-      (put-iatom world mugged)
-      (let* ((accum nil)
-             (frame (cons 0 (head mugged)))
-             (stack (list frame (cons 1 mugged) nil)))
-        (flet ((more (n)
-                 (setq frame (cons 0 n))
-                 (push frame stack))
-               (retn (i)
-                 (setq accum i)
-                 (pop stack)
-                 (setq frame (car stack))))
-          (do () ((null frame) accum)
-              (ecase (car frame)
-                (0 (let* ((n (cdr frame))
-                          (c (cached-ideal n)))
-                     (if c
-                         (retn c)
-                         (let* ((deep (deep n))
-                                (has  (hashed-ideal world deep n)))
-                           (if hash
-                               (retn has)
-                               (if (not deep)
-                                   (retn (put-iatom world n))
-                                   (progn
-                                     (setf (car frame) 1)
-                                     (more (head n)))))))))
-                (1 (let ((n (cdr frame)))
-                     (setf (car frame) 2)
-                     (setf (cdr frame) (cons n accum))
-                     (more (tail n))))
-                (2 (destructuring-bind (n . ideal-head) (cdr frame)
-                     (let ((i (icons ideal-head accum
-                                     (murmugs (imug ideal-head)
-                                              (imug accum)))))
-                       (setf (cached-ideal n) i)
-                       (setf (gethash i (world-cells world)) i)
-                       (retn i))))))))))
+(defun create-icell (atoms cells mugged)
+  (let* ((accum nil)
+         (frame (cons 0 (head mugged)))
+         (stack (list frame (cons 1 mugged) nil)))
+    (flet ((more (n)
+             (setq frame (cons 0 n))
+             (push frame stack))
+           (retn (i)
+             (setq accum i)
+             (pop stack)
+             (setq frame (car stack))))
+      (do () ((null frame) accum)
+          (ecase (car frame)
+            (0 (let* ((n (cdr frame))
+                      (c (cached-ideal n)))
+                 (if c
+                     (retn c)
+                     (let* ((deep (deep n))
+                            (has  (hashed-ideal (if deep cells atoms) n)))
+                       (if has
+                           (retn has)
+                           (if (not deep)
+                               (retn (create-iatom atoms n))
+                               (progn
+                                 (setf (car frame) 1)
+                                 (more (head n)))))))))
+            (1 (let ((n (cdr frame)))
+                 (setf (car frame) 2)
+                 (setf (cdr frame) (cons n accum))
+                 (more (tail n))))
+            (2 (destructuring-bind (n . ideal-head) (cdr frame)
+                 (let ((i (icons ideal-head accum
+                                 (murmugs (imug ideal-head)
+                                          (imug accum)))))
+                   (setf (cached-ideal n) i)
+                   (setf (gethash i cells) i)
+                   (retn i)))))))))
 
 (defun ideal (world noun)
   (or (cached-ideal noun)
-      (let ((deep (deep noun)))
-        (or (hashed-ideal world deep noun)
-            (create-ideal world deep noun)))))
+      (if (deep noun)
+          (let ((cells (world-cells world)))
+            (or (hashed-ideal cells noun)
+                (create-icell (world-atoms world) cells noun)))
+          (let ((atoms (world-atoms world)))
+            (or (hashed-ideal atoms noun)
+                (create-iatom atoms noun))))))
