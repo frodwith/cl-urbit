@@ -25,7 +25,7 @@
 ;       write an ideal noun impl and test it
 ;       add battery/formula slots, write nock.lisp (nock/pull)
 
-(defstruct (iatom (:constructor mkiatom (int mug)))
+(defstruct (iatom (:constructor make-iatom (int mug)))
   (int nil :read-only t :type bignum)
   (mug nil :read-only t :type mug))
 
@@ -44,88 +44,105 @@
          (iatom (iatom-mug i))
          (icell (icell-mug i)))))
 
-(defun iatom=mugged (i n)
+(defun iatom=mugatom (i n)
   (declare (iatom i))
-  (when (and (not (deep n))
-             (= (iatom-mug i) (mug n))
+  (when (and (= (iatom-mug i) (mug n))
              (= (iatom-int i) (cl-integer n)))
     (setf (cached-ideal n) i)
     t))
 
-(defstruct (icell=mugged-frame
+(defstruct (icell=mugcell-frame
              (:constructor icmf (waiting ideal noun))
              (:conc-name icmf-))
   (waiting nil :type boolean)
   (ideal nil :type ideal :read-only t)
   (noun nil :read-only t))
 
-(defun icell=mugged (i n)
+(defun icell=mugcell (i n)
   (declare (icell i))
-  (and (deep n)
-       (= (mug n) (icell-mug i))
+  (and (= (mug n) (icell-mug i))
        (let* ((frame (icmf nil (icell-head i) (head n)))
               (stack (list frame
                            (icmf nil (icell-tail i) (tail n))
                            (icmf t i n)
                            nil)))
-         (do () ((null frame) t)
-             (let ((i (icmf-ideal frame))
-                   (n (icmf-noun frame)))
-               (if (icmf-waiting frame)
-                   (progn (setf (cached-ideal n) i)
-                          (pop stack)
-                          (setq frame (car stack)))
-                   (etypecase i
-                     (fixnum (unless (= i n) (return nil)))
-                     (iatom  (unless (iatom=mugged i n) (return nil)))
-                     (icell  (unless (= (icell-mug i) (mug n)) (return nil))
-                             (setf (icmf-waiting frame) t)
-                             (push (icmf nil (icell-tail i) (tail n)) stack)
-                             (setq frame (icmf nil (icell-head i) (head n)))
-                             (push frame stack)))))))))
+         (flet ((next ()
+                  (pop stack)
+                  (setq frame (car stack))))
+           (do () ((null frame) t)
+               (let ((i (icmf-ideal frame))
+                     (n (icmf-noun frame)))
+                 (if (icmf-waiting frame)
+                     (progn (setf (cached-ideal n) i)
+                            (next))
+                     (etypecase i
+                       (fixnum (if (= i n)
+                                   (next)
+                                   (return nil)))
+                       (iatom (if (and (not deep n) (iatom=mugatom i n))
+                                  (next)
+                                  (return nil)))
+                       (icell (unless (= (icell-mug i) (mug n)) (return nil))
+                              (setf (icmf-waiting frame) t)
+                              (push (icmf nil (icell-tail i) (tail n)) stack)
+                              (setq frame (icmf nil (icell-head i) (head n)))
+                              (push frame stack))))))))))
 
-(defun ideal-hash (a)
-  (typecase a
-    (ideal (imug a))
-    (t (mug a))))
+(defun cells-hash (c)
+  (if (typep c 'icell)
+      (icell-mug c)
+      (mug c)))
 
-(defun ideal= (a b)
-  (typecase a
-    (iatom (typecase b
-             (iatom (eq a b))
-             (icell nil)
-             (t (iatom=mugged a b))))
-    (icell (typecase b
-             (iatom nil)
-             (icell (eq a b))
-             (t (icell=mugged a b))))
-    (t (etypecase b
-         (iatom (iatom=mugged b a))
-         (icell (icell=mugged b a))))))
+(defun cells= (a b)
+  (if (typep a 'icell)
+      (if (typep b 'icell)
+          (eq a b)
+          (icell=mugcell a b))
+      (icell=mugcell b a)))
 
-(sb-ext:define-hash-table-test ideal= ideal-hash)
+(sb-ext:define-hash-table-test cells= cells-hash)
 
-(defun make-world ()
+(defun atoms-hash (a)
+  (if (typep a 'iatom)
+      (atom-mug a)
+      (mug a)))
+
+(defun atoms= (a b)
+  (if (typep a 'iatom)
+      (if (typep b 'iatom)
+          (eq a b)
+          (iatom=mugatom a b))
+      (iatom=mugatom b a)))
+
+(sb-ext:define-hash-table-test atoms= atoms-hash)
+
+(defstruct (world (:constructor make-world ()))
   "the context in which uniqueness is ensured"
-  (make-hash-table :test 'ideal= :weakness :key))
+  ; split into two tables because
+  ; 1) smaller tables = faster lookups
+  ; 2) distinguished groups = faster hash/comparison
+  (atoms (make-hash-table :test 'atoms= :weakness :key) :read-only t)
+  (cells (make-hash-table :test 'cells= :weakness :key) :read-only t))
 
-(defun hashed-ideal (world noun)
-  (let ((found (gethash noun world)))
+(defun hashed-ideal (world deep noun)
+  (let ((found (gethash noun (if deep
+                                 (world-cells world)
+                                 (world-atoms world)))))
     (when found (setf (cached-ideal noun) found))
     found))
 
 (defun put-iatom (world a)
-  (let ((i (mkiatom (cl-integer a) (mug a))))
+  (let ((i (make-iatom (cl-integer a) (mug a))))
     (setf (cached-ideal a) i)
-    (setf (gethash i world) i)
+    (setf (gethash i (world-atoms world)) i)
     i))
 
-(defun create-ideal (world mugged)
-  (if (not (deep mugged))
+(defun create-ideal (world deep mugged)
+  (if (not deep)
       (put-iatom world mugged)
       (let* ((accum nil)
-             (frame (cons 0 mugged))
-             (stack (list frame nil)))
+             (frame (cons 0 (head mugged)))
+             (stack (list frame (cons 1 mugged) nil)))
         (flet ((more (n)
                  (setq frame (cons 0 n))
                  (push frame stack))
@@ -137,29 +154,31 @@
               (ecase (car frame)
                 (0 (let* ((n (cdr frame))
                           (c (cached-ideal n)))
-                       (if c
-                           (retn c)
-                           (let ((h (hashed-ideal world n)))
-                             (if h
-                                 (retn h)
-                                 (if (not (deep n))
-                                     (retn (put-iatom world n))
-                                     (progn
-                                       (setf (car frame) 1)
-                                       (more (head n)))))))))
+                     (if c
+                         (retn c)
+                         (let* ((deep (deep n))
+                                (has  (hashed-ideal world deep n)))
+                           (if hash
+                               (retn has)
+                               (if (not deep)
+                                   (retn (put-iatom world n))
+                                   (progn
+                                     (setf (car frame) 1)
+                                     (more (head n)))))))))
                 (1 (let ((n (cdr frame)))
-                       (setf (car frame) 2)
-                       (setf (cdr frame) (cons n accum))
-                       (more (tail n))))
+                     (setf (car frame) 2)
+                     (setf (cdr frame) (cons n accum))
+                     (more (tail n))))
                 (2 (destructuring-bind (n . ideal-head) (cdr frame)
-                       (let ((i (icons ideal-head accum
-                                       (murmugs (imug ideal-head)
-                                                (imug accum)))))
-                         (setf (cached-ideal n) i)
-                         (setf (gethash i world) i)
-                         (retn i))))))))))
+                     (let ((i (icons ideal-head accum
+                                     (murmugs (imug ideal-head)
+                                              (imug accum)))))
+                       (setf (cached-ideal n) i)
+                       (setf (gethash i (world-cells world)) i)
+                       (retn i))))))))))
 
 (defun ideal (world noun)
-  (or (cached-ideal noun)
-      (hashed-ideal world noun)
-      (create-ideal world noun)))
+  (or (cached-ideal noun) ; filters out fixnums
+      (let ((deep (deep noun)))
+        (or (hashed-ideal world deep noun)
+            (create-ideal world deep noun)))))
