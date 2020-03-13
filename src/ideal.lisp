@@ -81,7 +81,7 @@
                        (fixnum (if (= i n)
                                    (next)
                                    (return nil)))
-                       (iatom (if (and (not deep n) (iatom=mugatom i n))
+                       (iatom (if (and (not (deep n)) (iatom=mugatom i n))
                                   (next)
                                   (return nil)))
                        (icell (unless (= (icell-mug i) (mug n)) (return nil))
@@ -106,7 +106,7 @@
 
 (defun atoms-hash (a)
   (if (typep a 'iatom)
-      (atom-mug a)
+      (iatom-mug a)
       (mug a)))
 
 (defun atoms= (a b)

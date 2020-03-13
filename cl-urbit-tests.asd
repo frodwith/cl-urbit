@@ -7,6 +7,7 @@
                 :components
                 ((:file "tests")
                  (:file "math")
-                 (:file "mug"))))
+                 (:file "mug")
+                 (:file "data"))))
   :perform (test-op (o s)
     (uiop:symbol-call '#:urbit/tests '#:test-urbit)))

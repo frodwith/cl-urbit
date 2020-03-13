@@ -10,7 +10,12 @@
                 :components
                 ((:file "math")
                  (:file "data")
-                 (:file "mug"))))
+                 (:file "mug")
+                 (:file "ideal")
+                 (:file "data/fixnum")
+                 (:file "data/bignum")
+                 (:file "data/cons")
+                 )))
   :description "nock runtime and urbit worker process (http://urbit.org)"
   :long-description
   #.(uiop:read-file-string

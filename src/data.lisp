@@ -1,45 +1,53 @@
 (defpackage #:urbit/data
   (:use #:cl)
-  (:export #:noun-required #:atom-required #:cell-required
-           #:deep #:head #:tail #:cl-integer
+  (:export #:deep #:head #:tail #:cl-integer
            #:cached-mug #:cached-ideal #:cached-battery #:cached-speed))
 
 (in-package #:urbit/data)
 
 ; the data protocol: types which represent nouns should implement these methods
 
-(define-condition noun-required (error)
+(define-condition data-error (error)
   ((object :initarg #:given)))
 
-(define-condition atom-required (noun-required) ())
-(define-condition cell-required (noun-required) ())
+(define-condition unimplemented (data-error)
+  ((name :initarg #:name :type symbol)))
+
+(define-condition exit (data-error) ())
+(define-condition atom-required (exit) ())
+(define-condition cell-required (exit) ())
 
 ; say you're a noun by saying whether you're an atom or a cell
 (defgeneric deep (object)
-  (:documentation "give a true value for a cell and a false value for an object")
+  (:documentation "give a true value for a cell or a false value for an atom")
   (:method (non-noun)
-   (error 'noun-required :given non-noun)))
+   (error 'unimplemented :name 'deep :given non-noun)))
 
-(defmacro defdata (name condition)
+(defmacro defdata (name kind)
   `(eval-when (:compile-toplevel :load-toplevel :execute)
      (defgeneric ,name (object)
-       ; signal a condition
-       (:method (o) (error ,condition :given o)))
+       (:method (o) 
+        ,(ecase kind
+           (noun `(error 'unimplemented :name ',name :given o))
+           (atom `(if (deep o)
+                      (error 'atom-required :given o)
+                      (error 'unimplemented :name ',name :given o)))
+           (cell `(if (deep o)
+                      (error 'unimplemented :name ',name :given o)
+                      (error 'cell-required :given o))))))
      (defgeneric (setf ,name) (value object)
        ; ignore the provided value
        (:method (value object) value))))
 
-; all nouns must implement
-(defdata cached-mug 'noun-required)
-(defdata cached-ideal 'noun-required)
+(defdata cached-mug noun)
+(defdata cached-ideal noun)
 
 ; atom must implement
-(defdata cl-integer 'atom-required)
+(defdata cl-integer atom)
 
-; cells must implement
-(defdata head 'cell-required)
-(defdata tail 'cell-required)
-(defdata cached-speed 'cell-required)
+(defdata head cell)
+(defdata tail cell)
+(defdata cached-speed cell)
 
 ; battery is a combination of head and ideal,
 ; so it has a reasonable default implementation,
