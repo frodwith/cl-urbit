@@ -1,6 +1,8 @@
 (defpackage #:urbit/data
   (:use #:cl)
-  (:export #:deep #:head #:tail #:cl-integer
+  (:export #:data-error #:unimplemented
+           #:exit #:atom-required #:cell-required
+           #:deep #:head #:tail #:cl-integer
            #:cached-mug #:cached-ideal #:cached-battery #:cached-speed))
 
 (in-package #:urbit/data)

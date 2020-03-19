@@ -1,7 +1,5 @@
 (defpackage #:urbit/data/cons
-  (:use #:cl #:urbit/data #:urbit/mug)
-  (:import-from #:urbit/mug #:mug)
-  (:import-from #:urbit/ideal #:icell #:icell-mug))
+  (:use #:cl #:urbit/data #:urbit/mug #:urbit/ideal))
 
 (in-package #:urbit/data/cons)
 
@@ -34,18 +32,24 @@
     (and (typep m 'icell) m)))
 
 (defmethod (setf cached-ideal) ((val icell) (c cons))
-  (setf (meta c) val))
+  (setf (meta c) val)
+  (setf (car c) (icell-head val))
+  (setf (cdr c) (icell-tail val)))
 
 (defmethod head ((c cons))
   (car c))
 
 (defmethod (setf head) (val (c cons))
-  (setf (car c) val))
+  (etypecase (meta c)
+    ((or null mug) (setf (car c) val))
+    (icell val)))
 
 (defmethod tail ((c cons))
   (cdr c))
 
 (defmethod (setf tail) (val (c cons))
-  (setf (cdr c) val))
+  (etypecase (meta c)
+    ((or null mug) (setf (cdr c) val))
+    (icell val)))
 
 ; TODO: cached-speed
