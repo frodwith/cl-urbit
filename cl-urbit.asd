@@ -8,8 +8,8 @@
   :components ((:module "src"
                 :serial t
                 :components
-                ((:file "util")
-                 (:file "math")
+                ((:file "math")
+                 (:file "dostack")
                  (:file "data")
                  (:file "mug")
                  (:file "ideal")

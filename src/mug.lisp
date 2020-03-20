@@ -1,5 +1,5 @@
 (defpackage #:urbit/mug
-  (:use #:cl #:urbit/data #:urbit/math #:urbit/util #:murmurhash)
+  (:use #:cl #:urbit/data #:urbit/math #:urbit/dostack #:murmurhash)
   (:export #:mug #:murmug #:murmugs))
 
 (in-package #:urbit/mug)
@@ -33,13 +33,13 @@
     m))
 
 (defun mug-cell (cell)
-  (give-take
+  (dostack-accumulate
     (main (more (cons t cell))
           (give (head cell)))
     (give (n)
       (let ((c (cached-mug n)))
         (when c (take c))
-        (unless (deep n) (take (murmug (cl-integer n))))
+        (unless (deep n) (take (mug-atom n)))
         (more (cons t n))
         (give (head n))))
     (take (r top)
@@ -60,30 +60,3 @@
       (if (deep n)
           (mug-cell n)
           (mug-atom n))))
-
-;(flet ((more (n)
-;;             (setq frame (cons 0 n))
-;;             (push frame stack) 
-;;           (retn (m)
-;;             (pop stack)
-;;             (setq accum m)
-;;             (setq frame (car stack))) 
-;;      (do () ((null frame) accum)
-;;          (ecase (car frame)
-;;            (0 (let* ((n (cdr frame))
-;;                      (c (cached-mug n)))
-;;                 (if c
-;;                     (retn c)
-;;                     (if (not (deep n))
-;;                         (retn (mug-atom n))
-;;                         (progn
-;;                           (setf (car frame) 1)
-;;                           (more (head n)))))))
-;;            (1 (let ((n (cdr frame)))
-;;                 (setf (car frame) 2)
-;;                 (setf (cdr frame) (cons n accum))
-;;                 (more (tail n))))
-;;            (2 (destructuring-bind (n . m) (cdr frame)
-;;                 (let ((m (murmugs m accum)))
-;;                   (setf (cached-mug n) m)
-;;                   (retn m)))))) 
