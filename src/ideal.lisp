@@ -72,20 +72,19 @@
   (declare (icell i))
   (if-let (ci (cached-ideal c))
     (eq i ci)
-    (and (= (icell-mug i) (cached-mug c))
-         (flet ((fast (i c)
-                  (let ((ci (cached-ideal c)))
-                    (if ci
-                        (shallow (eq i ci))
-                        (if (= (icell-mug i) (cached-mug c))
-                            :deep
-                            :diff)))))
-           (when (cell= i c
-                   #'ideep #'deep 
-                   #'icell-head #'head
-                   #'icell-tail #'tail
-                   #'iatom=mugatom #'icell-copy #'fast)
-             (icell-copy i c))))))
+    (flet ((fast (i c)
+             (let ((ci (cached-ideal c)))
+               (if ci
+                   (shallow (eq i ci))
+                   (if (= (icell-mug i) (cached-mug c))
+                       :deep
+                       :diff)))))
+      (when (cell= i c
+              #'ideep #'deep
+              #'icell-head #'head
+              #'icell-tail #'tail
+              #'iatom=mugatom #'icell-copy #'fast)
+        (icell-copy i c)))))
 
 (defun cells-hash (c)
   (if (typep c 'icell)
