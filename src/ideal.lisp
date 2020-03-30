@@ -1,5 +1,5 @@
 (defpackage #:urbit/ideal
-  (:use #:cl #:urbit/data #:urbit/mug #:urbit/dostack)
+  (:use #:cl #:urbit/data #:urbit/mug #:urbit/control)
   (:export #:make-world #:ideal #:imug
            #:iatom #:iatom-mug #:iatom-int #:iatom=mugatom
            #:icell #:icell-mug #:icell-head #:icell-tail #:icell=mugcell))
@@ -22,7 +22,8 @@
 ; lookup+) when not cached, and so not suitable for values with varying parts
 ; (i.e. the samples of gates)
 
-; TODO: write data interface tests and pass them lisp objects
+; TODO: Full Unifying Equality
+;       write data interface tests and pass them lisp objects
 ;       test this file (with no ideal data impl)
 ;       write an ideal data impl and test it
 ;       add battery/formula slots, write nock.lisp (nock/pull)
@@ -46,48 +47,45 @@
          (iatom (iatom-mug i))
          (icell (icell-mug i)))))
 
-(defun iatom=mugatom (i n)
-  (declare (iatom i))
-  (when (and (= (iatom-mug i) (mug n))
-             (= (iatom-int i) (cl-integer n)))
-    (setf (cached-ideal n) i)
-    t))
+(defun ideep (i)
+  (declare (ideal i))
+  (etypecase i
+    (icell t)
+    ((or fixnum iatom) nil)))
 
-(defstruct (icell=mugcell-frame
-             (:constructor icmf (waiting ideal noun))
-             (:conc-name icmf-))
-  (waiting nil :type boolean)
-  (ideal nil :type ideal :read-only t)
-  (noun nil :read-only t))
+(defun iatom=mugatom (i a)
+  (or (eql i a)
+      (and (not (cached-ideal a))
+           (= (iatom-mug i) (cached-mug a))
+           (= (iatom-int (cl-integer a)))
+           (progn
+             (setf (cached-ideal a) i)
+             t))))
 
-(defun icell=mugcell (i n)
+(defun icell-copy (i c)
   (declare (icell i))
-  (and (= (icell-mug i) (mug n))
-       (not (dostack
-              (main (more (icmf t i n))
-                    (more (icmf nil (icell-tail i) (tail n)))
-                    (give (cons (icell-head i) (head n))))
-              (give (pair)
-                    (destructuring-bind (i . n) pair
-                      (etypecase i
-                        (fixnum (if (= i n)
-                                    (take)
-                                    (return t)))
-                        (iatom (if (and (not (deep n))
-                                        (iatom=mugatom i n))
-                                   (take)
-                                   (return t)))
-                        (icell (unless (= (icell-mug i) (mug n)) (return t))
-                               (more (icmf t i n))
-                               (more (icmf nil (icell-tail i) (tail n)))
-                               (give (cons (icell-head i) (head n)))))))
-              (take (top)
-                    (let ((i (icmf-ideal top))
-                          (n (icmf-noun top)))
-                      (if (icmf-waiting top)
-                          (progn (setf (cached-ideal n) i)
-                                 (take))
-                          (give (cons i n)))))))))
+  ; TODO: copy speed from c if we don't have and available
+  (setf (cached-ideal c) i))
+
+; compare a non-eq icell and mugged cell with equal mugs
+(defun icell=mugcell (i c)
+  (declare (icell i))
+  (if-let (ci (cached-ideal c))
+    (eq i ci)
+    (and (= (icell-mug i) (cached-mug c))
+         (flet ((fast (i c)
+                  (let ((ci (cached-ideal c)))
+                    (if ci
+                        (shallow (eq i ci))
+                        (if (= (icell-mug i) (cached-mug c))
+                            :deep
+                            :diff)))))
+           (when (cell= i c
+                   #'ideep #'deep 
+                   #'icell-head #'head
+                   #'icell-tail #'tail
+                   #'iatom=mugatom #'icell-copy #'fast)
+             (icell-copy i c))))))
 
 (defun cells-hash (c)
   (if (typep c 'icell)
@@ -141,29 +139,20 @@
                 big)))))
 
 (defun create-icell (atoms cells mugged)
-  (dostack-accumulate
-    (main (more (cons t mugged))
-          (give (head mugged)))
-    (give (n)
-      (let ((c (cached-ideal n)))
-        (when c (take c))
-        (let* ((d (deep n))
-               (h (hashed-ideal (if d cells atoms) n)))
-          (when h (take h))
-          (unless d (take (create-iatom atoms n)))
-          (more (cons t n))
-          (give (head n)))))
-    (take (r top)
-      (if (car top)
-          (let ((c (cdr top)))
-            (setf (car top) nil)
-            (setf (cdr top) (cons c r))
-            (give (tail c)))
-          (destructuring-bind (c . h) (cdr top)
-            (let ((i (icons h r (murmugs (imug h) (imug r)))))
-              (setf (cached-ideal c) i)
-              (setf (gethash i cells) i)
-              (take i)))))))
+  (flet ((atomic (atom)
+           (let ((iatom (create-iatom atoms atom)))
+             (setf (cached-ideal atom) iatom)
+             iatom))
+         (fast (noun)
+           (or (cached-ideal noun)
+               (let ((d (deep noun)))
+                 (values (hashed-ideal (if d cells atoms) noun) d))))
+         (slow (cell head-mug tail-mug)
+           (let ((icell (icons head tail (murmugs (imug head) (imug tail)))))
+             (setf (cached-ideal cell) icell)
+             (setf (gethash icell cells) icell)
+             icell)))
+    (sum-cell mugged #'atomic #'fast #'slow)))
 
 (defun ideal (world noun)
   (or (cached-ideal noun)
