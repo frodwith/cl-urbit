@@ -6,6 +6,7 @@
                 :serial t
                 :components
                 ((:file "tests")
+                 (:file "syntax")
                  (:file "math")
                  (:file "mug")
                  (:file "data"))))
