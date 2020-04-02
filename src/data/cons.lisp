@@ -52,4 +52,6 @@
     ((or null mug) (setf (cdr c) val))
     (icell val)))
 
-; TODO: cached-speed
+(defmethod cached-speed ((c cons))
+  ; TODO: cache speed
+  nil)

@@ -1,5 +1,6 @@
 (defpackage #:urbit/equality
-  (:use #:cl #:urbit/data #:urbit/control #:urbit/ideal))
+  (:use #:cl #:urbit/data #:urbit/control #:urbit/ideal)
+  (:export #:same))
 
 (in-package #:urbit/equality)
 
@@ -209,7 +210,8 @@
             #'tail #'tail
             #'atomic #'unify #'fast)
       (copy-parts a b)
-      (copy-speed a b))))
+      (copy-speed a b)
+      t)))
 
 (defmacro deep= (adeep bdeep atoms cells)
   `(if ,adeep

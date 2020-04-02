@@ -23,8 +23,7 @@
 ; lookup+) when not cached, and so not suitable for values with varying parts
 ; (i.e. the samples of gates)
 
-; TODO: write data interface tests and pass them lisp objects
-;       test this file (with no ideal data impl)
+; TODO: test this file (with no ideal data impl)
 ;       write an ideal data impl and test it
 ;       add battery/formula slots, write nock.lisp (nock/pull)
 

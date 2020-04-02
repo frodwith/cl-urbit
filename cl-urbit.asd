@@ -8,11 +8,13 @@
   :components ((:module "src"
                 :serial t
                 :components
-                ((:file "math")
+                ((:file "syntax")
+                 (:file "math")
                  (:file "data")
                  (:file "control")
                  (:file "mug")
                  (:file "ideal")
+                 (:file "equality")
                  (:file "data/fixnum")
                  (:file "data/bignum")
                  (:file "data/cons")
