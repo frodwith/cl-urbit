@@ -1,5 +1,5 @@
 (defpackage #:urbit/mug
-  (:use #:cl #:urbit/data #:urbit/math #:urbit/dostack #:murmurhash)
+  (:use #:cl #:urbit/data #:urbit/math #:urbit/control #:murmurhash)
   (:export #:mug #:murmug #:murmugs))
 
 (in-package #:urbit/mug)
@@ -31,61 +31,6 @@
   (let ((m (murmug (cl-integer a))))
     (setf (cached-mug a) m)
     m))
-
-(defun mug-cell (cell)
-  (dostack-accumulate
-    (main (more (cons t cell))
-          (give (head cell)))
-    (give (n)
-      (let ((c (cached-mug n)))
-        (when c (take c))
-        (unless (deep n) (take (mug-atom n)))
-        (more (cons t n))
-        (give (head n))))
-    (take (r top)
-      (if (car top)
-          (let ((c (cdr top)))
-            (setf (car top) nil)
-            (setf (cdr top) (cons c r))
-            (give (tail c)))
-          (destructuring-bind (c . h) (cdr top)
-            (let ((m (murmugs h r)))
-              (less)
-              (setf (cached-mug c) m)
-              (take m)))))))
-
-; could also do this with explicit continuation passing, no?
-
-;(defun sum-cell-cont (cell atomic fast slow)
-;  (labels ((give (n k)
-;             (multiple-value-bind (answer deep) (funcall fast n)
-;               (if answer
-;                   (funcall k answer)
-;                   (if deep
-;                       (give (head n) 
-;                             (lambda (ha)
-;                               (give (tail n)
-;                                     (lambda (ta)
-;                                       (funcall k (funcall slow n ha ta))))))
-;                       (funcall k (funcall atomic n)))))))
-;    (give (head cell)
-;          (lambda (ha)
-;            (give (tail cell)
-;                  (lambda (ta)
-;                    (funcall slow cell ha ta)))))))
-
-; when efficiency matters, don't use higher order functions e.g. mapcar. atomic,
-; fast, and slow can be symbols and sum-cell can be a macro. capture (for ideal,
-; etc) can be accomplished with flet.
-
-; actually fuck that, a good inliner makes this difference moot and it's clearer
-; as functions. write inline declarations it's not inlining well.
-
-; this labels usage (with give/take) is reasonable. the impl relies on TCO
-; anyway.
-
-; sum is pretty expressive. should so a similar thing i guess for cell=.
-; fast returning multiple values is cool.  cool.
 
 (defun mug (n)
   (flet ((atomic (atom)

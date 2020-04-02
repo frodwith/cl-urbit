@@ -23,8 +23,7 @@
 ; lookup+) when not cached, and so not suitable for values with varying parts
 ; (i.e. the samples of gates)
 
-; TODO: Full Unifying Equality
-;       write data interface tests and pass them lisp objects
+; TODO: write data interface tests and pass them lisp objects
 ;       test this file (with no ideal data impl)
 ;       write an ideal data impl and test it
 ;       add battery/formula slots, write nock.lisp (nock/pull)
