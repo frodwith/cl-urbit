@@ -2,7 +2,8 @@
   (:use #:cl #:urbit/data #:urbit/mug #:urbit/control)
   (:export #:make-world #:ideal #:imug
            #:iatom #:iatom-mug #:iatom-int #:iatom=mugatom
-           #:icell #:icell-mug #:icell-head #:icell-tail #:icell=mugcell))
+           #:icell #:icell-mug #:icell-head #:icell-tail
+           #:icell=mugcell #:ideep #:icell-copy))
 
 (in-package #:urbit/ideal)
 
@@ -73,12 +74,11 @@
   (if-let (ci (cached-ideal c))
     (eq i ci)
     (flet ((fast (i c)
-             (let ((ci (cached-ideal c)))
-               (if ci
-                   (shallow (eq i ci))
-                   (if (= (icell-mug i) (cached-mug c))
-                       :deep
-                       :diff)))))
+             (if-let (ci (cached-ideal c))
+               (shallow (eq i ci))
+               (if (= (icell-mug i) (cached-mug c))
+                   :deep
+                   :diff))))
       (when (cell= i c
               #'ideep #'deep
               #'icell-head #'head
@@ -146,7 +146,7 @@
            (or (cached-ideal noun)
                (let ((d (deep noun)))
                  (values (hashed-ideal (if d cells atoms) noun) d))))
-         (slow (cell head-mug tail-mug)
+         (slow (cell head tail)
            (let ((icell (icons head tail (murmugs (imug head) (imug tail)))))
              (setf (cached-ideal cell) icell)
              (setf (gethash icell cells) icell)

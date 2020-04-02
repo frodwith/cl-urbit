@@ -2,6 +2,8 @@
   (:use #:cl #:urbit/data)
   (:export #:sum-cell #:sum-noun #:cell= #:shallow #:if-let))
 
+(in-package #:urbit/control)
+
 (defmacro if-let ((name value-form) true-form false-form)
   `(let ((,name ,value-form))
      (if ,name
@@ -61,11 +63,11 @@
              (give (funcall ahead a)
                    (funcall bhead b)
                    (cons (cons t (cons (funcall atail a)
-                                       (funcall atail b)))
+                                       (funcall btail b)))
                          stack)))
            (more (a b stack)
              ; add a unify frame (skip for outermost layer)
-             (main a b (cons (cons nil (cons a b) stack))))
+             (main a b (cons (cons nil (cons a b)) stack)))
            (give (a b stack)
              (let ((ad (funcall adeep a))
                    (bd (funcall bdeep b)))

@@ -1,44 +1,47 @@
 (defpackage #:urbit/equality
-  (:use #:cl))
+  (:use #:cl #:urbit/data #:urbit/control #:urbit/ideal))
 
 (in-package #:urbit/equality)
 
-(defmacro zero-one-both (a b accessor
-                         zero-form
+(defmacro neither-one-both (a b accessor
+                         neither-form
                          ((one-a one-b one-value &optional flipped)
                           &body one-forms)
                          ((a-value b-value)
-                          &body two-forms))
+                          &body both-forms))
   (let ((an (gensym))
         (bn (gensym))
         (av (gensym))
         (bv (gensym))
         (one (gensym)))
-    (unless flipped (setq flipped (gensym)))
     `(let* ((,an ,a)
             (,bn ,b)
             (,av (,accessor ,an))
             (,bv (,accessor ,bn)))
-       (flet ((,one (,one-a ,one-b ,one-value ,flipped)
+       (flet ((,one (,one-a ,one-b ,one-value ,@(when flipped (list flipped)))
                 ,@one-forms))
          (if ,av
              (if ,bv
                (let ((,a-value ,av)
                      (,b-value ,bv))
-                 ,@two-forms)
-               (,one ,an ,bn ,av nil))
+                 ,@both-forms)
+               (,one ,an ,bn ,av ,@(when flipped '(nil))))
              (if ,bv
-               (,one ,bn ,an ,bv t)
-               ,zero-form))))))
+               (,one ,bn ,an ,bv ,@(when flipped '(t)))
+               ,neither-form))))))
 
 (eval-when (:execute :load-toplevel :compile-toplevel)
-  (setf (macro-function 'zob) (macro-function 'zero-one-both)))
+  (setf (macro-function 'nob) (macro-function 'neither-one-both)))
 
 (defun copy-speed (a b)
-  (zob a b cached-speed
+  (nob a b cached-speed
        nil
-       ((a b as) (setf (cached-speed b) as))
-       ((as bs) nil)))
+       ((a b as)
+        (declare (ignore a))
+        (setf (cached-speed b) as))
+       ((as bs)
+        (declare (ignore as bs))
+        nil)))
 
 (defun copy-parts (a b)
   (setf (head b) (head a))
@@ -49,7 +52,7 @@
   (let ((m (cached-mug a)))
     (if m
         (iatom=mugatom i a) 
-        (when (= (iatom-int i (cl-integer a)))
+        (when (= (iatom-int i) (cl-integer a))
           (setf (cached-ideal a) i)
           t))))
 
@@ -98,9 +101,11 @@
 ; compare non-eq cells with equal mugs
 (defun mugcell=mugcell (a b)
   (flet ((atomic (a b)
-           (zob a b cached-ideal
+           (nob a b cached-ideal
                 (nomug-atom= a b)
-                ((a b ai) (iatom=mugatom ai b))
+                ((a b ai)
+                 (declare (ignore a))
+                 (iatom=mugatom ai b))
                 ((ai bi) (eql ai bi))))
          (unify (a b)
            (copy-parts a b)
@@ -108,7 +113,7 @@
          (fast (a b)
            (flet ((same-mug (a b)
                     (= (cached-mug a) (cached-mug b))))
-             (zob a b cached-ideal
+             (nob a b cached-ideal
                   (if (same-mug a b) :deep :diff)
                   ((a b ai) (shallow (and (same-mug a b)
                                           (icell=mugcell ai b))))
@@ -123,25 +128,29 @@
 
 (defun mugcell=unmugcell (a b am)
   (flet ((atomic (a b)
-           (zob a b cached-ideal
+           (nob a b cached-ideal
                 (let ((am (cached-mug a))
                       (bm (cached-mug b)))
                   (if bm
                       (and (= bm am) (nomug-atom= a b))
                       (mugatom=unmugatom a b am)))
-                ((a b ai) (iatom=mundane ai b))
+                ((a b ai)
+                 (declare (ignore a))
+                 (iatom=mundane ai b))
                 ((ai bi) (eql ai bi))))
          (unify (a b)
            (setf (cached-mug b) (cached-mug a))
            (copy-parts a b)
            (copy-speed a b))
          (fast (a b)
-           (zob a b cached-ideal
+           (nob a b cached-ideal
                 (if-let (m (cached-mug b))
                   (if (= m (cached-mug a))
                       :deep
-                      :diff))
+                      :diff)
+                  :diff)
                 ((a b ai flipped)
+                 (declare (ignore a))
                  (shallow
                    (if flipped
                        (icell=mundane ai b)
@@ -163,28 +172,36 @@
 ; compare two non-eq, non-ideal, unmugged cells
 (defun unmugcell=unmugcell (a b)
   (flet ((atomic (a b)
-           (zob a b cached-ideal
-                (zob a b cached-mug
+           (nob a b cached-ideal
+                (nob a b cached-mug
                      (nomug-atom= a b)
                      ((a b am) (mugatom=unmugatom a b am))
                      ((am bm) (and (= am bm) (nomug-atom= a b))))
-                ((a b ai) (iatom=mundane ai b))
+                ((a b ai)
+                 (declare (ignore a))
+                 (iatom=mundane ai b))
                 ((ai bi) (eql ai bi))))
          (unify (a b)
-           (zob a b cached-mug
+           (nob a b cached-mug
                 nil
-                ((a b am) (setf (cached-mug b) am))
-                ((am bm) nil))
+                ((a b am)
+                 (declare (ignore a))
+                 (setf (cached-mug b) am))
+                ((am bm)
+                 (declare (ignore am bm))
+                 nil))
            (copy-parts a b)
            (copy-speed a b))
          (fast (a b)
-           (zob a b cached-ideal
-                (zob a b cached-mug
+           (nob a b cached-ideal
+                (nob a b cached-mug
                      :deep
                      ((a b am) (shallow (mugcell=unmugcell a b am)))
                      ((am bm) (shallow (and (= am bm)
                                             (mugcell=mugcell a b)))))
-                ((a b ai) (shallow (icell=mundane ai b)))
+                ((a b ai)
+                 (declare (ignore a))
+                 (shallow (icell=mundane ai b)))
                 ((ai bi) (shallow (eq ai bi))))))
     (when (cell= a b
             #'deep #'deep
@@ -195,9 +212,9 @@
       (copy-speed a b))))
 
 (defmacro deep= (adeep bdeep atoms cells)
-  (if ,adeep
-      (when ,bdeep ,cells)
-      (unless ,bdeep ,atoms)))
+  `(if ,adeep
+       (when ,bdeep ,cells)
+       (unless ,bdeep ,atoms)))
 
 ; compare an ideal with a non-ideal noun
 (defun ideal=mundane (a b)
@@ -225,7 +242,7 @@
 
 ; compare two non-eql non-ideal nouns
 (defun mundane=mundane (a b)
-  (zob a b cached-mug
+  (nob a b cached-mug
        (unmugged=unmugged a b)
        ((a b am)
         (mugged=unmugged a b am))
@@ -235,9 +252,11 @@
 ; compare two nouns
 (defun same (a b)
   (or (eql a b)
-      (zob a b cached-ideal
+      (nob a b cached-ideal
            (mundane=mundane a b)
-           ((a b ai) (ideal=mundane ai b))
+           ((a b ai)
+            (declare (ignore a))
+            (ideal=mundane ai b))
            ((ai bi)
             (when (eql ai bi)
               (when (ideep ai)

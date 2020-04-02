@@ -9,8 +9,8 @@
                 :serial t
                 :components
                 ((:file "math")
-                 (:file "dostack")
                  (:file "data")
+                 (:file "control")
                  (:file "mug")
                  (:file "ideal")
                  (:file "data/fixnum")
