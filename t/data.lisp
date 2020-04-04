@@ -1,6 +1,5 @@
 (defpackage #:urbit/tests/data
-  (:use #:cl #:fiveam
-        #:urbit/tests #:urbit/syntax #:urbit/data #:urbit/ideal #:urbit/equality))
+  (:use #:cl #:fiveam #:urbit/tests #:urbit/syntax #:urbit/data #:urbit/equality))
 
 (in-package #:urbit/tests/data)
 
@@ -9,12 +8,6 @@
            :in all-tests)
 
 (enable-brackets)
-
-(defun recons (data atomic kons)
-  (if (consp data)
-      (funcall kons (recons (car data) atomic kons) 
-                    (recons (cdr data) atomic kons))
-      (funcall atomic data)))
 
 (defmacro def-noun-suite (name convert)
   (flet ((prefix (p)
@@ -77,10 +70,9 @@
              (is (eq (head a) (head b)))
              (is (eq (tail a) (tail b)))))))))
 
-(defun lisp-recons (x)
-  (recons x #'identity #'cons))
+; we need data-specific tests to properly test unification
 
-(def-noun-suite lisp lisp-recons)
+(def-noun-suite lisp copy-tree)
 
 ; (defparameter *test-world* (make-world))
 ; (defun iconv (n) (ideal *test-world* n))

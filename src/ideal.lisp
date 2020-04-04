@@ -1,6 +1,6 @@
 (defpackage #:urbit/ideal
   (:use #:cl #:urbit/data #:urbit/mug #:urbit/control)
-  (:export #:make-world #:ideal #:imug
+  (:export #:make-world #:find-ideal #:imug
            #:iatom #:iatom-mug #:iatom-int #:iatom=mugatom
            #:icell #:icell-mug #:icell-head #:icell-tail
            #:icell=mugcell #:ideep #:icell-copy))
@@ -23,8 +23,7 @@
 ; lookup+) when not cached, and so not suitable for values with varying parts
 ; (i.e. the samples of gates)
 
-; TODO: test this file (with no ideal data impl)
-;       write an ideal data impl and test it
+; TODO: write an ideal data impl and test it
 ;       add battery/formula slots, write nock.lisp (nock/pull)
 
 (defstruct (iatom (:constructor make-iatom (int mug)))
@@ -151,12 +150,11 @@
              icell)))
     (sum-cell mugged #'atomic #'fast #'slow)))
 
-(defun ideal (world noun)
-  (or (cached-ideal noun)
-      (if (deep noun)
-          (let ((cells (world-cells world)))
-            (or (hashed-ideal cells noun)
-                (create-icell (world-atoms world) cells noun)))
-          (let ((atoms (world-atoms world)))
-            (or (hashed-ideal atoms noun)
-                (create-iatom atoms noun))))))
+(defun find-ideal (world noun)
+  (if (deep noun)
+      (let ((cells (world-cells world)))
+        (or (hashed-ideal cells noun)
+            (create-icell (world-atoms world) cells noun)))
+      (let ((atoms (world-atoms world)))
+        (or (hashed-ideal atoms noun)
+            (create-iatom atoms noun)))))

@@ -45,6 +45,8 @@
         nil)))
 
 (defun copy-parts (a b)
+  ; ponder checking for ideals here. how necessary is it in the presence of
+  ; the idealization that happens "underneath"?
   (setf (head b) (head a))
   (setf (tail b) (tail a)))
 
@@ -127,7 +129,8 @@
       (unify a b)
       t)))
 
-(defun mugcell=unmugcell (a b am)
+; compare a two non-eq, nonideal cells (a mugged, b not).
+(defun mugcell=unmugcell (a b amug)
   (flet ((atomic (a b)
            (nob a b cached-ideal
                 (let ((am (cached-mug a))
@@ -165,7 +168,7 @@
            #'head #'head
            #'tail #'tail
            #'atomic #'unify #'fast)
-      (setf (cached-mug b) am)
+      (setf (cached-mug b) amug)
       (copy-parts a b)
       (copy-speed a b)
       t)))
