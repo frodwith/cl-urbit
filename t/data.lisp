@@ -1,5 +1,6 @@
 (defpackage #:urbit/tests/data
-  (:use #:cl #:fiveam #:urbit/tests #:urbit/syntax #:urbit/data #:urbit/equality))
+  (:use #:cl #:fiveam #:urbit/tests #:urbit/syntax
+        #:urbit/data #:urbit/equality #:urbit/ideal))
 
 (in-package #:urbit/tests/data)
 
@@ -63,18 +64,15 @@
            (let ((a (,convert [[1 2] 3 4]))
                  (b (,convert [[1 2] 3 4]))
                  (c (,convert [[3 4] 1 2])))
+             ; we need data-specific tests to properly test unification
              (is (not (same a c)))
-             (is (not (eq (head a) (head b))))
-             (is (not (eq (tail a) (tail b))))
              (is (same a b))
              (is (eq (head a) (head b)))
              (is (eq (tail a) (tail b)))))))))
 
-; we need data-specific tests to properly test unification
 
 (def-noun-suite lisp copy-tree)
 
-; (defparameter *test-world* (make-world))
-; (defun iconv (n) (ideal *test-world* n))
-;  not implemented yet
-; (def-noun-suite ideal iconv)
+(defparameter *test-world* (make-world))
+(defun iconv (n) (find-ideal *test-world* n))
+(def-noun-suite ideal iconv)

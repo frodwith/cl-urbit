@@ -55,7 +55,7 @@
   (or (eql i a)
       (and (not (cached-ideal a))
            (= (iatom-mug i) (cached-mug a))
-           (= (iatom-int (cl-integer a)))
+           (= (iatom-int i) (cl-integer a))
            (progn
              (setf (cached-ideal a) i)
              t))))

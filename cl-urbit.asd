@@ -18,7 +18,8 @@
                  (:file "data/fixnum")
                  (:file "data/bignum")
                  (:file "data/cons")
-                 )))
+                 (:file "data/iatom")
+                 (:file "data/icell"))))
   :description "nock runtime and urbit worker process (http://urbit.org)"
   :long-description
   #.(uiop:read-file-string
