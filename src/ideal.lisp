@@ -2,7 +2,10 @@
   (:use #:cl #:urbit/data #:urbit/mug #:urbit/control)
   (:export #:make-world #:find-ideal #:imug
            #:iatom #:iatom-mug #:iatom-int #:iatom=mugatom
-           #:icell #:icell-mug #:icell-head #:icell-tail
+           #:icell #:icell-mug #:icell-head #:icell-tail #:icell-meta
+           #:formula #:make-formula #:formula-func #:formula-form
+           #:fat #:make-fat #:fat-formula
+           #:core #:battery
            #:icell=mugcell #:ideep #:icell-copy))
 
 (in-package #:urbit/ideal)
@@ -23,69 +26,15 @@
 ; lookup+) when not cached, and so not suitable for values with varying parts
 ; (i.e. the samples of gates)
 
-; TODO: add battery/formula slots, write nock.lisp (nock/pull)
-; gotta decide how we're ultimately going to handle hooks.
-; what about - not used to find, only used to register?
-;   get a kernel, which represents the idea (say) k141/one(3)/add(7)
-;     how did you get it? either you're trying to register it (you're a fast
-;     hint or some other registering process, say hashboard) or ... the only
-;     other person that would care about kernel-like things is a call or edit
-;     site, right? and they're dealing with stencils. okay, so it's register
-;     this core and register parent cores, basically.
-
-;   how do we clock? battery takes you to a structure that has a single
-;   recorded parent axis.
-;         1) clock the parent
-;         2) we have (map parent-stencil child-stencil)
-;   if this returns nothing, try to do discovery via hashboard
-
-;   what is hashboard? at clock site, after no stencil is found, go to the
-;   battery's discovery (shared by batteries with colliding hashes). this
-;   has a roots/parents structure, with a list of parent axes. For each
-;   parent axis,
-;         1) clock the parent at that axis
-;         2) grab parent stencil (break if doesn't exist)
-;         3) this axis has (map kernel (map imprint kernel)), if kernel found
-;            then take an imprint (stencil-wise hash) and lookup again
-;         4) register core using discovered kernel, rather than a fast hint
-
-;    so how does a fast hint register?
-;        1) clock parent at hinted axis
-;        2) grab parent stencil, get kernel, find child kernel with
-;           name/axis/hookLIST (not map, there's no map in the hint)
-;             if it's new, process the list into a map
-;        3) use kernel/parent stencil/battery to find child stencil
-;             if the stencil is new, we do registration effects
-;             otherwise it's a core that's already registered, see
-
-;   still have the question: should the hooklist be part of a kernel's identity?
-;   the objection is: what if i register the same noun different hook lists?
-;   if different hook lists mean different kernels, that's cromulent
-;   if the hook lists aren't part of the identity, that's nonsense.
-
-;   so, hook lists aren't part of the identity. they could instead be associated
-;   with particular registrations (i.e. stencils)
-
-;   --- hook lists and drivers on stencils
-;   --- driver-factories on kernels
-;   --- driver-factory given the stencil, axis-in-battery, hook list
-;   --- may be tempted to remove kernel, but suspect necessery at least for
-;       hashboard
-;   --- root imprint is bighash(battery + atomic-constant)
-;   --- children are bighash(battery + parent-axis + parent)
-
 ; placeholders
-(deftype kernel () 'null) ; no longer have ideals, can go in lower level
-                          ; or maybe put them here, since it makes sense
-                          ; for them to be in the same world with ideals
-                          ; coin toss?
-(deftype stencil () 'null) ; these gots hooks and driver maps now, contains ideals
-                           ; also a lazily-computed bighash
-                           ; and therefore must be defined (at least the struct)
-                           ; here
-(deftype assumption () 'null) ; these are so short and not used anywhere else...
-(deftype speed () 'null) ; contains stencils
-(deftype axis-map (element-type) 'null)
+(deftype kernel () 'null)
+(deftype stencil () 'null)
+(deftype assumption () 'null)
+(deftype axis-map (element-type)
+  (declare (ignore element-type))
+  'null)
+(deftype core ()
+  '(or (eql :fast) (eql :slow)))
 
 ; nil maps have no entries, duh, easy
 ; cons maps have one entry, often optimizable
@@ -100,32 +49,43 @@
   `(or (lmap ,key-type ,value-type)
        hash-table))
 
-;(deftype bighash () '(unsigned-byte 32))
-
-(deftype hook-list () 'ideal)
-
-;(defstruct discovery
-;  (roots nil :type (maps integer (cons kernel hook-list)))
-;  (parents nil :type (lmap integer (maps kernel (maps bighash hook-list)))))
-
-(defstruct (battery (:constructor battery (discovery)))
+(defstruct battery
   (arms nil :type (axis-map function))
   (unregistered nil :type (or null assumption))
   (parent-axis nil :type (or null integer))
   (roots nil :type (maps integer stencil))
   (parents nil :type (maps stencil stencil)))
-  ;(discovery nil :type (or null discovery)))
+
+(defstruct (formula (:constructor make-formula (form)))
+  (form nil :read-only t :type list)
+  (func nil :type (or null function)))
 
 (defstruct fat
   (battery nil :type (or null battery))
-  (formula nil :type (or null function))
-  (core nil :type (or null speed)))
+  (formula nil :type (or null formula))
+  (core nil :type (or null core)))
 
 (defstruct (icell (:constructor icons (head tail mug)))
   (head nil :read-only t :type ideal)
   (tail nil :read-only t :type ideal)
-  (mug nil :read-only t :type mug))
-  (meta nil :type (or null function battery speed fat))
+  (mug nil :read-only t :type mug)
+  (meta nil :type (or null formula battery core fat)))
+
+(defun icell-battery (c)
+  (macrolet ((with-b (&body forms)
+               `(let ((b (make-battery)))
+                  ,@forms
+                  b)))
+    (let ((m (icell-meta c)))
+      (typecase m
+        (battery m)
+        (fat (or (fat-battery m)
+                 (with-b (setf (fat-battery m) b))))
+        (t (with-b (setf (icell-meta c)
+                         (etypecase m
+                           (null b)
+                           (core (make-fat :core m :battery b))
+                           (formula (make-fat :formula m :battery b))))))))))
 
 (defstruct (iatom (:constructor make-iatom (int mug)))
   (int nil :read-only t :type bignum)
