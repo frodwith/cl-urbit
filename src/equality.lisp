@@ -265,5 +265,5 @@
            ((ai bi)
             (when (eql ai bi)
               (when (ideep ai)
-                (copy-speed a b)
-                t))))))
+                (copy-speed a b))
+              t)))))

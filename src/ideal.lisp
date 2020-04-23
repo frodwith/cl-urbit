@@ -1,6 +1,6 @@
 (defpackage #:urbit/ideal
   (:use #:cl #:urbit/data #:urbit/mug #:urbit/control)
-  (:export #:make-world #:find-ideal #:imug
+  (:export #:make-world #:find-ideal #:imug #:iint
            #:iatom #:iatom-mug #:iatom-int #:iatom=mugatom
            #:icell #:icell-mug #:icell-head #:icell-tail #:icell-meta
            #:formula #:make-formula #:formula-func #:formula-form
@@ -57,7 +57,7 @@
   (parents nil :type (maps stencil stencil)))
 
 (defstruct (formula (:constructor make-formula (form)))
-  (form nil :read-only t :type list)
+  (form nil :read-only t :type (or list symbol))
   (func nil :type (or null function)))
 
 (defstruct fat
@@ -65,7 +65,21 @@
   (formula nil :type (or null formula))
   (core nil :type (or null core)))
 
-(defstruct (icell (:constructor icons (head tail mug)))
+(defun print-icell (c &optional out)
+  (print-unreadable-object (c out :type t)
+    (labels ((recur (o tail)
+               (if (ideep o)
+                   (progn
+                     (unless tail (write-char #\[ out))
+                     (recur (icell-head o) nil)
+                     (write-char #\space out)
+                     (recur (icell-tail o) t)
+                     (unless tail (write-char #\] out)))
+                   (prin1 o out))))
+      (recur c nil))))
+
+(defstruct (icell (:constructor icons (head tail mug))
+                  (:print-object print-icell))
   (head nil :read-only t :type ideal)
   (tail nil :read-only t :type ideal)
   (mug nil :read-only t :type mug)
@@ -92,6 +106,11 @@
   (mug nil :read-only t :type mug))
 
 (deftype ideal () '(or fixnum iatom icell))
+
+(defun iint (i)
+  (etypecase i
+    (fixnum i)
+    (iatom (iatom-int i))))
 
 (defun imug (i)
   (declare (ideal i))

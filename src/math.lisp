@@ -1,7 +1,8 @@
 (defpackage #:urbit/math
   (:use #:cl)
-  (:export #:uint #:met #:mix #:end #:lsh #:rsh
-           #:mas #:tax #:pax))
+  (:export #:met #:mix #:end #:lsh #:rsh
+           #:mas #:tax #:pax
+           #:uint #:decomposable-axis))
 
 (in-package #:urbit/math)
 

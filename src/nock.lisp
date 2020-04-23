@@ -1,11 +1,13 @@
 (defpackage #:urbit/nock
-  (:use #:cl #:urbit/ideal #:urbit/data #:urbit/math))
+  (:use #:cl #:urbit/ideal #:urbit/data #:urbit/math)
+  (:import-from #:urbit/equality #:same)
+  (:export #:.* #:in-world #:bottle))
 
 (in-package #:urbit/nock)
 
 (defun compile-form (form)
-  (compile nil `(lambda (a)
-                  (declare (ignorable a) ; ignore unused subject (i.e. [1 1])
+  (compile nil `(lambda (s)
+                  (declare (ignorable s) ; ignore unused subject (i.e. [1 1])
                            ; delete unreachable note (code after crash) (SBCL ONLY)
                            (sb-ext:muffle-conditions sb-ext:compiler-note))
                   ,form)))
@@ -23,7 +25,7 @@
         (t (with-f (setf (icell-meta c)
                          (etypecase m
                            (null f)
-                           (core-speed (make-fat :core m :formula f))
+                           (core (make-fat :core m :formula f))
                            (battery (make-fat :battery m :formula f))))))))))
 
 (defun formula-function (formula)
@@ -34,12 +36,12 @@
 (defun compile-cell (c)
   (formula-form (icell-formula c)))
 
+(defparameter +crash+ '(error 'exit))
+
 (defun compile-noun (i)
   (if (ideep i)
       (compile-cell i)
       +crash+))
-
-(defparameter +crash+ '(error 'exit))
 
 (defmacro split (expr (head tail) &body forms)
   (let ((s (gensym)))
@@ -75,45 +77,38 @@
           (12 (compile-12 ar))
           (t +crash+)))))
 
-(defun autocons (head tail) ; FIXME: special cells
+(defun ^ (head tail) ; FIXME: special cells
   (cons head tail))
 
 (defun compile-autocons (head tail)
-  `(autocons ,(compile-cell head) ,(compile-noun tail)))
+  `(^ ,(compile-cell head) ,(compile-noun tail)))
 
-(defconstant +small+ 4096)
-(defparameter +small-fragments+
-  (loop with v = (make-array +small+)
-        initially (setf (aref v 0) +crash+
-                        (aref v 1) 'a)
-        for a from 2 below +small+
-        for tail = nil then (not tail)
-        for parent = 1 then (if tail parent (1+ parent))
-        for part = (if tail 'tail 'head)
-        for in = (if tail in (aref v parent))
-        do (setf (aref v a) (list part in))
-        finally (return v)))
-
-(defun compile-fragment (ax)
-  (declare (integer ax))
-  (loop for tail in (pax ax)
-        for part = (if tail 'tail 'head)
-        for s = (list part 'a) then (list part s)
-        finally (return s)))
+(defmacro frag (ax)
+  (declare (uint ax))
+  (case ax
+    (0 +crash+)
+    (1 's)
+    (t (loop for tail in (pax ax)
+             for part = (if tail 'tail 'head)
+             for s = (list part 's) then (list part s)
+             finally (return s)))))
 
 (defun compile-0 (a)
   (if (ideep a)
       +crash+
-      (let ((i (cl-integer a)))
-        (if (< i +small+)
-          (aref +small-fragments+ i)
-          (compile-fragment i)))))
+      `(frag ,(iint a))))
 
 (defun compile-1 (a)
   `(quote ,a))
 
-; FIXME: not how we're doing this
 (defparameter *world* nil)
+
+(defmacro in-world (world &body forms)
+  `(let ((*world* ,world))
+     ,@forms))
+
+(defmacro bottle (&body forms)
+  `(in-world (make-world) ,@forms))
 
 (defun ifind (noun)
   (or (cached-ideal noun)
@@ -121,7 +116,7 @@
           (find-ideal *world* noun)
           (error "nock world unbound"))))
 
-(defun nock (subject formula)
+(defun .* (subject formula)
   (if (deep formula)
       (funcall (formula-function (icell-formula (ifind formula)))
                subject)
@@ -129,107 +124,151 @@
 
 (defun compile-2 (a)
   (splash a (subject formula)
-    `(nock ,(compile-noun subject) ,(compile-noun formula))))
+    `(.* ,(compile-noun subject) ,(compile-noun formula))))
+
+(defun loob (bool)
+  (if bool 0 1))
+
+(defun .? (a)
+  (loob (deep a)))
 
 (defun compile-3 (a)
-  `(deep ,(compile-noun a)))
+  `(.? ,(compile-noun a)))
 
-(defun bump (a) ;FIXME: special bignums
+(defun .+ (a) ;FIXME: special bignums
   (1+ (cl-integer a)))
 
 (defun compile-4 (a)
-  `(bump ,(compile-noun a)))
+  `(.+ ,(compile-noun a)))
 
-(defun same (a b)
-  (if (urbit/equality:same a b) 0 1))
+(defun .= (a b)
+  (loob (same a b)))
 
 (defun compile-5 (a)
   (splash a (one two)
-    `(same ,(compile-noun one) ,(compile-noun two))))
+    `(.= ,(compile-noun one) ,(compile-noun two))))
+
+(defmacro lif (test yes no)
+  `(case (cl-integer ,test)
+     (0 ,yes)
+     (1 ,no)
+     (t ,+crash+)))
 
 (defun compile-6 (a)
   (splash a (test branches)
     (splash branches (yes no)
-      `(case ,(compile-noun test)
-         (0 ,(compile-noun yes))
-         (1 ,(compile-noun no))
-         (t ,+crash+)))))
+      `(lif ,(compile-noun test)
+            ,(compile-noun yes)
+            ,(compile-noun no)))))
+
+(defmacro => (a b)
+  `(let ((s ,a)) ,b))
 
 (defun compile-7 (a)
   (splash a (one two)
-    `(let ((a ,(compile-noun one)))
-       ,(compile-noun two))))
+    `(=> ,(compile-noun one) ,(compile-noun two))))
+
+(defmacro =+ (a b)
+  `(=> (^ ,a s) ,b))
 
 (defun compile-8 (a)
   (splash a (one two)
-    `(let ((a (autocons ,(compile-noun one) a)))
-       ,(compile-noun two))))
+    `(=+ ,(compile-noun one) ,(compile-noun two))))
+
+(defmacro kick (axis core)
+  `(=> ,core (.* s ,(compile-0 axis))))
 
 (defun compile-9 (a)
   (splash a (frag core)
-    `(let ((a ,(compile-noun core)))
-       (nock a ,(compile-0 frag)))))
+    `(kick ,frag ,(compile-noun core))))
 
 (defun copy (axis old new)
   (declare (ignore axis old))
   new)
 
-(defun editcons (ax big head tail)
-  (let ((c (autocons head tail)))
-    (copy ax big c)))
+(defmacro edit-on (ax)
+  (case ax
+    (2 '(copy 2 o (^ n (tail o))))
+    (3 '(copy 3 o (^ (head o) n)))
+    (t (let* ((tail (tax ax))
+              (side (if tail 'tail 'head))
+              (more `(let ((o (,side o)))
+                       (edit-on ,(mas ax))))
+              (parts (if tail
+                         `((head o) ,more)
+                         `(,more (tail o)))))
+         `(copy ,ax o (^ ,@parts))))))
 
-(defun editcons-form (ax tail more)
-  `(editcons ,ax old ,@(if tail
-                           `((head old) ,more)
-                           `(,more (tail old)))))
-
-(defun more-form (tail more)
-  `(let ((old (,(if tail 'tail 'head) old)))
-     ,more))
-
-(defparameter +small-edits+
-  (loop with v = (make-array +small+)
-        initially (setf (aref v 0) +crash+
-                        (aref v 1) 'new
-                        ; easier to exclude the final lets if we cheat 2 and 3
-                        (aref v 2) '(editcons 2 old new (tail old))
-                        (aref v 3) '(editcons 3 old (head old) new))
-        for i from 4 below +small+
-        ; tricky to count tail and mas, compute for clarity/simplicity
-        for tail = (tax i)
-        do (setf (aref v i)
-                 (editcons-form i tail (more-form tail (aref v (mas i)))))
-        finally (return v)))
-
-(defun compile-edit (ax)
-  (if (< ax +small+)
-      (aref +small-edits+ ax)
-      (let ((tail (tax ax)))
-        (editcons-form ax tail (more-form tail (compile-edit (mas ax)))))))
+(defmacro edit (ax small big)
+  (case ax
+    (0 +crash+)
+    (1 `(progn ,big ,small))
+    (t `(let ((o ,big)
+              (n ,small))
+          (edit-on ,ax)))))
 
 (defun compile-10 (a)
-  (splash a (spec old)
-    (splash spec (ax new)
+  (splash a (spec big)
+    (splash spec (ax small)
       (if (ideep ax)
           +crash+
-          (let ((iax (cl-integer ax)))
-            (if (= 0 iax)
-                +crash+
-                `(let ((old ,(compile-noun old))
-                       (new ,(compile-noun new)))
-                   ,(compile-edit iax))))))))
+          `(edit ,(iint ax)
+                 ,(compile-noun small)
+                 ,(compile-noun big))))))
+
+(let ((s '(1 2 . 3)))
+  (edit 6 (.+ (frag 6)) (frag 1)))
+  ;(EDIT 6 (.+ (FRAG 6)) (FRAG 1)))
+  ;(EDIT 6 (.+ (FRAG 6)) (FRAG 1)))
+
+(define-condition compile-condition () ())
+
+(define-condition compile-dynamic-hint (compile-condition)
+  ((tag :type integer)))
+
+(define-condition compile-static-hint (compile-condition)
+  ((tag :type integer)))
 
 (defun compile-11 (a)
   (splash a (hint next-formula)
-    (let ((next (compile-noun next-formula)))
+    (let ((next-form (compile-noun next-formula)))
       (if (ideep hint)
           (split hint (tag clue-formula)
-            (declare (ignore tag))
-            (let ((clue (compile-noun clue-formula)))
-              ; no dynamic hints yet
-              `(progn ,clue ,next)))
-          ; no static hints yet
-          next))))
+            (let ((clue-form (compile-noun clue-formula)))
+              (or (restart-case (signal 'compile-dynamic-hint
+                                        :tag (iint tag))
+                    (before (handler)
+                      `(progn (funcall ',handler subject ,next-formula
+                                       ,clue-form)
+                              ,next-form))
+                    (after (handler)
+                      `(let ((clue ,clue-form)
+                             (product ,next-form))
+                         (funcall ',handler subject ,next-formula product
+                                  clue)
+                         product))
+                    (around (before after)
+                      `(let ((clue ,clue-form))
+                         (or (funcall ',before a ,next-formula clue)
+                             (let ((product ,next-form))
+                               (funcall ',after subject ,next-formula product
+                                        clue))))))
+                  `(progn ,clue-form ,next-form))))
+          (or (restart-case (signal 'compile-static-hint
+                                    :tag (iint hint))
+                (before (handler)
+                  `(progn (funcall ',handler subject ,next-formula)
+                          next-form))
+                (after (handler)
+                  `(let ((product ,next-formula))
+                     (funcall ',handler subject ,next-formula product)
+                     product))
+                (around (before after)
+                  `(or (funcall ',before a ,next-formula)
+                       (let ((product ,next-form))
+                         (funcall ',after a ,next-formula product)
+                         product))))
+              next-form)))))
 
 (defun compile-12 (a)
   (declare (ignore a))

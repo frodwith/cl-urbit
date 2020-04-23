@@ -10,6 +10,7 @@
                  (:file "math")
                  (:file "mug")
                  (:file "data")
-                 (:file "ideal"))))
+                 (:file "ideal")
+                 (:file "nock"))))
   :perform (test-op (o s)
     (uiop:symbol-call '#:urbit/tests '#:test-urbit)))

@@ -15,6 +15,7 @@
                  (:file "mug")
                  (:file "ideal")
                  (:file "equality")
+                 (:file "nock")
                  (:file "data/fixnum")
                  (:file "data/bignum")
                  (:file "data/cons")
