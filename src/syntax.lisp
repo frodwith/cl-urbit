@@ -1,6 +1,9 @@
 (defpackage #:urbit/syntax
   (:use #:cl #:named-readtables)
-  (:export #:brackets #:enable-brackets #:arity-error))
+  (:import-from #:urbit/math #:string->cord)
+  (:export #:brackets #:cords #:all
+           #:enable-brackets #:enable-cords #:enable-syntax
+           #:arity-error #:cord-error))
 
 (in-package #:urbit/syntax)
 
@@ -21,10 +24,32 @@
               else
               collect (car pair) into leading))))
 
+(define-condition cord-error (error) (object))
+
+(defun read-cord (stream char)
+  (declare (ignore char))
+  (let ((obj (read stream)))
+    (if (typep obj 'symbol)
+        (string->cord (string-downcase (symbol-name obj)))
+        (error 'cord-error :object obj))))
+
 (defreadtable brackets
   (:merge :standard)
   (:macro-char #\[ #'read-left)
   (:macro-char #\] #'read-right))
 
+(defreadtable cords
+  (:merge :standard)
+  (:macro-char #\% #'read-cord))
+
+(defreadtable all
+  (:merge brackets cords))
+
 (defmacro enable-brackets ()
   '(in-readtable brackets))
+
+(defmacro enable-cords ()
+  '(in-readtable cords))
+
+(defmacro enable-syntax ()
+  '(in-readtable all))

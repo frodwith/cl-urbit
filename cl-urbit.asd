@@ -4,12 +4,12 @@
   :license "MIT"
   :homepage "https://github.com/frodwith/cl-urbit"
   :version "0.1"
-  :depends-on (:cl-murmurhash :named-readtables)
+  :depends-on (:cl-murmurhash :named-readtables :cl-intbytes)
   :components ((:module "src"
                 :serial t
                 :components
-                ((:file "syntax")
-                 (:file "math")
+                ((:file "math")
+                 (:file "syntax")
                  (:file "data")
                  (:file "control")
                  (:file "mug")

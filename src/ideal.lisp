@@ -65,6 +65,13 @@
   (formula nil :type (or null formula))
   (core nil :type (or null core)))
 
+(defstruct (icell (:constructor icons (head tail mug))
+                  (:print-object print-icell))
+  (head nil :read-only t :type ideal)
+  (tail nil :read-only t :type ideal)
+  (mug nil :read-only t :type mug)
+  (meta nil :type (or null formula battery core fat)))
+
 (defun print-icell (c &optional out)
   (print-unreadable-object (c out :type t)
     (labels ((recur (o tail)
@@ -77,13 +84,6 @@
                      (unless tail (write-char #\] out)))
                    (prin1 o out))))
       (recur c nil))))
-
-(defstruct (icell (:constructor icons (head tail mug))
-                  (:print-object print-icell))
-  (head nil :read-only t :type ideal)
-  (tail nil :read-only t :type ideal)
-  (mug nil :read-only t :type mug)
-  (meta nil :type (or null formula battery core fat)))
 
 (defun icell-battery (c)
   (macrolet ((with-b (&body forms)
