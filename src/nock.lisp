@@ -1,9 +1,13 @@
 (defpackage #:urbit/nock
   (:use #:cl #:urbit/ideal #:urbit/data #:urbit/math)
   (:import-from #:urbit/equality #:same)
-  (:export #:.* #:in-world #:bottle))
+  (:export #:nock #:bottle #:in-world
+           #:compile-dynamic-hint #:compile-static-hint
+           #:before #:after #:around))
 
 (in-package #:urbit/nock)
+
+; helpers
 
 (defun compile-form (form)
   (compile nil `(lambda (s)
@@ -33,15 +37,44 @@
       (setf (formula-func formula)
             (compile-form (formula-form formula)))))
 
-(defun compile-cell (c)
-  (formula-form (icell-formula c)))
-
 (defparameter +crash+ '(error 'exit))
+
+(defparameter *world* nil)
+
+(defmacro in-world (world &body forms)
+  `(let ((*world* ,world))
+     ,@forms))
+
+(defmacro bottle (&body forms)
+  `(in-world (make-world) ,@forms))
+
+(defun ifind (noun)
+  (or (cached-ideal noun)
+      (if *world*
+          (find-ideal *world* noun)
+          (error "nock world unbound"))))
+
+(defun nock (subject formula)
+  (if (deep formula)
+      (funcall (formula-function (icell-formula (ifind formula)))
+               subject)
+      (error 'exit)))
+
+(defun copy (axis old new)
+  ; TODO: copy speed if possible (see axis) from old to new
+  (declare (ignore axis old))
+  new)
 
 (defun compile-noun (i)
   (if (ideep i)
       (compile-cell i)
       +crash+))
+
+(defun compile-cell (c)
+  (formula-form (icell-formula c)))
+
+(defun loob (bool)
+  (if bool 0 1))
 
 (defmacro split (expr (head tail) &body forms)
   (let ((s (gensym)))
@@ -56,6 +89,18 @@
        (if (ideep ,s)
            (split ,s (,head ,tail) ,@forms)
            +crash+))))
+
+(defmacro atomic (expr name &body forms)
+  (let ((s (gensym)))
+    `(let ((,s ,expr))
+       (if (ideep ,s)
+           +crash+
+           (let ((,name (iint ,s)))
+             ,@forms)))))
+
+; compiler proper -- converts nouns to familiar looking lisp,
+; i.e. [0 0] becomes (%0 0). improper formula shapes become
+; +crash+es.
 
 (defun compile-cell-raw (c)
   (split c (op ar)
@@ -77,14 +122,101 @@
           (12 (compile-12 ar))
           (t +crash+)))))
 
-(defun ^ (head tail) ; FIXME: special cells
-  (cons head tail))
-
 (defun compile-autocons (head tail)
-  `(^ ,(compile-cell head) ,(compile-noun tail)))
+  `([] ,(compile-cell head) ,(compile-noun tail)))
 
-(defmacro frag (ax)
-  (declare (uint ax))
+(defun compile-0 (a)
+  (atomic a i `(%0 ,i)))
+
+(defun compile-1 (a)
+  `(%1 ,a))
+
+(defun compile-2 (a)
+  (splash a (subject formula)
+    `(%2 ,(compile-noun subject) ,(compile-noun formula))))
+
+(defun compile-3 (a)
+  `(%3 ,(compile-noun a)))
+
+(defun compile-4 (a)
+  `(%4 ,(compile-noun a)))
+
+(defun compile-5 (a)
+  (splash a (one two)
+    `(%5 ,(compile-noun one) ,(compile-noun two))))
+
+(defun compile-6 (a)
+  (splash a (test branches)
+    (splash branches (yes no)
+      `(%6 ,(compile-noun test)
+           ,(compile-noun yes)
+           ,(compile-noun no)))))
+
+(defun compile-7 (a)
+  (splash a (one two)
+    `(%7 ,(compile-noun one) ,(compile-noun two))))
+
+(defun compile-8 (a)
+  (splash a (one two)
+    `(%8 ,(compile-noun one) ,(compile-noun two))))
+
+(defun compile-9 (a)
+  (splash a (ax core)
+    (atomic ax i `(%9 ,i ,(compile-noun core)))))
+
+(defun compile-10 (a)
+  (splash a (spec big)
+    (splash spec (ax small)
+      (atomic ax i `(%10 (,i ,(compile-noun small))
+                             ,(compile-noun big))))))
+
+; hints are handled specially - conditions are signalled allowing the caller
+; to provide new forms. helper restarts allow the caller to supply only a
+; handler function, generating wrapper code to call it properly.
+
+(define-condition compile-hint ()
+  ((tag :type integer)))
+
+(define-condition compile-dynamic-hint (compile-hint) ())
+
+(define-condition compile-static-hint (compile-hint) ())
+
+(defun compile-11 (a)
+  (splash a (hint next-formula)
+    (let ((next-form (compile-noun next-formula)))
+      (if (ideep hint)
+          (split hint (tag clue-formula)
+            (let ((clue-form (compile-noun clue-formula))
+                  (itag (iint tag)))
+              (or (restart-case (signal 'compile-dynamic-hint :tag itag)
+                    (before (handler)
+                      `(%11d-before (,itag ,clue-form) ,next-form ,handler))
+                    (after (handler)
+                      `(%11d-after (,itag ,clue-form) ,next-form ,handler))
+                    (around (before after)
+                      `(%11d-around (,itag ,clue-form) ,next-form
+                                    ,next-formula ,before ,after)))
+                  `(%11d (,itag ,clue-form) ,next-form))))
+          (let ((itag (iint hint)))
+            (or (restart-case (signal 'compile-static-hint :tag itag)
+                  (before (handler)
+                    `(%11s-before ,itag ,next-form ,handler))
+                  (after (handler)
+                    `(%11s-after ,itag ,next-form ,handler))
+                  (around (before after)
+                    `(%11s-around ,itag ,next-form
+                                  ,next-formula ,before ,after)))
+                `(%11s ,itag ,next-form)))))))
+
+(defun compile-12 (a)
+  `(%12 ,a))
+
+; nock operators implemented as macros
+
+(defmacro [] (head tail) ; FIXME: special cells
+  `(cons ,head ,tail))
+
+(defmacro %0 (ax)
   (case ax
     (0 +crash+)
     (1 's)
@@ -93,103 +225,52 @@
              for s = (list part 's) then (list part s)
              finally (return s)))))
 
-(defun compile-0 (a)
-  (if (ideep a)
-      +crash+
-      `(frag ,(iint a))))
-
-(defun compile-1 (a)
+(defmacro %1 (a)
   `(quote ,a))
 
-(defparameter *world* nil)
+(defmacro %2 (subject formula)
+  `(nock ,subject ,formula))
 
-(defmacro in-world (world &body forms)
-  `(let ((*world* ,world))
-     ,@forms))
+(defmacro %3 (a)
+  `(loob (deep ,a)))
 
-(defmacro bottle (&body forms)
-  `(in-world (make-world) ,@forms))
+(defmacro %4 (a) ;FIXME: special bignums
+  `(1+ (cl-integer ,a)))
 
-(defun ifind (noun)
-  (or (cached-ideal noun)
-      (if *world*
-          (find-ideal *world* noun)
-          (error "nock world unbound"))))
+(defmacro %5 (a b)
+  `(loob (same ,a ,b)))
 
-(defun .* (subject formula)
-  (if (deep formula)
-      (funcall (formula-function (icell-formula (ifind formula)))
-               subject)
-      (error 'exit)))
-
-(defun compile-2 (a)
-  (splash a (subject formula)
-    `(.* ,(compile-noun subject) ,(compile-noun formula))))
-
-(defun loob (bool)
-  (if bool 0 1))
-
-(defun .? (a)
-  (loob (deep a)))
-
-(defun compile-3 (a)
-  `(.? ,(compile-noun a)))
-
-(defun .+ (a) ;FIXME: special bignums
-  (1+ (cl-integer a)))
-
-(defun compile-4 (a)
-  `(.+ ,(compile-noun a)))
-
-(defun .= (a b)
-  (loob (same a b)))
-
-(defun compile-5 (a)
-  (splash a (one two)
-    `(.= ,(compile-noun one) ,(compile-noun two))))
-
-(defmacro lif (test yes no)
+(defmacro %6 (test yes no)
   `(case (cl-integer ,test)
      (0 ,yes)
      (1 ,no)
      (t ,+crash+)))
 
-(defun compile-6 (a)
-  (splash a (test branches)
-    (splash branches (yes no)
-      `(lif ,(compile-noun test)
-            ,(compile-noun yes)
-            ,(compile-noun no)))))
-
-(defmacro => (a b)
+(defmacro %7 (a b)
   `(let ((s ,a)) ,b))
 
-(defun compile-7 (a)
-  (splash a (one two)
-    `(=> ,(compile-noun one) ,(compile-noun two))))
+(defmacro %8 (a b)
+  `(%7 ([] ,a s) ,b))
 
-(defmacro =+ (a b)
-  `(=> (^ ,a s) ,b))
+(defmacro %9 (axis core)
+  `(%7 ,core (%2 s (%0 ,axis))))
 
-(defun compile-8 (a)
-  (splash a (one two)
-    `(=+ ,(compile-noun one) ,(compile-noun two))))
+(defmacro %12 (a)
+  (declare (ignore a))
+  +crash+ )
 
-(defmacro kick (axis core)
-  `(=> ,core (.* s ,(compile-0 axis))))
-
-(defun compile-9 (a)
-  (splash a (frag core)
-    `(kick ,frag ,(compile-noun core))))
-
-(defun copy (axis old new)
-  (declare (ignore axis old))
-  new)
+(defmacro %10 ((ax small) big)
+  (case ax
+    (0 +crash+)
+    (1 `(progn ,big ,small))
+    (t `(let ((o ,big)
+                   (n ,small))
+               (edit-on ,(iint ax))))))
 
 (defmacro edit-on (ax)
   (case ax
-    (2 '(copy 2 o (^ n (tail o))))
-    (3 '(copy 3 o (^ (head o) n)))
+    (2 '(copy 2 o ([] n (tail o))))
+    (3 '(copy 3 o ([] (head o) n)))
     (t (let* ((tail (tax ax))
               (side (if tail 'tail 'head))
               (more `(let ((o (,side o)))
@@ -197,79 +278,46 @@
               (parts (if tail
                          `((head o) ,more)
                          `(,more (tail o)))))
-         `(copy ,ax o (^ ,@parts))))))
+         `(copy ,ax o ([] ,@parts))))))
 
-(defmacro edit (ax small big)
-  (case ax
-    (0 +crash+)
-    (1 `(progn ,big ,small))
-    (t `(let ((o ,big)
-              (n ,small))
-          (edit-on ,ax)))))
+; hint macros
 
-(defun compile-10 (a)
-  (splash a (spec big)
-    (splash spec (ax small)
-      (if (ideep ax)
-          +crash+
-          `(edit ,(iint ax)
-                 ,(compile-noun small)
-                 ,(compile-noun big))))))
+(defmacro %11s (tag next)
+  (declare (ignore tag))
+  next)
 
-(let ((s '(1 2 . 3)))
-  (edit 6 (.+ (frag 6)) (frag 1)))
-  ;(EDIT 6 (.+ (FRAG 6)) (FRAG 1)))
-  ;(EDIT 6 (.+ (FRAG 6)) (FRAG 1)))
+(defmacro %11d ((tag clue) next)
+  (declare (ignore tag))
+  `(progn ,clue ,next))
 
-(define-condition compile-condition () ())
+(defmacro %11s-before (tag next handler)
+  `(progn (funcall ,handler s ,next ,tag)
+          ,next))
 
-(define-condition compile-dynamic-hint (compile-condition)
-  ((tag :type integer)))
+(defmacro %11d-before ((tag clue) next handler)
+  `(progn (funcall ,handler s ,next ,tag ,clue)
+          ,next))
 
-(define-condition compile-static-hint (compile-condition)
-  ((tag :type integer)))
+(defmacro %11s-after (tag next handler)
+  `(let ((pro ,next))
+     (funcall ,handler s ,next ,tag pro)
+     pro))
 
-(defun compile-11 (a)
-  (splash a (hint next-formula)
-    (let ((next-form (compile-noun next-formula)))
-      (if (ideep hint)
-          (split hint (tag clue-formula)
-            (let ((clue-form (compile-noun clue-formula)))
-              (or (restart-case (signal 'compile-dynamic-hint
-                                        :tag (iint tag))
-                    (before (handler)
-                      `(progn (funcall ',handler subject ,next-formula
-                                       ,clue-form)
-                              ,next-form))
-                    (after (handler)
-                      `(let ((clue ,clue-form)
-                             (product ,next-form))
-                         (funcall ',handler subject ,next-formula product
-                                  clue)
-                         product))
-                    (around (before after)
-                      `(let ((clue ,clue-form))
-                         (or (funcall ',before a ,next-formula clue)
-                             (let ((product ,next-form))
-                               (funcall ',after subject ,next-formula product
-                                        clue))))))
-                  `(progn ,clue-form ,next-form))))
-          (or (restart-case (signal 'compile-static-hint
-                                    :tag (iint hint))
-                (before (handler)
-                  `(progn (funcall ',handler subject ,next-formula)
-                          next-form))
-                (after (handler)
-                  `(let ((product ,next-formula))
-                     (funcall ',handler subject ,next-formula product)
-                     product))
-                (around (before after)
-                  `(or (funcall ',before a ,next-formula)
-                       (let ((product ,next-form))
-                         (funcall ',after a ,next-formula product)
-                         product))))
-              next-form)))))
+(defmacro %11d-after ((tag clue) next handler)
+  `(let ((clu ,clue)
+         (pro ,next))
+     (funcall ,handler s ,next ,tag clu pro)
+     pro))
 
-(defun compile-12 (a)
-  (declare (ignore a))
-  +crash+)
+(defmacro %11s-around (tag form formula before after)
+  `(or (funcall ,before s ,formula ,tag)
+       (let ((pro ,form))
+         (funcall ,after s ,formula ,tag pro)
+         pro)))
+
+(defmacro %11d-around ((tag clue) form formula before after)
+  `(let ((clu ,clue))
+     (or (funcall ,before s ,formula ,tag clu)
+       (let ((pro ,form))
+         (funcall ,after s ,formula ,tag clu pro)
+         pro))))
