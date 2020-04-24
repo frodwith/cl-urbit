@@ -98,9 +98,9 @@
            (let ((,name (iint ,s)))
              ,@forms)))))
 
-; compiler proper -- converts nouns to familiar looking lisp,
-; i.e. [0 0] becomes (%0 0). improper formula shapes become
-; +crash+es.
+; compiler proper -- converts ideals to familiar looking lisp,
+; i.e. #<ICELL [0 0]> becomes (%0 0).
+; improper formula shapes become +crash+.
 
 (defun compile-cell-raw (c)
   (split c (op ar)
@@ -126,7 +126,8 @@
   `([] ,(compile-cell head) ,(compile-noun tail)))
 
 (defun compile-0 (a)
-  (atomic a i `(%0 ,i)))
+  (atomic a i
+    `(%0 ,i)))
 
 (defun compile-1 (a)
   `(%1 ,a))
@@ -162,22 +163,25 @@
 
 (defun compile-9 (a)
   (splash a (ax core)
-    (atomic ax i `(%9 ,i ,(compile-noun core)))))
+    (atomic ax i
+      `(%9 ,i ,(compile-noun core)))))
 
 (defun compile-10 (a)
   (splash a (spec big)
     (splash spec (ax small)
-      (atomic ax i `(%10 (,i ,(compile-noun small))
-                             ,(compile-noun big))))))
+      (atomic ax i
+        `(%10 (,i ,(compile-noun small)) ,(compile-noun big))))))
 
 ; hints are handled specially - conditions are signalled allowing the caller
 ; to provide new forms. helper restarts allow the caller to supply only a
 ; handler function, generating wrapper code to call it properly.
 
 (define-condition compile-hint ()
-  ((tag :type integer)))
+  ((tag :type integer)
+   (next :type (or symbol list))))
 
-(define-condition compile-dynamic-hint (compile-hint) ())
+(define-condition compile-dynamic-hint (compile-hint)
+  ((clue :type (or symbol list))))
 
 (define-condition compile-static-hint (compile-hint) ())
 
@@ -188,7 +192,10 @@
           (split hint (tag clue-formula)
             (let ((clue-form (compile-noun clue-formula))
                   (itag (iint tag)))
-              (or (restart-case (signal 'compile-dynamic-hint :tag itag)
+              (or (restart-case (signal 'compile-dynamic-hint
+                                        :tag itag
+                                        :next next-form
+                                        :clue clue-form)
                     (before (handler)
                       `(%11d-before (,itag ,clue-form) ,next-form ,handler))
                     (after (handler)
@@ -198,7 +205,9 @@
                                     ,next-formula ,before ,after)))
                   `(%11d (,itag ,clue-form) ,next-form))))
           (let ((itag (iint hint)))
-            (or (restart-case (signal 'compile-static-hint :tag itag)
+            (or (restart-case (signal 'compile-static-hint
+                                      :tag itag
+                                      :next next-form)
                   (before (handler)
                     `(%11s-before ,itag ,next-form ,handler))
                   (after (handler)
@@ -263,9 +272,8 @@
   (case ax
     (0 +crash+)
     (1 `(progn ,big ,small))
-    (t `(let ((o ,big)
-                   (n ,small))
-               (edit-on ,(iint ax))))))
+    (t `(let ((o ,big) (n ,small))
+          (edit-on ,ax)))))
 
 (defmacro edit-on (ax)
   (case ax
