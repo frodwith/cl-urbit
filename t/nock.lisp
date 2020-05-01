@@ -127,23 +127,41 @@
 ;  --
 (defparameter +ackerman-source+ [7 [7 [1 %kack] 8 [1 [7 [8 [1 0] [1 8 [1 0] 8 [1 8 [4 0 6] 6 [5 [0 2] 0 62] [0 14] 9 2 10 [6 0 2] 0 3] 9 2 0 1] 0 1] 11 [%fast 1 %dec [0 7] 0] 0 1] 7 [8 [1 0 0] [1 6 [5 [1 0] 0 12] [4 0 13] 6 [5 [1 0] 0 13] [9 2 10 [6 [8 [9 4 0 7] 9 2 10 [6 0 28] 0 2] 1 1] 0 1] 9 2 10 [6 [8 [9 4 0 7] 9 2 10 [6 0 28] 0 2] 9 2 10 [13 8 [9 4 0 7] 9 2 10 [6 0 29] 0 2] 0 1] 0 1] 0 1] 11 [%fast 1 %ack [0 7] 0] 0 1] 11 [%fast 1 %kack [1 0] 0] 0 1] 9 5 0 1])
 
-;(defparameter *dec-jet-invocations* 0)
-;
-;(defun dec-jet (sam)
-;  (incf *dec-jet-invocations*)
-;  (let ((i (cl-integer sam)))
-;    (if (= 0 i)
-;      (error 'exit)
-;      (1- i))))
+(defparameter *mock-dec-calls* 0)
+(defun mock-dec (sam)
+  (let ((i (cl-integer sam)))
+    (if (= 0 i)
+      (error 'exit)
+      (1- i))))
 
-;(defstruct )
-;
-;(root %kack
-;  (gate dec #'dec-jet))
+(defparameter +ackerman-jets+
+  (list
+    (root %kack %kack nil
+          (gate %dec #'mock-dec))))
 
-(defun ack (n m)
-  (bottle
-    (nock [n m] [9 2 10 [6 0 1] +ackerman-source+])))
+(defun ack (n m world)
+  (nock [n m] [9 2 10 [6 0 1] (copy-tree +ackerman-source+)]))
 
-(test ack
-  (is (= 7 (ack 2 2))))
+(test ackerman
+  (let ((pack nil))
+    ; no mention of jets
+    (is (= 7 (bottle (ack 2 2))))
+    (is (= 0 *mock-dec-calls*))
+    ; jet tree is present, but no registrations - no increase
+    (is (= 7 (in-world (make-world +ackerman-jets+) (ack 2 2))))
+    (is (= 0 *mock-dec-calls*))
+    ; turn fast hints on - this time the jet should fire 
+    (is (= 7 (let* ((w (make-world +ackerman-jets+))
+                    (a (with-fast-hints w (ack 2 2))))
+               (setf pack (save-jet-pack w))
+               a)))
+    (is (= 2 *mock-dec-calls*))
+    ; call in a new world with no jets - no increase
+    (is (= 7 (bottle (ack 2 2))))
+    (is (= 2 *mock-dec-calls*))
+    ; with jets but no registrations, no increase
+    (is (= 7 (in-world (make-world +ackerman-jets+) (ack 2 2))))
+    (is (= 2 *mock-dec-calls*))
+    ; supply the saved jet pack, the jets fire
+    (is (= 7 (in-world (make-world +ackerman-jets+ pack) (ack 2 2))))
+    (is (= 4 *mock-dec-calls*))))

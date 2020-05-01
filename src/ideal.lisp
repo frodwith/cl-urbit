@@ -28,8 +28,6 @@
 ; (i.e. the samples of gates)
 
 ; placeholders
-(deftype kernel () 'null)
-(deftype stencil () 'null)
 (deftype assumption () 'null)
 (deftype axis-map (element-type)
   (declare (ignore element-type))
@@ -37,27 +35,15 @@
 (deftype core ()
   '(or (eql :fast) (eql :slow)))
 
-; nil maps have no entries, duh, easy
-; cons maps have one entry, often optimizable
-; vectors have a "small" number of entries that we can sort or iterate over
-(deftype lmap (key-type value-type)
-  `(or null
-       (cons ,key-type ,value-type)
-       (vector (cons ,key-type ,value-type))))
-
-; hashtables have a nice even, uniformly bad perfomance and we won't iterate
-(deftype maps (key-type value-type)
-  `(or (lmap ,key-type ,value-type)
-       hash-table))
-
 (defstruct battery
   (arms nil :type (axis-map function))
   (unregistered nil :type (or null assumption))
-  (parent-axis nil :type (or null integer))
-  (roots nil :type (maps integer stencil))
-  (parents nil :type (maps stencil stencil)))
+  (parent-axis nil :type (or null ideal-atom))
+  (roots (make-hash-table :test 'eql) :type hash-table)
+  (parents (make-hash-table :test 'eq) :type hash-table))
 
-(deftype driver () (or null function))
+; TODO: roots and parents could probably be faster in most cases than
+; hash-tables, since quite often they contain a small number of entries.
 
 (defstruct (formula (:constructor make-formula (form)))
   (form nil :read-only t :type (or list symbol))
@@ -128,7 +114,7 @@
   (declare (ideal i))
   (etypecase i
     (icell t)
-    (ideal-atom) nil))
+    (ideal-atom nil)))
 
 (defun iatom=mugatom (i a)
   (or (eql i a) ; takes care of actual fixnums (no cached mug)
@@ -197,11 +183,16 @@
   ; 2) distinguished groups = faster hash/comparison
   (atoms (make-hash-table :test 'atoms= :weakness :key) :read-only t)
   (cells (make-hash-table :test 'cells= :weakness :key) :read-only t)
-  (roots (make-hash-table :test 'equal) :read-only t))
+  (roots (make-hash-table :test 'equal) :read-only t)
+  ; we push onto this list whenever we install a new stencil
+  ; 1) keeps registered batteries from weakref-ing out, losing registrations
+  ; 2) serves as a registration log for producing battery packs
+  (stencils nil :type list)) 
 
-(defun make-world (&optional jet-tree)
+(defun make-world (&optional jet-tree jet-pack)
   (let ((w (init-world)))
-    (when jet-tree (install-tree jet-tree))
+    (install-tree w jet-tree)
+    (when jet-pack (install-jet-pack w jet-pack))
     w))
 
 (defun hashed-ideal (table noun)
@@ -236,22 +227,38 @@
     (sum-cell mugged #'atomic #'fast #'slow)))
 
 (defun find-cons (world ihead itail)
-  (let ((findr (icons ihead itail (murmugs (imug ihead) (imug itail)))))
-    (hash-place p (world-cells-world) findr
-      (or p (setq p findr)))))
+  (find-ideal-cell world (cons ihead itail)))
+
+(defun find-ideal-cell (world cell)
+  (let ((cells (world-cells world)))
+    (or (hashed-ideal cells cell)
+        (create-icell (world-atoms world) cells cell))))
+
+(defun find-ideal-atom (world a)
+  (let ((atoms (world-atoms world)))
+    (or (hashed-ideal atoms a)
+        (create-iatom atoms a))))
 
 (defun find-ideal (world noun)
   (if (deep noun)
-      (let ((cells (world-cells world)))
-        (or (hashed-ideal cells noun)
-            (create-icell (world-atoms world) cells noun)))
-      (let ((atoms (world-atoms world)))
-        (or (hashed-ideal atoms noun)
-            (create-iatom atoms noun)))))
+      (find-ideal-cell world noun)
+      (find-ideal-atom world noun)))
 
-; kernels are used to link drivers to stencils
-; driver takes stencil constructor args minus driver,
-; produces nil or function from axis to core function
+; world will not be evaluated unless no cached-ideal
+(defmacro idealm (finder world noun)
+  (let ((s (gensym)))
+    `(let ((,s ,noun))
+       (or (cached-ideal ,s)
+           (,finder ,world ,s)))))
+
+(defmacro get-ideal (world noun)
+  `(idealm find-ideal ,world ,noun))
+
+(defmacro get-ideal-atom (world a)
+  `(idealm find-ideal-atom ,world ,a))
+
+(defmacro get-ideal-cell (world cell)
+  `(idealm find-ideal-cell ,world ,cell))
 
 (defstruct kernel
   (name nil :type uint :read-only t)
@@ -291,8 +298,8 @@
   (root-place r world name constant
     (or r (setq r (make-root constant name nil)))))
 
-(defstruct (child (:constructor make-static (parent name driver)
-                  (:include kernel)))
+(defstruct (child (:constructor make-static (parent name driver))
+                  (:include kernel))
   (parent nil :type kernel :read-only t))
 
 (defstruct (dynamic (:constructor make-dynamic (parent name axis driver))
@@ -326,49 +333,73 @@
     (dynamic (dynamic-axis kernel))
     (child 1)))
 
+; stencils
+; installing a stencil causes cores that match it to clock fast
+; they are typically installed by
+; 1) processing a jet pack
+; 2) core registration (i.e. %fast hints)
+
 (defstruct stencil
-  (ideal nil :type ideal) ; battery or static core (see kernel)
-  (hooks nil :type ideal) ; unprocessed hook list
-  (kernel nil :type kernel)
-  (driver nil :type (or null function)))
+  (ideal nil :type ideal :read-only t) ; battery or static core (see kernel)
+  (hooks nil :type ideal :read-only t) ; unprocessed hook list
+  (kernel nil :type kernel :read-only t)
+  (driver nil :type (or null function) :read-only t))
 
 (defstruct (child-stencil (:include stencil))
-  (parent nil :type stencil))
+  (parent nil :type stencil :read-only t))
 
-(defmacro stencil-place (stencil-symbol kernel ideal &body forms)
-  `(hash-place ,stencil-symbol (kernel-stencils ,kernel) ,ideal
-     ,@forms))
-
-(defun call-kernel-driver (kernel ideal hooks)
+(defun call-kernel-driver (kernel parent-stencil ideal hooks)
   (let ((kdriver (kernel-driver kernel)))
     (when kdriver
-      (funcall kdriver kernel ideal hooks))))
+      (funcall kdriver kernel parent-stencil ideal hooks))))
 
-; once you get the returned stencil, you presumably will use it to update
-; the battery's match maps etc.
+(define-condition reinstall-stencil (error) (stencil))
 
-(defun install-root-stencil (world icore name hooks)
+(defun install-root-stencil (world name icore hooks)
   (let* ((constant (icell-tail icore))
-         (kernel (find-root world name constant)))
-    (stencil-place s kernel icore
-      (if s
-          (error 'stencil-reinstall :stencil s)
-          (setq s (make-stencil
-                    :ideal icore :kernel kernel
-                    :driver (call-kernel-driver kernel icore hooks)))))))
+         (kernel (find-root world name constant))
+         (stencil (make-stencil
+                    :ideal icore :kernel kernel :hooks hooks
+                    :driver (call-kernel-driver kernel nil icore hooks)))
+         (battery (icell-head icore))
+         (roots (battery-roots (icell-battery battery)))
+         (old (gethash constant roots)))
+    (if old
+        (error 'reinstall-stencil :stencil old)
+        (progn (push stencil (world-stencils world))
+               (setf (gethash constant roots) stencil)))))
 
-(defun install-child-stencil (world parent battery name axis hooks)
+(defun install-child-stencil (world name battery axis parent hooks)
   (let* ((parentk (stencil-kernel parent))
          (kernel (find-child parentk name axis))
          (ideal (if (kernel-static kernel)
                     (find-cons world battery (stencil-ideal parent))
-                    battery)))
-    (stencil-place s kernel ideal
-      (if s
-          (error 'stencil-reinstall :stencil s)
-          (setq s (make-child-stencil
-                    :ideal ideal :kernel kernel :parent parent
-                    :driver (call-kernel-driver kernel ideal hooks)))))))
+                    battery))
+         (stencil (make-child-stencil
+                    :ideal ideal :kernel kernel :parent parent :hooks hooks
+                    :driver (call-kernel-driver kernel parent ideal hooks)))
+         (parents (battery-parents (icell-battery battery)))
+         (old (gethash parent parents)))
+    (if old
+        (error 'reinstall-stencil :stencil old)
+        (progn (push stencil (world-stencils world))
+               (setf (gethash parent parents) stencil)))))
+
+; jet trees 
+; MAKE-WORLD takes an optional jet-tree argument
+; a jet tree is a list of jet-root
+; make them with ROOT and the optional children with CORE
+; each kernel is associated with a driver. see GATE-DRIVER for an example.
+; driver should be (lambda (kernel parent-stencil ideal hooks)
+;                    ; resolve hooks, do partial evaluation, etc.
+;                    (lambda (axis-in-battery)
+;                      ; for gates, axis-in-battery is 1
+;                      (when (= 1 axis-in-battery) #'driver)                      )
+; driver can be nil or return nil at either level, in which case the nock 
+; inside the battery will be used in the usual way.
+;
+; GATE is provided as a convenience wrapper for the leaves, as it's by far the
+; most common case.
 
 (defstruct jet-core
   (name nil :type uint)
@@ -376,40 +407,156 @@
   (children nil :type list))
 
 (defstruct (jet-root
-             (:constructor root (name constant driver &optional children))
+             (:constructor root (name constant driver &rest children))
              (:include jet-core))
   (constant nil :type uint))
 
 (defstruct (jet-child
-             (:constructor core (name axis driver &optional children))
+             (:constructor core (name axis driver &rest children))
              (:include jet-core))
   (axis nil :type uint))
+
+(defun gate-driver (sample-function)
+  (lambda (kernel parent-stencil hooks ideal)
+    (declare (ignore kernel parent-stencil ideal hooks))
+    (lambda (axis)
+      (when (= axis 1)
+        (lambda (core)
+          (funcall sample-function (head (tail core))))))))
+
+(defun gate (name sample-function)
+  (core name 3 (gate-driver sample-function)))
+
+(defun install-jet-children (world jet-parent parent-kernel)
+  (dolist (child (jet-core-children jet-parent))
+    (install-jet-child world parent-kernel child)))
 
 (defun install-jet-child (world parent-kernel child)
   (install-jet-children
     world child (install-child
-                  world parent-kernel
+                  parent-kernel
                   (jet-core-name child)
-                  (find-ideal world (jet-child-axis child))
+                  (get-ideal-atom world (jet-child-axis child))
                   (jet-core-driver child))))
-
-(defun install-jet-children (world jet-parent parent-kernel)
-  (dolist ((child (jet-core-children jet-parent)))
-    (install-jet-child world parent-kernel child)))
 
 (defun install-jet-root (world root)
   (install-jet-children
     world root (install-root
                  world
                  (jet-core-name root)
-                 (find-ideal world (jet-root-constant root))
+                 (get-ideal-atom world (jet-root-constant root))
                  (jet-core-driver root))))
 
 (defun install-tree (world roots)
   (dolist (r roots) (install-jet-root world r)))
 
-; kernels are installed at boot time by the equivalent of jets/tree.c
-; stencils are installed by 
-;   1) the battery-pack process 
-;   2) fast hints (when enabled) after a core clocks slow
-; stencil installation causes clocking to find matching cores
+; jet packs
+
+(defun zero-terminate (list)
+  (loop for c on list
+        unless (cdr c) do (rplacd c 0))
+  list)
+
+(defmacro need (cell expr)
+  (let ((tmp (gensym)))
+    `(let ((,tmp ,expr))
+       (if ,(if cell
+                `(not (deep ,tmp))
+                `(deep ,tmp)) 
+           (error ',(if cell 'cell-required 'atom-required)
+                  :given ,tmp)
+           ,tmp))))
+
+(defmacro need-atom (expr)
+  `(need nil ,expr))
+
+(defmacro need-cell (expr)
+  `(need t ,expr))
+
+(defmacro denoun (bindings expr &body forms)
+  (etypecase bindings
+    (null `(progn ,@forms))
+    (symbol
+      (case bindings
+        (@ `(progn (need-atom ,expr) ,@forms))
+        (^ `(progn (need-cell ,expr) ,@forms))
+        (t (let ((name (symbol-name bindings)))
+             (multiple-value-bind (sym val)
+               (let ((start (char name 0))
+                     (pack (symbol-package bindings)))
+                 (if (char= #\@ start)
+                     (if (char= #\@ (char name 1))
+                         (values (intern (subseq name 2) pack)
+                                 `(cl-integer ,expr))
+                         (values (intern (subseq name 1) pack)
+                                 `(need-atom ,expr)))
+                     (if (char= #\^ start)
+                         (values (intern (subseq name 1) pack)
+                                 `(need-cell ,expr))
+                         (values bindings expr))))
+               `(let ((,sym ,val)) ,@forms))))))
+    (cons
+      (destructuring-bind (one . more) bindings
+        (if (null more)
+            `(denoun ,one ,expr ,@forms)
+            (let ((cell (gensym "CELL"))
+                  (head (gensym "HEAD"))
+                  (tail (gensym "TAIL")))
+              `(let* ((,cell ,expr)
+                      (,head (head ,cell))
+                      (,tail (tail ,cell)))
+                 (denoun ,one ,head (denoun ,more ,tail ,@forms)))))))))
+
+(defun save-jet-pack (world)
+  (jam
+    (zero-terminate
+      (loop with parents = (make-hash-table :test 'eq)
+            for i upfrom 0
+            for stencil in (reverse (world-stencils world))
+            for kernel = (stencil-kernel stencil)
+            for name = (kernel-name kernel)
+            for ideal = (stencil-ideal stencil)
+            for hooks = (stencil-hooks stencil)
+            do (setf (gethash i parents) stencil)
+            collect
+            (etypecase kernel
+              (root `(0 ,name ,ideal . ,hooks))
+              (child (let* ((axis (parent-axis kernel))
+                            (pstencil (child-stencil-parent stencil))
+                            (parenti (gethash pstencil parents))
+                            (battery (if (kernel-static kernel)
+                                         (icell-head ideal)
+                                         ideal)))
+                       `(1 ,name ,battery ,axis ,parenti . ,hooks))))))))
+
+(defun cue (a)
+  (declare (ignore a))
+  ; TODO
+  0)
+
+(defun jam (n)
+  (declare (ignore n))
+  ; TODO
+  0)
+
+(defun install-jet-pack (world pack)
+  (loop for more = (cue pack) then (tail more)
+        while (deep more)
+        with parents = (make-array 100 :adjustable t :fill-pointer 0
+                                       :element-type 'stencil)
+        for s = (macrolet ((! (e) `(get-ideal world ,e))
+                           (@ (e) `(get-ideal-atom world ,e))
+                           (^ (e) `(get-ideal-cell world ,e)))
+                  (denoun (@@stem bulb) (head more)
+                    (ecase stem
+                      (0 (denoun (@name core hooks) bulb
+                           (denoun (^ @) core
+                             (install-root-stencil
+                               world (@ name) (^ core) (! hooks)))))
+                      (1 (denoun (@name ^battery @axis @@parent hooks) bulb
+                           (install-child-stencil
+                             world (@ name) (^ battery) (@ axis) 
+                             (aref parents parent) (! hooks)))))))
+        do (vector-push-extend s parents)
+        finally (unless (= 0 (cl-integer more))
+                  (error 'exit))))

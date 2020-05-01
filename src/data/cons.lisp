@@ -37,7 +37,7 @@
   (setf (cdr c) (icell-tail val)))
 
 (defmethod head ((c cons))
-  (or (car c) (error 'noun-required)))
+  (car c))
 
 (defmethod (setf head) (val (c cons))
   (etypecase (meta c)
@@ -45,7 +45,7 @@
     (icell val)))
 
 (defmethod tail ((c cons))
-  (or (cdr c) (error 'noun-required)))
+  (cdr c))
 
 (defmethod (setf tail) (val (c cons))
   (etypecase (meta c)
