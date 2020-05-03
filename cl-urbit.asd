@@ -4,7 +4,8 @@
   :license "MIT"
   :homepage "https://github.com/frodwith/cl-urbit"
   :version "0.1"
-  :depends-on (:cl-murmurhash :named-readtables :cl-intbytes)
+  :depends-on 
+  (:cl-murmurhash :named-readtables :cl-intbytes :trivial-bit-streams)
   :components ((:module "src"
                 :serial t
                 :components

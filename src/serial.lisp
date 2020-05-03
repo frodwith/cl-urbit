@@ -1,10 +1,15 @@
 (defpackage #:urbit/serial
-  (:use #:cl #:cl-intbytes #:trivial-bit-streams #:urbit/ideal))
+  (:use #:cl #:urbit/math #:urbit/data #:urbit/ideal
+        #:cl-intbytes #:trivial-bit-streams)
+  (:export #:jam #:cue #:jam-to-write #:cue-from-read))
 
 (in-package #:urbit/serial)
 
-(defun jam-ideal-with-callback (ideal on-byte)
-  (with-bit-output-stream (s :callback on-byte)
+; ideals are already deduplicated, efficiently and globally, allowing us
+; to use an efficient eq hashtable for backreferences.
+; see trivial-bit-streams for write-fn
+(defun jam-to-write (ideal write-fn)
+  (with-bit-output-stream (s :callback write-fn)
     (let ((cursor 0)
           (dupes (make-hash-table :test 'eq)))
       (labels
@@ -18,17 +23,17 @@
            (one) (one) (mat ref))
          (save (a)
            (setf (gethash a dupes) cursor))
-         (mat (a)
-           (if (= 0 a)
+         (mat (i)
+           (if (= 0 i)
                (one)
-               (let* ((abits (integer-length a))
-                      (bbits (integer-length abits))
-                      (above (1+ bbits))
-                      (below (1- bbits)))
-                 (write-bits (ash 1 bbits) above s)
-                 (write-bits (logand abits (1- (ash 1 below))) below s)
-                 (write-bits a abits s)
-                 (setq cursor (+ cursor above below abits)))))
+               (let* ((a (integer-length i))
+                      (b (integer-length a))
+                      (above (1+ b))
+                      (below (1- b)))
+                 (write-bits (ash 1 b) above s)
+                 (write-bits (logand a (1- (ash 1 below))) below s)
+                 (write-bits i a s)
+                 (setq cursor (+ cursor above below a)))))
          (take (stack)
            (unless (null stack)
              (give (car stack) (cdr stack))))
@@ -48,14 +53,83 @@
                          (if (< isize dsize)
                              (progn (zero) (mat i))
                              (back dupe)))
-                       (progn (save a) (zero) (mat a)))
+                       (progn (save a) (zero) (mat i)))
                    (take stack))))))
         (give ideal nil)))))
 
-(defun jam-ideal (ideal)
+; see trivial-bit-streams for read-fn
+(defun cue-from-read (kons read-fn)
+  (with-bit-input-stream (s :callback read-fn)
+    (let ((cursor 0)
+          (refs (make-hash-table :test 'eql)))
+      (labels ((bits (n)
+                 (loop with done = 0
+                       with accu = 0
+                       for left = (- n done)
+                       until (= 0 left)
+                       do (multiple-value-bind (int got) (read-bits left s)
+                            (setq accu (logxor (ash int done) accu))
+                            (setq done (+ done got)))
+                       finally (progn (setq cursor (+ cursor done))
+                                      (return accu))))
+               (one ()
+                 (incf cursor)
+                 (let ((b (read-bit s)))
+                   (= b 1)))
+               (save (pos ref)
+                 (setf (gethash pos refs) ref))
+               (rub ()
+                 (let ((zeros (loop for i upfrom 0
+                                    for b = (one)
+                                    until b
+                                    finally (return i))))
+                   (if (zerop zeros)
+                       0
+                       (let* ((below (1- zeros))
+                              (lbits (bits below))
+                              (bex (ash 1 below))
+                              (len (logxor bex lbits)))
+                         (bits len)))))
+               (take (r stack)
+                 (if (null stack)
+                     r
+                     (give (cons r (car stack)) (cdr stack))))
+               (give (frame stack)
+                 (if (consp frame)
+                     (destructuring-bind (r . m) frame
+                       (if (consp m)
+                           (destructuring-bind (l . pos) m
+                             (take (save pos (funcall kons l r)) stack))
+                           (give cursor (cons frame stack))))
+                     (if (one)
+                         (if (one)
+                             (take (save frame (or (gethash (rub) refs)
+                                                   (error 'exit)))
+                                   stack)
+                             (give cursor (cons frame stack)))
+                         (take (save frame (rub)) stack)))))
+        (give 0 nil)))))
+
+(defun read-from-octets (len octs)
+  (let ((done 0))
+    (lambda (buf)
+      (loop for i from done below (min (- len done) (length buf))
+            do (setf (aref buf i) (aref octs i))
+            finally (progn (setq done (+ i done))
+                           (return i))))))
+
+(defun read-from-int (a)
+  (let ((len (met 3 a)))
+    (read-from-octets len (int->octets a len))))
+
+(defun jam (ideal)
   (let ((oct (make-array 100 :adjustable t :fill-pointer 0)))
-    (flet ((callback (buf end)
-             (loop for i below end
-                   do (vector-push-extend (aref buf i) oct))))
-      (jam-ideal-with-callback ideal #'callback)
-      (octets->uint oct (fill-pointer oct)))))
+    (jam-to-write
+      ideal
+      (lambda (buf end)
+        (loop for i below end
+              do (vector-push-extend (aref buf i) oct))))
+    (octets->uint oct (fill-pointer oct))))
+
+(defun cue (kons int)
+  (cue-from-read kons (read-from-int int)))
