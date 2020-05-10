@@ -1,5 +1,5 @@
 (defpackage #:urbit/mug
-  (:use #:cl #:urbit/data #:urbit/math #:urbit/control #:murmurhash)
+  (:use #:cl #:urbit/data #:urbit/math #:urbit/common #:murmurhash)
   (:export #:mug #:murmug #:murmugs))
 
 (in-package #:urbit/mug)

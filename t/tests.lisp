@@ -1,5 +1,5 @@
 (defpackage #:urbit/tests
-  (:use #:cl #:fiveam #:urbit/control)
+  (:use #:cl #:fiveam)
   (:export #:test-urbit #:all-tests))
 
 (in-package #:urbit/tests)

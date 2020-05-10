@@ -1,8 +1,10 @@
-(defpackage #:urbit/control
+(defpackage #:urbit/common
   (:use #:cl #:urbit/data)
-  (:export #:sum-cell #:sum-noun #:cell= #:shallow #:if-let))
+  (:import-from #:urbit/math #:uint)
+  (:export #:sum-cell #:sum-noun #:cell= #:shallow #:if-let
+           #:denoun #:dedata #:decons))
 
-(in-package #:urbit/control)
+(in-package #:urbit/common)
 
 (defmacro if-let ((name value-form) true-form false-form)
   `(let ((,name ,value-form))
@@ -95,3 +97,80 @@
                          (funcall unify a b)
                          (take stack)))))))
     (main a b nil)))
+
+(defmacro denoun ((&key (head 'head)
+                        (tail 'tail)
+                        (int 'cl-integer)
+                        (deep 'deep))
+                  bindings expr &body forms)
+  (labels ((binds (val items form)
+             (destructuring-bind (one . more) items
+               (if (null more)
+                   (bind val one form)
+                   (let* ((hsym (gensym "HEAD"))
+                          (tsym (gensym "TAIL")))
+                     `(let ((,hsym (,head ,val))
+                            (,tsym (,tail ,val)))
+                        ,(bind hsym one (binds tsym more form)))))))
+           (bind (val item form)
+             (etypecase item
+               (null (let ((i (gensym)))
+                       `(let ((,i ,val))
+                          (declare (ignore ,i))
+                          ,form)))
+               (list (binds val item form))
+               (symbol
+                 (let ((name (symbol-name item)))
+                   (cond ((string= "@" name)
+                          `(if (,deep ,val)
+                           (error 'atom-required :given ,val)
+                           ,form))
+                         ((string= "^" name)
+                          `(if (,deep ,val)
+                           ,form
+                           (error 'cell-required :given ,val))   )
+                         (t (let* ((name (symbol-name item))
+                                   (start (char name 0))
+                                   (pack (symbol-package item)))
+                              (flet ((chop (n) (intern (subseq name n) pack)))
+                                (if (char= #\@ start)
+                                    (if (char= #\@ (char name 1))
+                                      `(let ((,(chop 2) (,int ,val))) ,form)
+                                      `(if (,deep ,val)
+                                           (error 'atom-required :given ,val)
+                                           (let ((,(chop 1) ,val)) ,form)))
+                                    (if (char= #\^ start)
+                                      `(if (,deep ,val)
+                                           (let ((,(chop 1) ,val)) ,form)
+                                           (error 'cell-required :given ,val))
+                                      `(let ((,item ,val)) ,form))))))))))))
+    (if (null bindings)
+        `(progn ,expr ,@forms)
+        (let* ((whole (gensym "WHOLE"))
+               (body (binds whole bindings `(progn ,@forms))))
+          `(let ((,whole ,expr)) ,body)))))
+
+(defmacro dedata (bindings expr &body forms)
+  `(denoun nil ,bindings ,expr ,@forms))
+
+(defun need-int (a)
+  (typecase a
+    (uint a)
+    (t (error 'atom-required))))
+
+(define-condition cons-required (cell-required) ())
+
+(defun decar (c)
+  (if (consp c)
+      (car c)
+      (error 'cons-required)))
+
+(defun decdr (c)
+  (if (consp c)
+      (cdr c)
+      (error 'cons-required)))
+
+(defmacro decons (bindings expr &body forms)
+  `(denoun (:head decar :tail decdr :deep consp :int need-int)
+           ,bindings ,expr ,@forms))
+

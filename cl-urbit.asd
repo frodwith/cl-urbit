@@ -12,7 +12,7 @@
                 ((:file "math")
                  (:file "syntax")
                  (:file "data")
-                 (:file "control")
+                 (:file "common")
                  (:file "mug")
                  (:file "ideal")
                  (:file "equality")

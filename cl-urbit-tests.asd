@@ -10,6 +10,7 @@
                  (:file "math")
                  (:file "mug")
                  (:file "data")
+                 (:file "common")
                  (:file "ideal")
                  (:file "nock"))))
   :perform (test-op (o s)

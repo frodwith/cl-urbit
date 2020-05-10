@@ -58,7 +58,9 @@
         (give ideal nil)))))
 
 ; see trivial-bit-streams for read-fn
-(defun cue-from-read (kons read-fn)
+; atom-fn will be passed a common lisp integer to make atoms
+; cell-fn is passed head and tail to make cells
+(defun cue-from-read (read-fn atom-fn cell-fn)
   (with-bit-input-stream (s :callback read-fn)
     (let ((cursor 0)
           (refs (make-hash-table :test 'eql)))
@@ -99,7 +101,7 @@
                      (destructuring-bind (r . m) frame
                        (if (consp m)
                            (destructuring-bind (l . pos) m
-                             (take (save pos (funcall kons l r)) stack))
+                             (take (save pos (funcall cell-fn l r)) stack))
                            (give cursor (cons frame stack))))
                      (if (one)
                          (if (one)
@@ -107,7 +109,7 @@
                                                    (error 'exit)))
                                    stack)
                              (give cursor (cons frame stack)))
-                         (take (save frame (rub)) stack)))))
+                         (take (save frame (funcall atom-fn (rub))) stack)))))
         (give 0 nil)))))
 
 (defun read-from-octets (len octs)
@@ -131,5 +133,5 @@
               do (vector-push-extend (aref buf i) oct))))
     (octets->uint oct (fill-pointer oct))))
 
-(defun cue (kons int)
-  (cue-from-read kons (read-from-int int)))
+(defun cue (int atom-fn cell-fn)
+  (cue-from-read (read-from-int int) atom-fn cell-fn))

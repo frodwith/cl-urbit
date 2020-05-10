@@ -1,5 +1,5 @@
 (defpackage #:urbit/equality
-  (:use #:cl #:urbit/data #:urbit/control #:urbit/ideal)
+  (:use #:cl #:urbit/data #:urbit/common #:urbit/ideal)
   (:export #:same))
 
 (in-package #:urbit/equality)
