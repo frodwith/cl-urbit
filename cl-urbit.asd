@@ -13,15 +13,18 @@
                  (:file "syntax")
                  (:file "data")
                  (:file "common")
-                 (:file "mug")
-                 (:file "ideal")
-                 (:file "equality")
-                 (:file "nock")
                  (:file "data/fixnum")
                  (:file "data/bignum")
                  (:file "data/cons")
+                 (:file "mug")
+                 (:file "ideal")
                  (:file "data/iatom")
-                 (:file "data/icell"))))
+                 (:file "data/icell")
+                 (:file "serial")
+                 (:file "jets")
+                 (:file "equality")
+                 (:file "nock")
+                 )))
   :description "nock runtime and urbit worker process (http://urbit.org)"
   :long-description
   #.(uiop:read-file-string
