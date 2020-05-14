@@ -1,7 +1,9 @@
 (defpackage #:urbit/jets
   (:use #:cl #:urbit/common #:urbit/math
         #:urbit/data #:urbit/ideal #:urbit/serial)
-  (:import-from #:urbit/data #:exit))
+  (:import-from #:urbit/data #:exit)
+  (:export #:root #:core #:gate #:get-speed
+           #:load-world #:save-jet-pack #:install-jet-pack))
 
 (in-package #:urbit/jets)
 
@@ -43,7 +45,7 @@
   (child-place c parent name axis
     (if c
         (error 'reinstall-kernel :kernel c)
-        (setq c (make-child parent name axis driver)))))
+        (setq c (make-child name axis parent driver)))))
 
 ; kernel finding is used by stencil installation, and will create a 
 ; kernel if one has not already been installed.
@@ -54,7 +56,7 @@
 
 (defun find-child (parent name axis)
   (child-place c parent name axis
-    (or c (setq c (make-child parent name axis nil)))))
+    (or c (setq c (make-child name axis parent nil)))))
 
 ; installing a stencil causes matching cores to clock fast.
 ; usually it is done either by running something like a fast hint
@@ -84,19 +86,22 @@
              (error 'cell-required :given bat))))))
 
 (defun compile-meter (world battery)
-  (let* ((axis (iint (battery-parent-axis battery)))
-         (frag (if (= axis 1)
-                   'payload
-                   (axis-parts axis 'payload 'head 'tail))))
+  (let ((axis (iint (battery-parent-axis battery))))
     (setf (battery-meter battery)
           (compile
             nil
             `(lambda (payload)
                (or (if (deep payload)
-                       (handler-case
-                         (case (get-speed ',world ,frag)
-                           ,@(hash-pairs (battery-parents battery)))
-                         (exit () nil))
+                       ,(if (= axis 0)
+                            'nil
+                            (let ((frag (if (= axis 1)
+                                            'payload
+                                            (axis-parts axis 'payload
+                                                        'head 'tail))))
+                              `(handler-case
+                                 (case (get-speed ',world ,frag)
+                                   ,@(hash-pairs (battery-parents battery)))
+                                 (exit () nil))))
                        (case payload ,@(hash-pairs (battery-roots battery))))
                    :slow))))))
 
@@ -244,9 +249,11 @@
 
 ; destructively set the final nil of a list to a 0 (lisp list -> noun list)
 (defun zero-terminate (list)
-  (loop for c on list
-        unless (cdr c) do (rplacd c 0))
-  list)
+  (if (null list)
+      0
+      (loop for c on list
+            unless (cdr c) do (rplacd c 0)
+            finally (return list))))
 
 (defun parent-axis (kernel)
   (etypecase kernel

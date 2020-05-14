@@ -2,6 +2,7 @@
   (:use #:cl #:urbit/ideal #:urbit/data #:urbit/math)
   (:import-from #:urbit/equality #:same)
   (:import-from #:alexandria #:when-let*)
+  (:import-from #:urbit/jets #:get-speed)
   (:export #:nock #:bottle #:in-world
            #:compile-dynamic-hint #:compile-static-hint
            #:before #:after #:around))
@@ -259,17 +260,20 @@
 (defmacro %8 (a b)
   `(%7 ([] ,a s) ,b))
 
+(defun call-jet (core axis-in-battery)
+  (let ((spd (get-speed *world* core)))
+    (when (typep spd 'fast)
+      (when-let* ((driver (stencil-driver spd))
+                  (jet (funcall driver axis-in-battery)))
+        (funcall jet core)))))
+
 (defmacro %9 (axis core)
-  (let ((jet-forms
-          (and (> axis 1)
-               (not (tax axis))
-               `((let ((z (get-speed *world* s)))
-                   (when (typep z 'fast)
-                     (when-let* ((d (stencil-driver z))
-                                 (j (funcall d ,(mas axis))))
-                       (funcall j s))))))))
-    `(%7 ,core (let ((f (%0 ,axis)))
-                 (or ,@jet-forms (%2 s f))))))
+  (let ((jet-forms (and (> axis 1)
+                        (not (tax axis))
+                        `((call-jet s ,(mas axis))))))
+    `(%7 ,core 
+         (let ((f (%0 ,axis)))
+           (or ,@jet-forms (%2 s f))))))
 
 (defmacro %12 (a)
   (declare (ignore a))

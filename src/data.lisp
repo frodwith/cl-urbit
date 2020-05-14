@@ -10,10 +10,10 @@
 ; the data protocol: types which represent nouns should implement these methods
 
 (define-condition data-error (error)
-  ((object :initarg #:given)))
+  ((object :initarg :given)))
 
 (define-condition unimplemented (data-error)
-  ((name :initarg #:name :type symbol)))
+  ((name :initarg :name :type symbol)))
 
 (define-condition exit (data-error) ())
 (define-condition atom-required (exit) ())

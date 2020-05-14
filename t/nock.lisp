@@ -1,6 +1,6 @@
 (defpackage #:urbit/tests/nock
   (:use #:cl #:fiveam #:urbit/tests #:urbit/syntax #:urbit/nock 
-        #:urbit/equality #:urbit/data))
+        #:urbit/jets #:urbit/equality #:urbit/data))
 
 (in-package #:urbit/tests/nock)
 
@@ -139,8 +139,12 @@
     (root %kack %kack nil
           (gate %dec #'mock-dec))))
 
-(defun ack (n m world)
+(defun ack (n m)
   (nock [n m] [9 2 10 [6 0 1] (copy-tree +ackerman-source+)]))
+
+; placeholder
+(defmacro with-fast-hints (world &body forms)
+  `(in-world ,world ,@forms))
 
 (test ackerman
   (let ((pack nil))
@@ -148,10 +152,10 @@
     (is (= 7 (bottle (ack 2 2))))
     (is (= 0 *mock-dec-calls*))
     ; jet tree is present, but no registrations - no increase
-    (is (= 7 (in-world (make-world +ackerman-jets+) (ack 2 2))))
+    (is (= 7 (in-world (load-world +ackerman-jets+) (ack 2 2))))
     (is (= 0 *mock-dec-calls*))
     ; turn fast hints on - this time the jet should fire 
-    (is (= 7 (let* ((w (make-world +ackerman-jets+))
+    (is (= 7 (let* ((w (load-world +ackerman-jets+))
                     (a (with-fast-hints w (ack 2 2))))
                (setf pack (save-jet-pack w))
                a)))
@@ -160,8 +164,8 @@
     (is (= 7 (bottle (ack 2 2))))
     (is (= 2 *mock-dec-calls*))
     ; with jets but no registrations, no increase
-    (is (= 7 (in-world (make-world +ackerman-jets+) (ack 2 2))))
+    (is (= 7 (in-world (load-world +ackerman-jets+) (ack 2 2))))
     (is (= 2 *mock-dec-calls*))
     ; supply the saved jet pack, the jets fire
-    (is (= 7 (in-world (make-world +ackerman-jets+ pack) (ack 2 2))))
+    (is (= 7 (in-world (load-world +ackerman-jets+ pack) (ack 2 2))))
     (is (= 4 *mock-dec-calls*))))

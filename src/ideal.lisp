@@ -8,7 +8,7 @@
            #:dynamic-kernel #:dynamic-kernel-axis
            #:stencil #:child-stencil #:child-stencil-parent
            #:stencil-hooks #:stencil-ideal #:stencil-kernel #:stencil-driver
-           #:battery #:battery-meter
+           #:core #:fast #:slow #:icell-battery #:battery #:battery-meter
            #:battery-parent-axis #:battery-parents #:battery-roots
            #:imug #:iint 
            #:iatom #:iatom-mug #:iatom-int #:iatom=mugatom
@@ -17,7 +17,6 @@
            #:get-ideal-atom #:get-ideal-cell #:get-ideal
            #:formula #:make-formula #:formula-func #:formula-form
            #:fat #:make-fat #:fat-formula
-           #:core #:battery #:icell-battery
            #:icell=mugcell #:ideep #:icell-copy))
 
 (in-package #:urbit/ideal)
