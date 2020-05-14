@@ -1,7 +1,7 @@
 (defpackage #:urbit/math
   (:use #:cl #:cl-intbytes)
   (:export #:met #:mix #:end #:lsh #:rsh
-           #:mas #:tax #:pax
+           #:mas #:tax #:pax #:axis-parts
            #:string->cord #:cord->string
            #:uint #:decomposable-axis))
 

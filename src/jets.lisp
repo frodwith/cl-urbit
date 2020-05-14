@@ -117,8 +117,8 @@
          (kernel (find-root world name constant))
          (stencil (stencil icore hooks kernel
                            (call-kernel-driver kernel nil icore hooks)))
-         (battery (icell-head icore))
-         (roots (battery-roots (icell-battery battery)))
+         (battery (icell-battery (icell-head icore)))
+         (roots (battery-roots battery))
          (old (gethash constant roots)))
     (if old
         (error 'reinstall-stencil :stencil old)

@@ -1,5 +1,6 @@
 (defpackage #:urbit/equality
   (:use #:cl #:urbit/data #:urbit/common #:urbit/ideal)
+  (:import-from #:alexandria #:if-let)
   (:export #:same))
 
 (in-package #:urbit/equality)

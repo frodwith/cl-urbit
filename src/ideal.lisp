@@ -1,13 +1,15 @@
 (defpackage #:urbit/ideal
   (:use #:cl #:urbit/data #:urbit/mug #:urbit/common)
   (:import-from #:urbit/math #:uint)
+  (:import-from #:alexandria #:if-let)
   (:export #:make-world #:world-stencils #:world-roots
            #:kernel #:root-kernel #:child-kernel
            #:kernel-children #:kernel-driver #:kernel-name
            #:dynamic-kernel #:dynamic-kernel-axis
            #:stencil #:child-stencil #:child-stencil-parent
            #:stencil-hooks #:stencil-ideal #:stencil-kernel #:stencil-driver
-           #:battery #:battery-parents #:battery-roots #:battery-meter
+           #:battery #:battery-meter
+           #:battery-parent-axis #:battery-parents #:battery-roots
            #:imug #:iint 
            #:iatom #:iatom-mug #:iatom-int #:iatom=mugatom
            #:icell #:icell-mug #:icell-head #:icell-tail #:icell-meta
@@ -88,7 +90,7 @@
   (parent-axis 0 :type ideal-atom)
   (roots (make-hash-table :test 'eql) :type hash-table)
   (parents (make-hash-table :test 'eq) :type hash-table)
-  (meter nil :type (or nil function)))
+  (meter nil :type (or null function)))
 
 (defstruct (formula (:constructor make-formula (form)))
   (form nil :read-only t :type (or list symbol))
