@@ -94,3 +94,11 @@
   (the list
        (loop for i downfrom (- (integer-length a) 2) to 0
              collecting (logbitp i a))))
+
+(defun axis-parts (a id head tail)
+  (declare (decomposable-axis a)
+           (symbol id head tail))
+  (loop for is-tail in (pax a)
+        for part = (if is-tail tail head)
+        for s = (list part id) then (list part s)
+        finally (return s)))

@@ -6,8 +6,8 @@
            #:kernel-children #:kernel-driver #:kernel-name
            #:dynamic-kernel #:dynamic-kernel-axis
            #:stencil #:child-stencil #:child-stencil-parent
-           #:stencil-hooks #:stencil-ideal #:stencil-kernel
-           #:battery #:battery-parents #:battery-roots
+           #:stencil-hooks #:stencil-ideal #:stencil-kernel #:stencil-driver
+           #:battery #:battery-parents #:battery-roots #:battery-meter
            #:imug #:iint 
            #:iatom #:iatom-mug #:iatom-int #:iatom=mugatom
            #:icell #:icell-mug #:icell-head #:icell-tail #:icell-meta
@@ -75,18 +75,20 @@
 (deftype axis-map (element-type)
   (declare (ignore element-type))
   'null)
-(deftype core ()
-  '(or (eql :fast) (eql :slow)))
+
+(deftype fast () 'stencil)
+(deftype slow () '(eql :slow))
+(deftype core () '(or fast slow))
 
 ; icell metadata
 ; TODO: roots and parents could probably be faster in most cases than
 ; hash-tables, since quite often they contain a small number of entries.
 (defstruct battery
-  (arms nil :type (axis-map function))
   (unregistered nil :type (or null assumption))
-  (parent-axis nil :type (or null ideal-atom))
+  (parent-axis 0 :type ideal-atom)
   (roots (make-hash-table :test 'eql) :type hash-table)
-  (parents (make-hash-table :test 'eq) :type hash-table))
+  (parents (make-hash-table :test 'eq) :type hash-table)
+  (meter nil :type (or nil function)))
 
 (defstruct (formula (:constructor make-formula (form)))
   (form nil :read-only t :type (or list symbol))

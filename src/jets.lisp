@@ -1,6 +1,6 @@
 (defpackage #:urbit/jets
-  (:use #:cl #:urbit/common #:urbit/data #:urbit/ideal #:urbit/serial)
-  (:import-from #:urbit/math #:uint)
+  (:use #:cl #:urbit/common #:urbit/math
+        #:urbit/data #:urbit/ideal #:urbit/serial)
   (:import-from #:urbit/data #:exit))
 
 (in-package #:urbit/jets)
@@ -67,6 +67,51 @@
 
 (define-condition reinstall-stencil (error) (stencil))
 
+(defun hash-pairs (h)
+  (loop for k being the hash-keys in h using (hash-value v)
+        collect `(k v)))
+
+
+(defmacro get-battery (world core)
+  (let ((s (gensym)))
+    `(let ((,s ,core))
+       (let ((bat (or (cached-battery ,s)
+                      (let ((i (get-ideal ,world (head ,s))))
+                        (setf (cached-battery ,s) i)
+                        i))))
+         (if (ideep bat)
+             bat
+             (error 'cell-required :given bat))))))
+
+(defun compile-meter (world battery)
+  (let* ((axis (iint (battery-parent-axis battery)))
+         (frag (if (= axis 1)
+                   'payload
+                   (axis-parts axis 'payload 'head 'tail))))
+    (setf (battery-meter battery)
+          (compile
+            nil
+            `(lambda (payload)
+               (or (if (deep payload)
+                       (handler-case
+                         (case (get-speed ',world ,frag)
+                           ,@(hash-pairs (battery-parents battery)))
+                         (exit () nil))
+                       (case payload ,@(hash-pairs (battery-roots battery))))
+                   :slow))))))
+
+(defun clock (world core)
+  (let ((battery (icell-battery (get-battery world core))))
+    (funcall (or (battery-meter battery)
+                 (compile-meter world battery))
+             (tail core))))
+
+(defmacro get-speed (world core)
+  (let ((s (gensym)))
+    `(let ((,s ,core))
+       (or (cached-speed ,s)
+           (clock ,world ,s)))))
+
 (defun install-root-stencil (world name icore hooks)
   (let* ((constant (icell-tail icore))
          (kernel (find-root world name constant))
@@ -78,7 +123,8 @@
     (if old
         (error 'reinstall-stencil :stencil old)
         (progn (push stencil (world-stencils world))
-               (setf (gethash constant roots) stencil)))))
+               (setf (gethash constant roots) stencil)
+               (setf (battery-meter battery) nil)))))
 
 (defun install-child-stencil (world name battery axis parent hooks)
   (let* ((parentk (stencil-kernel parent))
@@ -94,7 +140,8 @@
     (if old
         (error 'reinstall-stencil :stencil old)
         (progn (push stencil (world-stencils world))
-               (setf (gethash parent parents) stencil)))))
+               (setf (gethash parent parents) stencil)
+               (setf (battery-meter battery) nil)))))
 
 ; jet trees are used to specify kernel drivers
 ; in general you should construct such a list of ROOTs

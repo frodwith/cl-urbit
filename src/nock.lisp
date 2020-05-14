@@ -1,6 +1,7 @@
 (defpackage #:urbit/nock
   (:use #:cl #:urbit/ideal #:urbit/data #:urbit/math)
   (:import-from #:urbit/equality #:same)
+  (:import-from #:alexandria #:when-let*)
   (:export #:nock #:bottle #:in-world
            #:compile-dynamic-hint #:compile-static-hint
            #:before #:after #:around))
@@ -229,10 +230,7 @@
   (case ax
     (0 +crash+)
     (1 's)
-    (t (loop for tail in (pax ax)
-             for part = (if tail 'tail 'head)
-             for s = (list part 's) then (list part s)
-             finally (return s)))))
+    (t (axis-parts ax 's 'head 'tail))))
 
 (defmacro %1 (a)
   `(quote ,a))
@@ -262,11 +260,20 @@
   `(%7 ([] ,a s) ,b))
 
 (defmacro %9 (axis core)
-  `(%7 ,core (%2 s (%0 ,axis))))
+  (let ((jet-forms
+          (and (> axis 1)
+               (not (tax axis))
+               `((let ((z (get-speed *world* s)))
+                   (when (typep z 'fast)
+                     (when-let* ((d (stencil-driver z))
+                                 (j (funcall d ,(mas axis))))
+                       (funcall j s))))))))
+    `(%7 ,core (let ((f (%0 ,axis)))
+                 (or ,@jet-forms (%2 s f))))))
 
 (defmacro %12 (a)
   (declare (ignore a))
-  +crash+ )
+  +crash+)
 
 (defmacro %10 ((ax small) big)
   (case ax

@@ -1,16 +1,10 @@
 (defpackage #:urbit/common
   (:use #:cl #:urbit/data)
   (:import-from #:urbit/math #:uint)
-  (:export #:sum-cell #:sum-noun #:cell= #:shallow #:if-let
+  (:export #:sum-cell #:sum-noun #:cell= #:shallow
            #:denoun #:dedata #:decons))
 
 (in-package #:urbit/common)
-
-(defmacro if-let ((name value-form) true-form false-form)
-  `(let ((,name ,value-form))
-     (if ,name
-         ,true-form
-         ,false-form)))
 
 (defun sum-cell (cell atomic fast slow)
   (labels ((more (n stack)
