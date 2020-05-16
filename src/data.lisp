@@ -1,8 +1,8 @@
 (defpackage #:urbit/data
-  (:use #:cl)
+  (:use #:cl #:urbit/math)
   (:export #:data-error #:unimplemented
            #:exit #:atom-required #:cell-required
-           #:deep #:head #:tail #:cl-integer
+           #:deep #:head #:tail #:cl-integer #:dfrag
            #:cached-mug #:cached-ideal #:cached-battery #:cached-speed))
 
 (in-package #:urbit/data)
@@ -66,3 +66,11 @@
   (:method (value object)
    (setf (head object) value)
    value))
+
+(defun dfrag (iax data)
+  (case iax
+    (0 (error 'exit))
+    (1 data)
+    (t (loop for d = data then (if tail (tail d) (head d))
+             for tail in (pax iax)
+             finally (return d)))))

@@ -129,6 +129,7 @@
 
 (defparameter *mock-dec-calls* 0)
 (defun mock-dec (sam)
+  (incf *mock-dec-calls*)
   (let ((i (cl-integer sam)))
     (if (= 0 i)
       (error 'exit)
@@ -142,10 +143,9 @@
 (defun ack (n m)
   (nock [n m] [9 2 10 [6 0 1] (copy-tree +ackerman-source+)]))
 
-; placeholder
-(defmacro with-fast-hints (world &body forms)
-  `(in-world ,world ,@forms))
+(defparameter +decs-per-call+ 26)
 
+; placeholder
 (test ackerman
   (let ((pack nil))
     ; no mention of jets
@@ -156,16 +156,16 @@
     (is (= 0 *mock-dec-calls*))
     ; turn fast hints on - this time the jet should fire 
     (is (= 7 (let* ((w (load-world +ackerman-jets+))
-                    (a (with-fast-hints w (ack 2 2))))
+                    (a (in-world w (with-fast-hints (ack 2 2)))))
                (setf pack (save-jet-pack w))
                a)))
-    (is (= 2 *mock-dec-calls*))
+    (is (= +decs-per-call+ *mock-dec-calls*))
     ; call in a new world with no jets - no increase
     (is (= 7 (bottle (ack 2 2))))
-    (is (= 2 *mock-dec-calls*))
+    (is (= +decs-per-call+ *mock-dec-calls*))
     ; with jets but no registrations, no increase
     (is (= 7 (in-world (load-world +ackerman-jets+) (ack 2 2))))
-    (is (= 2 *mock-dec-calls*))
+    (is (= +decs-per-call+ *mock-dec-calls*))
     ; supply the saved jet pack, the jets fire
     (is (= 7 (in-world (load-world +ackerman-jets+ pack) (ack 2 2))))
-    (is (= 4 *mock-dec-calls*))))
+    (is (= (* 2 +decs-per-call+) *mock-dec-calls*))))

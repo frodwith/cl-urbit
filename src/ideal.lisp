@@ -29,8 +29,7 @@
 (defstruct kernel
   (name nil :type uint :read-only t)
   (driver nil :type (or null function) :read-only t)
-  (children (make-hash-table :test 'equal) :read-only t)
-  (stencils (make-hash-table :test 'eq) :read-only t))
+  (children (make-hash-table :test 'equal) :read-only t))
 
 (defstruct (root-kernel
              (:include kernel)
@@ -81,15 +80,17 @@
 (deftype slow () '(eql :slow))
 (deftype core () '(or fast slow))
 
+(defparameter +unregistered-meter+ (constantly :slow))
+
 ; icell metadata
 ; TODO: roots and parents could probably be faster in most cases than
 ; hash-tables, since quite often they contain a small number of entries.
 (defstruct battery
   (unregistered nil :type (or null assumption))
-  (parent-axis 0 :type ideal-atom)
+  (parent-axis 0 :type uint)
   (roots (make-hash-table :test 'eql) :type hash-table)
   (parents (make-hash-table :test 'eq) :type hash-table)
-  (meter nil :type (or null function)))
+  (meter +unregistered-meter+ :type (or null function)))
 
 (defstruct (formula (:constructor make-formula (form)))
   (form nil :read-only t :type (or list symbol))
