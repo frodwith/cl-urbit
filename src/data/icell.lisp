@@ -22,5 +22,7 @@
   a)
 
 (defmethod cached-speed ((c icell))
-  ; TODO: cache speed
-  nil)
+  (icell-speed c))
+
+(defmethod (setf cached-speed) (val (c icell))
+  (setf (icell-speed c) val))

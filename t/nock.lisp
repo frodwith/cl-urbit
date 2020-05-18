@@ -141,7 +141,7 @@
           (gate %dec #'mock-dec))))
 
 (defun ack (n m)
-  (nock [n m] [9 2 10 [6 0 1] (copy-tree +ackerman-source+)]))
+  (nock [n m] (copy-tree [9 2 10 [6 0 1] +ackerman-source+])))
 
 (defparameter +decs-per-call+ 26)
 

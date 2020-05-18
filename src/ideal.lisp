@@ -1,7 +1,7 @@
 (defpackage #:urbit/ideal
   (:use #:cl #:urbit/data #:urbit/mug #:urbit/common)
   (:import-from #:urbit/math #:uint)
-  (:import-from #:alexandria #:if-let)
+  (:import-from #:alexandria #:if-let #:when-let)
   (:export #:make-world #:world-stencils #:world-roots
            #:kernel #:root-kernel #:child-kernel
            #:kernel-children #:kernel-driver #:kernel-name
@@ -12,7 +12,8 @@
            #:battery-parent-axis #:battery-parents #:battery-roots
            #:imug #:iint 
            #:iatom #:iatom-mug #:iatom-int #:iatom=mugatom
-           #:icell #:icell-mug #:icell-head #:icell-tail #:icell-meta
+           #:icell #:icell-head #:icell-tail
+           #:icell-meta #:icell-mug #:icell-speed
            #:find-ideal #:find-cons
            #:get-ideal-atom #:get-ideal-cell #:get-ideal
            #:formula #:make-formula #:formula-func #:formula-form
@@ -116,17 +117,18 @@
 (deftype ideal () '(or ideal-atom icell))
 
 (defun print-icell (c &optional out)
-  (print-unreadable-object (c out :type t)
-    (labels ((recur (o tail)
-               (if (ideep o)
-                   (progn
-                     (unless tail (write-char #\[ out))
-                     (recur (icell-head o) nil)
-                     (write-char #\space out)
-                     (recur (icell-tail o) t)
-                     (unless tail (write-char #\] out)))
-                   (prin1 o out))))
-      (recur c nil))))
+  (print-unreadable-object (c out :type t :identity t)
+    (format out "~x" (icell-mug c))))
+;    (labels ((recur (o tail)
+;               (if (ideep o)
+;                   (progn
+;                     (unless tail (write-char #\[ out))
+;                     (recur (icell-head o) nil)
+;                     (write-char #\space out)
+;                     (recur (icell-tail o) t)
+;                     (unless tail (write-char #\] out)))
+;                   (prin1 o out))))
+;      (recur c nil))))
 
 (defun icell-battery (c)
   (macrolet ((with-b (&body forms)
@@ -143,6 +145,20 @@
                            (null b)
                            (core (make-fat :core m :battery b))
                            (formula (make-fat :formula m :battery b))))))))))
+
+(defun icell-speed (c)
+  (let ((m (icell-meta c)))
+    (typecase m
+      (core m)
+      (fat (fat-core m)))))
+
+(defun (setf icell-speed) (val c)
+  (let ((m (icell-meta c)))
+    (typecase m
+      ((or null core) (setf (icell-meta c) val))
+      (formula (setf (icell-meta c) (make-fat :formula m :core val)))
+      (battery (setf (icell-meta c) (make-fat :battery m :core val)))
+      (fat (setf (fat-core m) val)))))
 
 (defun iint (i)
   (etypecase i
@@ -174,7 +190,10 @@
 
 (defun icell-copy (i c)
   (declare (icell i))
-  ; TODO: copy speed from c if we don't have and available
+  (if-let (ispd (icell-speed i))
+    (setf (cached-speed c) ispd)
+    (when-let (cspd (cached-speed c))
+      (setf (icell-speed i) cspd)))
   (setf (cached-ideal c) i))
 
 ; compare a non-eq icell and mugged cell with equal mugs
