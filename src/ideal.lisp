@@ -2,7 +2,7 @@
   (:use #:cl #:urbit/data #:urbit/mug #:urbit/common)
   (:import-from #:urbit/math #:uint)
   (:import-from #:alexandria #:if-let #:when-let)
-  (:export #:make-world #:world-stencils #:world-roots
+  (:export #:make-world #:world-stencils #:world-roots #:world-hinter
            #:kernel #:root-kernel #:child-kernel
            #:kernel-children #:kernel-driver #:kernel-name
            #:dynamic-kernel #:dynamic-kernel-axis
@@ -242,7 +242,15 @@
 
 (sb-ext:define-hash-table-test atoms= atoms-hash)
 
-(defstruct (world (:constructor make-world ()))
+(defun ignore-all-hints (tag clue next)
+  (declare (uint tag)
+           ; clue is null for static hints, otherwise formula
+           ((or null icell) clue)
+           (icell next))
+  (declare (ignore tag clue next))
+  nil)
+
+(defstruct (world (:constructor make-world (&optional hinter)))
   ; noun hash-consing, split into two tables because
   ; 1) smaller tables = faster lookups
   ; 2) distinguished groups = faster hash/comparison
@@ -250,6 +258,8 @@
   (cells (make-hash-table :test 'cells= :weakness :key) :read-only t)
   ; the whole deduplicated tree of installed kernels (see jets.lisp)
   (roots (make-hash-table :test 'equal) :read-only t)
+  ; decisions about how to handle hints are per-world because ideals are
+  (hinter #'ignore-all-hints :type function :read-only t)
   ; stack/log of installed stencils, most recent first (again jets.lisp)
   (stencils nil :type list)) 
 

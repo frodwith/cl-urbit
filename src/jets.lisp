@@ -313,8 +313,8 @@
 ; for running real code (that deals with jets), this is the recommended
 ; toplevel call for creating a world. It's theoretically possible to
 ; install trees and jet packs into a running world, but unsupported.
-(defun load-world (jet-tree &optional jet-pack)
-  (let ((w (make-world)))
+(defun load-world (jet-tree &key jet-pack hinter)
+  (let ((w (if hinter (make-world hinter) (make-world))))
     (install-tree w jet-tree)
     (when jet-pack (install-jet-pack w jet-pack))
     w))

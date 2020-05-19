@@ -4,7 +4,7 @@
   (:import-from #:urbit/common #:dedata)
   (:import-from #:urbit/equality #:same)
   (:import-from #:alexandria #:when-let*)
-  (:export #:nock #:bottle #:in-world #:with-fast-hints
+  (:export #:nock #:bottle #:in-world #:fast-hinter
            #:compile-dynamic-hint #:compile-static-hint
            #:hint-tag #:hint-next #:hint-clue
            #:before #:after #:around))
@@ -176,49 +176,44 @@
       (atomic ax i
         `(@10 (,i ,(compile-noun small)) ,(compile-noun big))))))
 
-; hints are handled specially - conditions are signalled allowing the caller
-; to provide new forms. helper restarts allow the caller to supply only a
-; handler function, generating wrapper code to call it properly.
-
-(define-condition compile-hint ()
-  ((tag :type integer :initarg :tag :accessor hint-tag)
-   (next :type (or symbol list) :initarg :next :accessor hint-next)))
-
-(define-condition compile-dynamic-hint (compile-hint)
-  ((clue :type (or symbol list) :initarg :clue :accessor hint-clue)))
-
-(define-condition compile-static-hint (compile-hint) ())
-
 (defun compile-11 (a)
   (splash a (hint next-formula)
     (let ((next-form (compile-noun next-formula)))
       (if (ideep hint)
           (split hint (tag clue-formula)
-            (let ((clue-form (compile-noun clue-formula))
-                  (itag (iint tag)))
-              (or (restart-case (signal 'compile-dynamic-hint
-                                        :tag itag
-                                        :next next-form
-                                        :clue clue-form)
-                    (before (handler)
-                      `(@11d-before (,itag ,clue-form) ,next-form ,handler))
-                    (after (handler)
-                      `(@11d-after (,itag ,clue-form) ,next-form ,handler))
-                    (around (before after)
-                      `(@11d-around (,itag ,clue-form) ,next-form
-                                    ,next-formula ,before ,after)))
+            (let* ((clue-form (compile-noun clue-formula))
+                   (itag (iint tag))
+                   (hinter (funcall (world-hinter *world*) itag
+                                    clue-formula next-formula)))
+              (or (when (consp hinter)
+                    (destructuring-bind (tag . data) hinter
+                      (case tag
+                        (:before
+                          `(@11d-before (,itag ,clue-form) ,next-form ,data))
+                        (:after
+                          `(@11d-after (,itag ,clue-form) ,next-form ,data))
+                        (:around
+                          (when (consp data)
+                            (destructuring-bind (before . after) data
+                              `(@11d-around
+                                 (,itag ,clue-form)
+                                 ,next-form ,next-formula ,before ,after)))))))
                   `(@11d (,itag ,clue-form) ,next-form))))
-          (let ((itag (iint hint)))
-            (or (restart-case (signal 'compile-static-hint
-                                      :tag itag
-                                      :next next-form)
-                  (before (handler)
-                    `(@11s-before ,itag ,next-form ,handler))
-                  (after (handler)
-                    `(@11s-after ,itag ,next-form ,handler))
-                  (around (before after)
-                    `(@11s-around ,itag ,next-form
-                                  ,next-formula ,before ,after)))
+          (let* ((itag (iint hint))
+                 (hinter (funcall (world-hinter *world*)
+                                  itag nil next-formula)))
+            (or (when (consp hinter)
+                  (destructuring-bind (tag . data) hinter
+                    (case tag
+                      (:before
+                        `(@11s-before ,itag ,next-form ,data))
+                      (:after
+                        `(@11s-after ,itag ,next-form ,data))
+                      (:around
+                        (when (consp data)
+                          (destructuring-bind (before . after) data
+                            `(@11s-around ,itag ,next-form
+                                          ,before ,after)))))))
                 `(@11s ,itag ,next-form)))))))
 
 (defun compile-12 (a)
@@ -312,79 +307,87 @@
   `(progn ,clue ,next))
 
 (defmacro @11s-before (tag next handler)
-  `(progn (funcall ,handler s ,next ,tag)
-          ,next))
+  (declare (ignore tag))
+  `(progn (funcall ,handler s) ,next))
 
 (defmacro @11d-before ((tag clue) next handler)
-  `(progn (funcall ,handler s ,next ,tag ,clue)
-          ,next))
+  (declare (ignore tag))
+  `(progn (funcall ,handler s ,clue) ,next))
 
 (defmacro @11s-after (tag next handler)
+  (declare (ignore tag))
   `(let ((pro ,next))
-     (funcall ,handler s ,next ,tag pro)
+     (funcall ,handler s pro)
      pro))
 
 (defmacro @11d-after ((tag clue) next handler)
+  (declare (ignore tag))
   `(let ((clu ,clue)
          (pro ,next))
-     (funcall ,handler s ,next ,tag clu pro)
+     (funcall ,handler s clu pro)
      pro))
 
-(defmacro @11s-around (tag form formula before after)
-  `(or (funcall ,before s ,formula ,tag)
+(defmacro @11s-around (tag form before after)
+  (declare (ignore tag))
+  `(or (funcall ,before s)
        (let ((pro ,form))
-         (funcall ,after s ,formula ,tag pro)
+         (funcall ,after s pro)
          pro)))
 
-(defmacro @11d-around ((tag clue) form formula before after)
+(defmacro @11d-around ((tag clue) form before after)
+  (declare (ignore tag))
   `(let ((clu ,clue))
-     (or (funcall ,before s ,formula ,tag clu)
+     (or (funcall ,before s clu)
        (let ((pro ,form))
-         (funcall ,after s ,formula ,tag clu pro)
+         (funcall ,after s clu pro)
          pro))))
-
-(enable-cords)
 
 (define-condition unregistered-parent (warning)
   ((name :type uint :initarg :name)
    (axis :type uint :initarg :axis)
    (core :initarg :core)))
 
-(defun handle-fast (hint)
-  (case (hint-tag hint)
-    (%fast
-      (invoke-restart
-        'after
-        (lambda (subject formula tag clue core)
-          (declare (ignore subject formula tag))
-          (let ((spd (or (cached-speed core)
-                         (clock *world* core))))
-            (etypecase spd
-              (fast (setf (cached-speed core) spd))
-              (slow
-                (handler-case
-                  (dedata (@name (@num @ax) hooks) clue
-                    (case num
-                      (0 (when (and (> ax 2) (tax ax))
-                           (let* ((parent (dfrag ax core))
-                                  (pspeed (get-speed *world* parent)))
-                             (if (typep pspeed 'fast)
-                                 (setf (cached-speed core)
-                                       (install-child-stencil
-                                         *world* name (head core) (mas ax)
-                                         pspeed (get-ideal *world* hooks)))
-                                 (warn 'unregistered-parent
-                                       :name name :core core :axis ax)))))
-                      (1 (when (zerop ax)
-                           (let ((payload (tail core)))
-                             (unless (deep payload)
-                               (setf (cached-speed core)
-                                     (install-root-stencil
-                                       *world* name
-                                       (get-ideal-cell *world* core)
-                                       (get-ideal *world* hooks)))))))))
-                  (exit () (setf (cached-speed core) spd)))))))))))
+(define-condition bad-fast (warning)
+  ((clue :initarg :clud)
+   (core :initarg :core)))
 
-(defmacro with-fast-hints (&body forms)
-  `(handler-bind ((compile-dynamic-hint #'handle-fast))
-     ,@forms))
+(defun handle-fast (subject clue core)
+  (declare (ignore subject))
+  (block
+    register
+    (let ((spd (or (cached-speed core)
+                   (clock *world* core))))
+      (when (typep spd 'slow)
+        (handler-case
+          (dedata (@name (@num @ax) hooks) clue
+            (case num
+              (0 (when (and (> ax 2) (tax ax))
+                   (let* ((parent (dfrag ax core))
+                          (pspeed (get-speed *world* parent)))
+                     (when (typep pspeed 'fast)
+                       (setf (cached-speed core)
+                             (install-child-stencil
+                               *world* name (head core) (mas ax)
+                               pspeed (get-ideal *world* hooks)))
+                       (return-from register))
+                     (warn 'unregistered-parent
+                           :name name :core core :axis ax))))
+              (1 (when (zerop ax)
+                   (let ((payload (tail core)))
+                     (unless (deep payload)
+                       (setf (cached-speed core)
+                             (install-root-stencil
+                               *world* name
+                               (get-ideal-cell *world* core)
+                               (get-ideal *world* hooks)))
+                       (return-from register)))))))
+          (exit () nil))
+        (warn 'bad-fast :clue clue :core core))
+      (setf (cached-speed core) spd))))
+
+(enable-cords)
+
+(defun fast-hinter (tag clue next)
+  (declare (ignore next))
+  (when (and clue (= %fast tag))
+    (cons :after #'handle-fast)))
