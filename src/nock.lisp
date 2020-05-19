@@ -352,33 +352,38 @@
 
 (defun handle-fast (hint)
   (case (hint-tag hint)
-    (%fast (invoke-restart
-             'after
-             (lambda (subject formula tag clue core)
-               (declare (ignore subject formula tag))
-               (when (typep (get-speed *world* core) 'slow)
-                 (handler-case
-                   (dedata (@name (@num @ax) hooks) clue
-                     (case num
-                       (0 (when (and (> ax 2) (tax ax))
-                            (let* ((parent (dfrag ax core))
-                                   (pspeed (get-speed *world* parent)))
-                              (if (typep pspeed 'fast)
-                                  (setf (cached-speed core)
-                                        (install-child-stencil
-                                          *world* name (head core) (mas ax)
-                                          pspeed (get-ideal *world* hooks)))
-                                  (warn 'unregistered-parent
-                                        :name name :core core :axis ax)))))
-                       (1 (when (zerop ax)
-                            (let ((payload (tail core)))
-                              (unless (deep payload)
-                                (setf (cached-speed core)
-                                      (install-root-stencil
-                                        *world* name
-                                        (get-ideal-cell *world* core)
-                                        (get-ideal *world* hooks)))))))))
-                   (exit () nil))))))))
+    (%fast
+      (invoke-restart
+        'after
+        (lambda (subject formula tag clue core)
+          (declare (ignore subject formula tag))
+          (let ((spd (or (cached-speed core)
+                         (clock *world* core))))
+            (etypecase spd
+              (fast (setf (cached-speed core) spd))
+              (slow
+                (handler-case
+                  (dedata (@name (@num @ax) hooks) clue
+                    (case num
+                      (0 (when (and (> ax 2) (tax ax))
+                           (let* ((parent (dfrag ax core))
+                                  (pspeed (get-speed *world* parent)))
+                             (if (typep pspeed 'fast)
+                                 (setf (cached-speed core)
+                                       (install-child-stencil
+                                         *world* name (head core) (mas ax)
+                                         pspeed (get-ideal *world* hooks)))
+                                 (warn 'unregistered-parent
+                                       :name name :core core :axis ax)))))
+                      (1 (when (zerop ax)
+                           (let ((payload (tail core)))
+                             (unless (deep payload)
+                               (setf (cached-speed core)
+                                     (install-root-stencil
+                                       *world* name
+                                       (get-ideal-cell *world* core)
+                                       (get-ideal *world* hooks)))))))))
+                  (exit () (setf (cached-speed core) spd)))))))))))
 
 (defmacro with-fast-hints (&body forms)
   `(handler-bind ((compile-dynamic-hint #'handle-fast))

@@ -2,7 +2,7 @@
   (:use #:cl #:urbit/common #:urbit/math
         #:urbit/data #:urbit/ideal #:urbit/serial)
   (:import-from #:urbit/data #:exit)
-  (:export #:root #:core #:gate #:get-speed
+  (:export #:root #:core #:gate #:get-speed #:clock
            #:install-child-stencil #:install-root-stencil
            #:load-world #:save-jet-pack #:install-jet-pack))
 
