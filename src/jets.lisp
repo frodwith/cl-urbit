@@ -1,6 +1,7 @@
 (defpackage #:urbit/jets
   (:use #:cl #:urbit/common #:urbit/math
         #:urbit/data #:urbit/ideal #:urbit/serial)
+  (:import-from #:alexandria #:if-let)
   (:import-from #:urbit/data #:exit)
   (:export #:root #:core #:gate #:get-speed #:clock
            #:install-child-stencil #:install-root-stencil
@@ -94,41 +95,62 @@
          (rootc (hash-table-count roots))
          (parents (battery-parents battery))
          (parentc (hash-table-count parents)))
-    (flet ((match-parent ()
+    (flet ((match-root ()
+             `(case payload
+                ,@(case-pairs roots)
+                (t (assume nil)
+                  (make-slow (assume nil) '(1)))))
+           (match-parent ()
              (let ((frag (if (= axis 1)
                              'payload
-                             (axis-parts axis 'payload 'head 'tail))))
+                             (axis-parts axis 'payload 'head 'tail)))
+                   (cax (peg 3 axis)))
                `(handler-case
-                  (case (get-speed ',world ,frag)
-                    ,@(case-pairs parents))
-                  (exit () nil))))
-           (match-root ()
-             `(case payload ,@(case-pairs roots))))
+                  (let ((spd (get-speed ',world ,frag)))
+                    (case spd
+                      ,@(case-pairs parents)
+                      (t (multiple-value-bind (as peds)
+                           (etypecase spd
+                             (fast (values (assume nil) (list ,cax)))
+                             (slow (values (assume (slow-assumptions spd))
+                                           (mapcar (lambda (a) (peg ,cax a))
+                                                   (slow-edits spd)))))
+                           (let ((beds (if (= 3 (car peds))
+                                           '(1)
+                                           (cons 2 peds))))
+                             (make-slow as beds))))))
+                  (exit () (make-slow (assume nil) '(1)))))))
       (compile
         nil
         `(lambda (payload)
-           ,(if (zerop rootc)
-                `(or (when (deep payload) ,(match-parent))
-                     :slow)
-                (if (zerop parentc)
-                    `(or (unless (deep payload) ,(match-root))
-                         :slow)
-                    `(or (if (deep payload)
-                             ,(match-parent)
-                             ,(match-root))
-                         :slow))))))))
+           (flet ((assume (tail)
+                    ,(if (world-stable world)
+                         'tail
+                         `(cons ',(battery-unregistered battery) tail))))
+             ,(if (zerop rootc)
+                  `(if (deep payload)
+                     ,(match-parent)
+                     (make-slow (assume nil) '(1)))
+                  (if (zerop parentc)
+                    `(if (deep payload)
+                         (make-slow (assume nil) '(1))
+                         ,(match-root))
+                    `(if (deep payload)
+                         ,(match-parent)
+                         ,(match-root))))))))))
 
 (defun clock (world core)
   (let ((battery (icell-battery (get-battery world core))))
-    (funcall (or (battery-meter battery)
-                 (setf (battery-meter battery) (compile-meter world battery)))
-             (tail core))))
+    (if-let (m (battery-meter battery))
+      (funcall m (tail core))
+      (make-slow (if (world-stable world) nil (battery-unregistered battery))
+                 (list 2)))))
 
 (defmacro get-speed (world core)
   (let ((c (gensym))
         (s (gensym)))
     `(let ((,c ,core))
-       (or (cached-speed ,c)
+       (or (valid-speed ,c)
            (let ((,s (clock ,world ,c)))
              (setf (cached-speed ,c) ,s)
              ,s)))))
@@ -144,8 +166,10 @@
     (if old
         (error 'reinstall-stencil :stencil old)
         (progn (push stencil (world-stencils world))
-               (setf (battery-meter battery) nil)
                (setf (gethash constant roots) stencil)
+               (setf (battery-meter battery)
+                     (compile-meter world battery))
+               (invalidate-battery battery)
                stencil))))
 
 (defun install-child-stencil (world name battery axis parent hooks)
@@ -168,9 +192,11 @@
               (unless (= oax axis)
                 (error 'multiple-battery-parents :battery battery)))
           (push stencil (world-stencils world))
-          (setf (battery-meter bmeta) nil)
           (setf (battery-parent-axis bmeta) axis)
           (setf (gethash parent parents) stencil)
+          (setf (battery-meter bmeta)
+                (compile-meter world bmeta))
+          (invalidate-battery bmeta)
           stencil))))
 
 ; jet trees are used to specify kernel drivers
@@ -313,8 +339,10 @@
 ; for running real code (that deals with jets), this is the recommended
 ; toplevel call for creating a world. It's theoretically possible to
 ; install trees and jet packs into a running world, but unsupported.
-(defun load-world (jet-tree &key jet-pack hinter)
-  (let ((w (if hinter (make-world hinter) (make-world))))
+(defun load-world (&key jet-tree jet-pack hinter allow-registration)
+  (let ((w (if hinter
+               (make-world :hinter hinter :stable (not allow-registration))
+               (make-world))))
     (install-tree w jet-tree)
     (when jet-pack (install-jet-pack w jet-pack))
     w))

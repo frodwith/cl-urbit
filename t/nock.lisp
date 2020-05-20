@@ -152,10 +152,11 @@
     (is (= 7 (bottle (ack 2 2))))
     (is (= 0 *mock-dec-calls*))
     ; jet tree is present, but no registrations - no increase
-    (is (= 7 (in-world (load-world +ackerman-jets+) (ack 2 2))))
+    (is (= 7 (in-world (load-world :jet-tree +ackerman-jets+) (ack 2 2))))
     (is (= 0 *mock-dec-calls*))
     ; turn fast hints on - this time the jet should fire 
-    (is (= 7 (let* ((w (load-world +ackerman-jets+ :hinter #'fast-hinter))
+    (is (= 7 (let* ((w (load-world :jet-tree +ackerman-jets+
+                                   :hinter #'fast-hinter))
                     (a (in-world w (ack 2 2))))
                (setf pack (save-jet-pack w))
                a)))
@@ -164,9 +165,9 @@
     (is (= 7 (bottle (ack 2 2))))
     (is (= +decs-per-call+ *mock-dec-calls*))
     ; with jets but no registrations, no increase
-    (is (= 7 (in-world (load-world +ackerman-jets+) (ack 2 2))))
+    (is (= 7 (in-world (load-world :jet-tree +ackerman-jets+) (ack 2 2))))
     (is (= +decs-per-call+ *mock-dec-calls*))
     ; supply the saved jet pack, the jets fire
-    (is (= 7 (in-world (load-world +ackerman-jets+ :jet-pack pack)
+    (is (= 7 (in-world (load-world :jet-tree +ackerman-jets+ :jet-pack pack)
                (ack 2 2))))
     (is (= (* 2 +decs-per-call+) *mock-dec-calls*))))

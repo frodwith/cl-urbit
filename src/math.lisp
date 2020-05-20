@@ -1,7 +1,7 @@
 (defpackage #:urbit/math
   (:use #:cl #:cl-intbytes)
   (:export #:met #:mix #:end #:lsh #:rsh
-           #:mas #:tax #:pax #:axis-parts
+           #:peg #:mas #:tax #:pax #:axis-parts
            #:string->cord #:cord->string
            #:uint #:decomposable-axis))
 
@@ -73,6 +73,20 @@
         finally (return str)))
 
 ; axis functions
+
+(defun peg (a b)
+  (declare (uint a b))
+  (if (= 1 a)
+      b
+      (if (= 1 b)
+          a
+          (let* ((c (integer-length b))
+                 (d (1- c))
+                 (e (ash 1 d))
+                 (f (- b e))
+                 (g (ash a d)))
+            (+ f g)))))
+
 ; NOTE the argument type must be >= 2
 (deftype decomposable-axis () '(integer 2))
 

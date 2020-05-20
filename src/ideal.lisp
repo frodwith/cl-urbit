@@ -2,13 +2,15 @@
   (:use #:cl #:urbit/data #:urbit/mug #:urbit/common)
   (:import-from #:urbit/math #:uint)
   (:import-from #:alexandria #:if-let #:when-let)
-  (:export #:make-world #:world-stencils #:world-roots #:world-hinter
+  (:export #:make-world #:valid-speed #:invalidate-battery
+           #:world-stencils #:world-roots #:world-hinter #:world-stable
            #:kernel #:root-kernel #:child-kernel
            #:kernel-children #:kernel-driver #:kernel-name
            #:dynamic-kernel #:dynamic-kernel-axis
            #:stencil #:child-stencil #:child-stencil-parent
            #:stencil-hooks #:stencil-ideal #:stencil-kernel #:stencil-driver
-           #:core #:fast #:slow #:icell-battery #:battery #:battery-meter
+           #:core #:fast #:slow #:slow-edits #:slow-assumptions #:make-slow 
+           #:icell-battery #:battery #:battery-meter #:battery-unregistered
            #:battery-parent-axis #:battery-parents #:battery-roots
            #:imug #:iint 
            #:iatom #:iatom-mug #:iatom-int #:iatom=mugatom
@@ -71,27 +73,48 @@
 ; lookup+) when not cached, and so not suitable for values with varying parts
 ; (i.e. the samples of gates)
 
-; placeholders
-(deftype assumption () 'null)
-(deftype axis-map (element-type)
-  (declare (ignore element-type))
-  'null)
+(deftype assumption () '(cons boolean null))
+
+(defun make-assumption ()
+  (cons t nil))
+
+(defun check-assumption (a)
+  (car a))
+
+(defun invalidate-assumption (a)
+  (setf (car a) nil))
+
+(defstruct (slow (:constructor make-slow (assumptions edits)))
+  (assumptions nil :read-only t :type list)
+  (edits nil :read-only t :type list))
 
 (deftype fast () 'stencil)
-(deftype slow () '(eql :slow))
 (deftype core () '(or fast slow))
 
-(defparameter +unregistered-meter+ (constantly :slow))
+(defun valid-speed (core)
+  (let ((s (cached-speed core)))
+    (typecase s
+      (null nil)
+      (fast s)
+      (slow (if (every #'check-assumption (slow-assumptions s))
+                s
+                (progn
+                  (setf (cached-speed core) nil)
+                  nil))))))
+
+(defun invalidate-battery (b)
+  (invalidate-assumption (battery-unregistered b))
+  (setf (battery-unregistered b) (make-assumption)))
 
 ; icell metadata
 ; TODO: roots and parents could probably be faster in most cases than
 ; hash-tables, since quite often they contain a small number of entries.
 (defstruct battery
-  (unregistered nil :type (or null assumption))
+  (unregistered (make-assumption) :type assumption)
   (parent-axis 0 :type uint)
   (roots (make-hash-table :test 'eql) :type hash-table)
   (parents (make-hash-table :test 'eq) :type hash-table)
-  (meter +unregistered-meter+ :type (or null function)))
+  (meter nil :type (or null function)))
 
 (defstruct (formula (:constructor make-formula (form)))
   (form nil :read-only t :type (or list symbol))
@@ -192,7 +215,7 @@
   (declare (icell i))
   (if-let (ispd (icell-speed i))
     (setf (cached-speed c) ispd)
-    (when-let (cspd (cached-speed c))
+    (when-let (cspd (valid-speed c))
       (setf (icell-speed i) cspd)))
   (setf (cached-ideal c) i))
 
@@ -250,7 +273,7 @@
   (declare (ignore tag clue next))
   nil)
 
-(defstruct (world (:constructor make-world (&optional hinter)))
+(defstruct world
   ; noun hash-consing, split into two tables because
   ; 1) smaller tables = faster lookups
   ; 2) distinguished groups = faster hash/comparison
@@ -260,6 +283,8 @@
   (roots (make-hash-table :test 'equal) :read-only t)
   ; decisions about how to handle hints are per-world because ideals are
   (hinter #'ignore-all-hints :type function :read-only t)
+  ; setting stable nil will cause slow speeds to check battery assumptions
+  (stable t :type boolean :read-only t)
   ; stack/log of installed stencils, most recent first (again jets.lisp)
   (stencils nil :type list)) 
 

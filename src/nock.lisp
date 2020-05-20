@@ -355,7 +355,7 @@
   (declare (ignore subject))
   (block
     register
-    (let ((spd (or (cached-speed core)
+    (let ((spd (or (valid-speed core)
                    (clock *world* core))))
       (when (typep spd 'slow)
         (handler-case
