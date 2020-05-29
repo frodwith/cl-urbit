@@ -1,6 +1,5 @@
 (defpackage #:urbit/ideal
-  (:use #:cl #:urbit/data #:urbit/mug #:urbit/common)
-  (:import-from #:urbit/math #:uint)
+  (:use #:cl #:urbit/data #:urbit/mug #:urbit/common #:urbit/math)
   (:import-from #:alexandria #:if-let #:when-let)
   (:export #:make-world #:valid-speed #:invalidate-battery
            #:world-stencils #:world-roots #:world-hinter #:world-stable
@@ -9,8 +8,8 @@
            #:dynamic-kernel #:dynamic-kernel-axis
            #:stencil #:child-stencil #:child-stencil-parent
            #:stencil-hooks #:stencil-ideal #:stencil-kernel #:stencil-driver
-           #:core #:fast #:slow #:slow-edits #:slow-assumptions #:make-slow 
-           #:icell-battery #:battery #:battery-meter #:battery-unregistered
+           #:core #:fast #:slow #:slow-parents #:slow-assumptions #:make-slow
+           #:icell-battery #:battery #:battery-meter #:battery-stable
            #:battery-parent-axis #:battery-parents #:battery-roots
            #:imug #:iint 
            #:iatom #:iatom-mug #:iatom-int #:iatom=mugatom
@@ -47,7 +46,7 @@
 (defstruct (dynamic-kernel
              (:include child-kernel)
              (:constructor dynamic-kernel (parent name axis driver)))
-  (axis nil :type uint :read-only t))
+  (axis nil :type zig :read-only t))
 
 (defstruct (stencil (:constructor stencil (ideal hooks kernel driver)))
   (ideal nil :type ideal :read-only t) ; battery or static core (see kernel)
@@ -73,48 +72,56 @@
 ; lookup+) when not cached, and so not suitable for values with varying parts
 ; (i.e. the samples of gates)
 
-(deftype assumption () '(cons boolean null))
-
-(defun make-assumption ()
-  (cons t nil))
-
-(defun check-assumption (a)
-  (car a))
-
-(defun invalidate-assumption (a)
-  (setf (car a) nil))
-
-(defstruct (slow (:constructor make-slow (assumptions edits)))
-  (assumptions nil :read-only t :type list)
-  (edits nil :read-only t :type list))
-
-(deftype fast () 'stencil)
-(deftype core () '(or fast slow))
-
-(defun valid-speed (core)
-  (let ((s (cached-speed core)))
-    (typecase s
-      (null nil)
-      (fast s)
-      (slow (if (every #'check-assumption (slow-assumptions s))
-                s
-                (progn
-                  (setf (cached-speed core) nil)
-                  nil))))))
-
-(defun invalidate-battery (b)
-  (invalidate-assumption (battery-unregistered b))
-  (setf (battery-unregistered b) (make-assumption)))
-
 ; icell metadata
 ; TODO: roots and parents could probably be faster in most cases than
 ; hash-tables, since quite often they contain a small number of entries.
+
+(deftype core ()
+  '(or void   ; not a core (cell with atom head) 
+       mean   ; battery unknown to jet system (most cores)
+       fast   ; matches a stencil
+       spry   ; child, fast parent
+       slow   ; child, parent not fast
+       slug   ; root, wrong constant
+       stop)) ; payload wrong shape at zig
+
+(defstruct assumption
+  (valid t :type boolean))
+
+; we can never be fast til the parent is fast, so don't need an assumption
+(defstruct (slow (:constructor make-slow (to parent)))
+  (to nil :type zig :read-only t)
+  (parent nil :type core :read-only t))
+
+; we're one measly registration away from being fast, maybe!
+(defstruct (spry (:include slow)
+                 (:constructor make-spry (to parent valid)))
+  (valid nil :type assumption :read-only t))
+
+(deftype fast () 'stencil)
+(deftype mean () 'assumption)
+(deftype slug () '(cons (eql :slug) assumption))
+(deftype stop () 'zig)
+(deftype void () '(eql :void))
+
+(defstruct match
+  (meter nil :type function))
+
+(defstruct (root-match (:include match))
+  (constants (make-hash-table :test 'eql) :type hash-table))
+
+(defstruct (child-match ((:include match)
+                         (:constructor (make-child-match (axis)))))
+  (axis nil :type ideal-atom)
+  (parents (make-hash-table :test 'eq) :type hash-table))
+
 (defstruct battery
-  (unregistered (make-assumption) :type assumption)
-  (parent-axis 0 :type uint)
-  (roots (make-hash-table :test 'eql) :type hash-table)
-  (parents (make-hash-table :test 'eq) :type hash-table)
-  (meter nil :type (or null function)))
+  (stable (make-assumption) :type assumption)
+  (match nil :type (or null match)))
+
+(defun invalidate-battery (b)
+  (setf (assumption-valid (battery-stable b)) nil)
+  (setf (battery-stable b) (make-assumption)))
 
 (defstruct (formula (:constructor make-formula (form)))
   (form nil :read-only t :type (or list symbol))

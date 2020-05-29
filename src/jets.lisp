@@ -3,7 +3,7 @@
         #:urbit/data #:urbit/ideal #:urbit/serial)
   (:import-from #:alexandria #:if-let)
   (:import-from #:urbit/data #:exit)
-  (:export #:root #:core #:gate #:get-speed #:clock
+  (:export #:root #:core #:gate #:get-speed #:measure
            #:install-child-stencil #:install-root-stencil
            #:load-world #:save-jet-pack #:install-jet-pack))
 
@@ -33,7 +33,7 @@
 (defun make-child (name axis parent driver)
   (if (and (= 1 axis) (kernel-static parent))
       (child-kernel parent name driver)
-      (dynamic-kernel parent name axis driver)))
+      (dynamic-kernel parent name (axis->zig axis) driver)))
 
 (define-condition reinstall-kernel (error) (kernel))
 
@@ -60,7 +60,7 @@
   (child-place c parent name axis
     (or c (setq c (make-child name axis parent nil)))))
 
-; installing a stencil causes matching cores to clock fast.
+; installing a stencil causes matching cores to measure fast.
 ; usually it is done either by running something like a fast hint
 ; or by installing a battery pack.
 
@@ -70,134 +70,68 @@
       (funcall kdriver kernel parent-stencil ideal hooks))))
 
 (define-condition reinstall-stencil (error) (stencil))
-(define-condition multiple-battery-parents (error) (battery))
+(define-condition payload-conflict (error) (battery))
 
-(defmacro get-battery (world core)
-  (let ((s (gensym)))
-    `(let ((,s ,core))
-       (let ((bat (or (cached-battery ,s)
-                      (let ((i (get-ideal ,world (head ,s))))
-                        (setf (cached-battery ,s) i)
-                        i))))
-         (if (ideep bat)
-             bat
-             (error 'cell-required :given bat))))))
-
-(defun case-pairs (h)
-  (loop for k being the hash-keys in h using (hash-value v)
-        collect `(',k ',v)))
-
-(defparameter +unregistered-meter+ (constantly :slow))
-
-(defun compile-meter (world battery)
-  (let* ((axis (iint (battery-parent-axis battery)))
-         (roots (battery-roots battery))
-         (rootc (hash-table-count roots))
-         (parents (battery-parents battery))
-         (parentc (hash-table-count parents)))
-    (flet ((match-root ()
-             `(case payload
-                ,@(case-pairs roots)
-                (t (assume nil)
-                  (make-slow (assume nil) '(1)))))
-           (match-parent ()
-             (let ((frag (if (= axis 1)
-                             'payload
-                             (axis-parts axis 'payload 'head 'tail)))
-                   (cax (peg 3 axis)))
-               `(handler-case
-                  (let ((spd (get-speed ',world ,frag)))
-                    (case spd
-                      ,@(case-pairs parents)
-                      (t (multiple-value-bind (as peds)
-                           (etypecase spd
-                             (fast (values (assume nil) (list ,cax)))
-                             (slow (values (assume (slow-assumptions spd))
-                                           (mapcar (lambda (a) (peg ,cax a))
-                                                   (slow-edits spd)))))
-                           (let ((beds (if (= 3 (car peds))
-                                           '(1)
-                                           (cons 2 peds))))
-                             (make-slow as beds))))))
-                  (exit () (make-slow (assume nil) '(1)))))))
-      (compile
-        nil
-        `(lambda (payload)
-           (flet ((assume (tail)
-                    ,(if (world-stable world)
-                         'tail
-                         `(cons ',(battery-unregistered battery) tail))))
-             ,(if (zerop rootc)
-                  `(if (deep payload)
-                     ,(match-parent)
-                     (make-slow (assume nil) '(1)))
-                  (if (zerop parentc)
-                    `(if (deep payload)
-                         (make-slow (assume nil) '(1))
-                         ,(match-root))
-                    `(if (deep payload)
-                         ,(match-parent)
-                         ,(match-root))))))))))
-
-(defun clock (world core)
-  (let ((battery (icell-battery (get-battery world core))))
-    (if-let (m (battery-meter battery))
-      (funcall m (tail core))
-      (make-slow (if (world-stable world) nil (battery-unregistered battery))
-                 (list 2)))))
-
-(defmacro get-speed (world core)
-  (let ((c (gensym))
-        (s (gensym)))
-    `(let ((,c ,core))
-       (or (valid-speed ,c)
-           (let ((,s (clock ,world ,c)))
-             (setf (cached-speed ,c) ,s)
-             ,s)))))
+(defun invalidate-battery (b)
+  (setf (assumption-valid (battery-stable b)) nil)
+  (setf (battery-stable b) (make-assumption)))
 
 (defun install-root-stencil (world name icore hooks)
   (let* ((constant (icell-tail icore))
          (kernel (find-root world name constant))
-         (stencil (stencil icore hooks kernel
-                           (call-kernel-driver kernel nil icore hooks)))
          (battery (icell-battery (icell-head icore)))
-         (roots (battery-roots battery))
-         (old (gethash constant roots)))
-    (if old
-        (error 'reinstall-stencil :stencil old)
-        (progn (push stencil (world-stencils world))
-               (setf (gethash constant roots) stencil)
-               (setf (battery-meter battery)
-                     (compile-meter world battery))
-               (invalidate-battery battery)
-               stencil))))
+         (match (battery-match battery))
+         (constants
+           (typecase match
+             (child-match
+               (error 'payload-conflict :battery battery))
+             (null
+               (setq match (make-root-match))
+               (setf (battery-match battery) match)
+               (root-match-constants match))
+             (root-match
+               (let ((constants (root-match-constants match)))
+                 (if-let (old (gethash constant constants))
+                   (error 'reinstall-stencil :stencil old)
+                   constants)))))
+         (driver (call-kernel-driver kernel nil icore hooks))
+         (made (stencil icore hooks kernel driver)))
+      (push made (world-stencils world))
+      (setf (gethash constant constants) made)
+      (setf (match-meter match) (compile-root-meter battery))
+      (invalidate-battery battery)
+      made))
 
-(defun install-child-stencil (world name battery axis parent hooks)
-  (let* ((parentk (stencil-kernel parent))
+(defun install-child-stencil (world name battery-ideal axis parent hooks)
+  (let* ((battery (icell-battery battery-ideal))
+         (match (battery-match battery))
+         (parents (typecase match
+                    (root-match
+                      (error 'payload-conflict :battery battery)) 
+                    (null
+                      (setq match (make-child-match axis))
+                      (setf (battery-match battery) match)
+                      (child-match-parents match))
+                    (child-match
+                      (unless (= (iint axis) (iint (child-match-axis match)))
+                        (error 'payload-conflict :battery battery))
+                      (let ((parents (child-match-parents match)))
+                        (if-let (old (gethash parent parents))
+                          (error 'reinstall-stencil :stencil old)
+                          parents)))))
+         (parentk (stencil-kernel parent))
          (kernel (find-child parentk name axis))
          (ideal (if (kernel-static kernel)
-                    (find-cons world battery (stencil-ideal parent))
-                    battery))
-         (stencil (child-stencil
-                    parent ideal hooks kernel
-                    (call-kernel-driver kernel parent ideal hooks)))
-         (bmeta   (icell-battery battery))
-         (parents (battery-parents bmeta))
-         (old (gethash parent parents)))
-    (if old
-        (error 'reinstall-stencil :stencil old)
-        (let ((oax (battery-parent-axis bmeta)))
-          (if (zerop oax)
-              (setf (battery-parent-axis bmeta) axis)
-              (unless (= oax axis)
-                (error 'multiple-battery-parents :battery battery)))
-          (push stencil (world-stencils world))
-          (setf (battery-parent-axis bmeta) axis)
-          (setf (gethash parent parents) stencil)
-          (setf (battery-meter bmeta)
-                (compile-meter world bmeta))
-          (invalidate-battery bmeta)
-          stencil))))
+                    (find-cons world battery-ideal
+                               (stencil-ideal parent))
+                    battery-ideal))
+         (driver (call-kernel-driver kernel parent ideal hooks))
+         (made (child-stencil parent ideal hooks kernel driver)))
+      (push made (world-stencils world))
+      (setf (gethash parent parents) made)
+      (setf (match-meter battery) (compile-child-meter world match))
+      (invalidate-battery battery)
+      made))
 
 ; jet trees are used to specify kernel drivers
 ; in general you should construct such a list of ROOTs
@@ -307,7 +241,7 @@
 
 (defun parent-axis (kernel)
   (etypecase kernel
-    (dynamic-kernel (dynamic-kernel-axis kernel))
+    (dynamic-kernel (zig->axis (dynamic-kernel-axis kernel)))
     (child-kernel 1)))
 
 (defun save-jet-pack (world)
@@ -346,3 +280,119 @@
     (install-tree w jet-tree)
     (when jet-pack (install-jet-pack w jet-pack))
     w))
+
+; core measurement, for identifying cores that match prior registrations
+; TODO: COMMIT
+;       1) test zig.lisp completely
+;       COMMIT
+;       2) test zig-changes-speed
+;       COMMIT
+;       3) get the nock tests running again,
+;          put in cheerful copying printfs,
+;          then take them out
+;       COMMIT
+
+(defun speed-valid (spd)
+  (etypecase spd
+    ((or void fast stop) t)
+    (mean (assumption-valid spd))
+    (spry (assumption-valid (spry-valid spd)))
+    (slow (speed-valid (slow-parent spd)))
+    (slug (assumption-valid (cdr spd)))))
+
+(defun zig-changes-speed (z spd)
+  (declare (zig z) (core spd))
+  (or (zerop (bit z 0)) ; editing the battery always changes speed
+      (etypecase spd
+        ((or void mean) nil)
+        (slug t)
+        (stop (zig-sub-p spd (subseq z 1)))
+        ; spry is a struct-subtype of slow, and not treated differently here
+        (slow
+          (multiple-value-bind (shared more) (zig-common z (slow-to spd))
+            (and shared (zig-changes-speed more (slow-parent spd)))))
+        (fast
+          (or (= 1 (length z))
+              (labels
+                ((recur (z k)
+                   (or (kernel-static k)
+                       (multiple-value-bind (shared more)
+                         (zig-common z (parent-axis k))
+                         (when shared
+                           (or (zerop (length more))
+                               (zerop (bit more 0))
+                               (recur (subseq more 1)
+                                      (child-kernel-parent k))))))))
+                (recur (subseq z 1) (stencil-kernel spd))))))))
+
+(defun case-pairs (h)
+  (loop for k being the hash-keys in h using (hash-value v)
+        collect `(',k ',v)))
+
+(defun compile-root-meter (battery)
+  (compile
+    nil
+    `(lambda (payload)
+       (if (deep payload)
+           #*
+           (case payload
+             ,@(case-pairs (root-match-constants (battery-match battery)))
+             (t `(:slug ,(battery-stable battery))))))))
+
+(defun compile-child-meter (world battery)
+  (compile
+    nil
+    (let* ((match (battery-match battery))
+           (ax (child-match-axis match))
+           (z (axis->zig ax)))
+      `(lambda (payload)
+         (if (not (deep payload))
+             #* ; stop whole payload
+             (multiple-value-bind (parent fail)
+               ,(zig-compile-fail z 'payload 'head 'tail 'deep)
+               (if (null parent)
+                   fail ; stop at fail axis
+                   (if (not (deep parent))
+                       ,z ; stop at parent axis
+                       (let ((pspd (get-speed ',world parent)))
+                         (case pspd
+                           ,@(case-pairs (child-match-parents match))
+                           (t (if (typep pspd 'fast)
+                                  (make-spry z pspd ',(battery-stable battery))
+                                  (make-slow z pspd)))))))))))))
+
+(defmacro get-battery (world core)
+  (let ((s (gensym)))
+    `(let ((,s ,core))
+       (let ((bat (or (cached-battery ,s)
+                      (let ((i (get-ideal ,world (head ,s))))
+                        (setf (cached-battery ,s) i)
+                        i))))
+         (if (ideep bat)
+             bat
+             (error 'cell-required :given bat))))))
+
+(defun measure (world core)
+  (let ((head (get-battery world core)))
+    (if (not (ideep head))
+        :void   
+        (let ((battery (icell-battery head)))
+          (if-let (m (battery-match battery))
+            (funcall (match-meter m) (tail core))
+            (battery-stable battery)))))) ; mean
+
+(defun valid-speed (core)
+  (when-let (spd (cached-speed core))
+    (if (speed-valid spd)
+        spd
+        (progn (setf (cached-speed core) nil)
+               nil))))
+
+(defmacro get-speed (world core)
+  (let ((c (gensym))
+        (s (gensym)))
+    `(let ((,c ,core))
+       (or (valid-speed ,c)
+           (let ((,s (measure ,world ,c)))
+             (setf (cached-speed ,c) ,s)
+             ,s)))))

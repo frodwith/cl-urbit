@@ -64,11 +64,6 @@
                subject)
       (error 'exit)))
 
-(defun copy (axis old new)
-  ; TODO: copy speed if possible (see axis) from old to new
-  (declare (ignore axis old))
-  new)
-
 (defun compile-noun (i)
   (if (ideep i)
       (compile-cell i)
@@ -276,25 +271,37 @@
   (declare (ignore a))
   +crash+)
 
+(defun copy (z old new)
+  (declare (zig z))
+  (when-let (spd (valid-speed old))
+    (unless (zig-changes-speed z spd)
+      (setf (cached-speed new) spd)))
+  new)
+
+(defun pvax (pax)
+  (map 'bit-vector (lambda (bool) (if bool 1 0)) pax))
+
+; TODO: this loop might be clearer with a zig, making pvax unneccessary
+(defun edit-on (pax)
+  (destructuring-bind (tail . remain) pax
+    (if (null remain)
+        (if tail
+            '(copy #*1 o (^ (head o) n))
+            '(copy #*0 o (^ n (tail o)))   )
+        (let* ((side (if tail 'tail 'head))
+               (more `(let ((o (,side o)))
+                        ,(edit-on remain)))
+               (parts (if tail
+                          `((head o) ,more)
+                          `(,more (tail o)))))
+          `(copy ,(pvax pax) o (^ ,@parts))))))
+
 (defmacro @10 ((ax small) big)
   (case ax
     (0 +crash+)
     (1 `(progn ,big ,small))
     (t `(let ((o ,big) (n ,small))
-          (edit-on ,ax)))))
-
-(defmacro edit-on (ax)
-  (case ax
-    (2 '(copy 2 o (^ n (tail o))))
-    (3 '(copy 3 o (^ (head o) n)))
-    (t (let* ((tail (tax ax))
-              (side (if tail 'tail 'head))
-              (more `(let ((o (,side o)))
-                       (edit-on ,(mas ax))))
-              (parts (if tail
-                         `((head o) ,more)
-                         `(,more (tail o)))))
-         `(copy ,ax o (^ ,@parts))))))
+          ,(edit-on (pax ax))))))
 
 ; hint macros
 
