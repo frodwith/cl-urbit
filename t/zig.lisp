@@ -30,16 +30,30 @@
     (is (equal r (zig->axis (axis->zig r))))))
 
 (test sub-examples
+  (is (zig-sub-p (axis->zig 8) (axis->zig 8)))
   (is (zig-sub-p (axis->zig 7) (axis->zig 15)))
   (is (not (zig-sub-p (axis->zig 15) (axis->zig 7))))
   (is (not (zig-sub-p (axis->zig 7) (axis->zig 12)))))
 
 (test random-sub
-  (for-all ((r (gen-integer :min 1)))
+  (for-all ((r (gen-integer :min 4)))
     (let* ((z (axis->zig r))
            (less (subseq z 0 (- (length z) 2))))
       (is (zig-sub-p less z))
       (is (not (zig-sub-p z less))))))
+
+(test common-examples
+  (is (zig-common (axis->zig 6) (axis->zig 12)))
+  (is (zig-common (axis->zig 12) (axis->zig 6)))
+  (is (not (zig-common (axis->zig 4) (axis->zig 6))))
+  (is (not (zig-common (axis->zig 4) (axis->zig 5)))))
+
+(test random-common
+  (for-all ((r (gen-integer :min 2)))
+    (let* ((z (axis->zig r))
+           (fork (copy-seq z)))
+      (setf (bit fork 0) (if (zerop (bit fork 0)) 1 0))
+      (is (not (zig-common z fork))))))
 
 (defmacro zcf (a (part fail) &body forms)
   (let ((bus (gensym)))
