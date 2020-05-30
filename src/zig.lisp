@@ -52,17 +52,6 @@
         (equal a b)
         (and (< alen blen) (zig-common-head a b alen)))))
 
-(defun zig-compile (z subject head tail)
-  (declare (zig z))
-  (declare (symbol subject head tail))
-  (loop for r = subject
-        then (list (if (= (bit z i) 0)
-                       head
-                       tail)
-                   r)
-        for i below (length z)
-        finally (return r)))
-
 (defun zig-compile-fail (z subject head tail deep)
   (declare (zig z))
   (declare (symbol subject head tail deep))
