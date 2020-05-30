@@ -9,7 +9,7 @@
            #:stencil #:child-stencil #:child-stencil-parent
            #:stencil-hooks #:stencil-ideal #:stencil-kernel #:stencil-driver
            #:core #:void #:mean #:fast #:spry #:slow #:slug #:stop
-           #:valid-speed #:slow-parent #:slow-to
+           #:valid-speed #:slow-parent #:slow-to #:make-slow #:make-spry
            #:icell-battery #:battery #:battery-meter #:battery-stable
            #:battery-parent-axis #:battery-parents #:battery-roots
            #:battery-match #:match #:match-meter
@@ -20,7 +20,7 @@
            #:imug #:iint 
            #:iatom #:iatom-mug #:iatom-int #:iatom=mugatom
            #:icell #:icell-head #:icell-tail
-           #:icell-meta #:icell-mug #:icell-speed
+           #:icell-meta #:icell-mug #:icell-speed #:speed-valid
            #:find-ideal #:find-cons
            #:get-ideal-atom #:get-ideal-cell #:get-ideal
            #:formula #:make-formula #:formula-func #:formula-form

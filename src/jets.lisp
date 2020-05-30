@@ -3,7 +3,8 @@
         #:urbit/data #:urbit/ideal #:urbit/serial)
   (:import-from #:alexandria #:if-let)
   (:import-from #:urbit/data #:exit)
-  (:export #:root #:core #:gate #:get-speed #:measure #:zig-changes-speed
+  (:export #:root #:core #:gate #:get-speed #:get-battery
+           #:measure #:zig-changes-speed
            #:install-child-stencil #:install-root-stencil
            #:load-world #:save-jet-pack #:install-jet-pack))
 
@@ -84,10 +85,10 @@
                     (driver (call-kernel-driver kernel nil icore hooks)))
                (stencil icore hooks kernel driver)))
            (meet (pairs)
+             (invalidate-battery battery)
              (compile-root-meter (battery-stable battery) pairs))
            (save (stencil)
              (push stencil (world-stencils world))
-             (invalidate-battery battery)
              stencil))
       (let ((match (battery-match battery)))
         (typecase match
@@ -95,7 +96,7 @@
           (null
             (let* ((constants (make-hash-table :test 'eql))
                    (stencil (make-stencil))
-                   (meter (meet `((',constant ',stencil))))
+                   (meter (meet `((,constant ',stencil))))
                    (match (make-root-match constants meter)))
               (setf (gethash constant constants) stencil)
               (setf (battery-match battery) match)
@@ -114,9 +115,9 @@
          (match (battery-match battery)))
     (flet ((save (stencil)
              (push stencil (world-stencils world))
-             (invalidate-battery battery)
              stencil)
            (meet (z pairs)
+             (invalidate-battery battery)
              (compile-child-meter world (battery-stable battery) z pairs))
            (make-stencil ()
              (let* ((parentk (stencil-kernel parent))
@@ -132,14 +133,14 @@
         (null
           (let* ((parents (make-hash-table :test 'eq))
                  (stencil (make-stencil))
-                 (z (zig->axis axis))
-                 (meter (meet z `((',parent ',stencil))))
+                 (z (axis->zig axis))
+                 (meter (meet z `((,parent ',stencil))))
                  (match (make-child-match z parents meter)))
             (setf (gethash parent parents) stencil)
             (setf (battery-match battery) match)
             (save stencil)))
         (child-match
-          (if (not (= (iint axis) (iint (child-match-axis match))))
+          (if (not (= (iint axis) (zig->axis (child-match-axis match))))
               (error 'payload-conflict :battery battery)
               (let ((parents (child-match-parents match)))
                 (if-let (old (gethash parent parents))
@@ -147,7 +148,7 @@
                   (let ((stencil (make-stencil)))
                     (setf (gethash parent parents) stencil)
                     (setf (match-meter match)
-                          (meet (zig->axis axis) (case-pairs parents)))
+                          (meet (axis->zig axis) (case-pairs parents)))
                     (save stencil))))))))))
 
 ; jet trees are used to specify kernel drivers
@@ -299,12 +300,9 @@
     w))
 
 ; core measurement, for identifying cores that match prior registrations
-; TODO: COMMIT
-;       1) test zig.lisp completely
+; TODO: 1) test zig-changes-speed
 ;       COMMIT
-;       2) test zig-changes-speed
-;       COMMIT
-;       3) get the nock tests running again,
+;       2) get the nock tests running again,
 ;          put in cheerful copying printfs,
 ;          then take them out
 ;       COMMIT
@@ -336,7 +334,7 @@
 
 (defun case-pairs (h)
   (loop for k being the hash-keys in h using (hash-value v)
-        collect `(',k ',v)))
+        collect `(,k ',v)))
 
 (defun compile-root-meter (assumption case-pairs)
   (compile
@@ -346,7 +344,7 @@
            #*
            (case payload
              ,@case-pairs
-             (t `(:slug ,,assumption)))))))
+             (t (cons :slug ,assumption)))))))
 
 (defun compile-child-meter (world assumption z case-pairs)
   (compile
@@ -364,8 +362,8 @@
                        (case pspd
                          ,@case-pairs
                          (t (if (typep pspd 'fast)
-                                (make-spry z pspd ',assumption)
-                                (make-slow z pspd))))))))))))
+                                (make-spry ,z pspd ',assumption)
+                                (make-slow ,z pspd))))))))))))
 
 (defmacro get-battery (world core)
   (let ((s (gensym)))

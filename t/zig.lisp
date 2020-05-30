@@ -78,5 +78,3 @@
   (zcf 26 (p f)
     (is (null p))
     (is (equal #*10 f))))
-
-(run! 'zig-tests)
