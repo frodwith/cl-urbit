@@ -1,16 +1,22 @@
 (defpackage #:urbit/ideal
   (:use #:cl #:urbit/data #:urbit/mug #:urbit/common #:urbit/math)
   (:import-from #:alexandria #:if-let #:when-let)
-  (:export #:make-world #:valid-speed #:invalidate-battery
+  (:export #:make-world
            #:world-stencils #:world-roots #:world-hinter #:world-stable
-           #:kernel #:root-kernel #:child-kernel
+           #:kernel #:root-kernel #:child-kernel #:child-kernel-parent
            #:kernel-children #:kernel-driver #:kernel-name
            #:dynamic-kernel #:dynamic-kernel-axis
            #:stencil #:child-stencil #:child-stencil-parent
            #:stencil-hooks #:stencil-ideal #:stencil-kernel #:stencil-driver
-           #:core #:fast #:slow #:slow-parents #:slow-assumptions #:make-slow
+           #:core #:void #:mean #:fast #:spry #:slow #:slug #:stop
+           #:valid-speed #:slow-parent #:slow-to
            #:icell-battery #:battery #:battery-meter #:battery-stable
            #:battery-parent-axis #:battery-parents #:battery-roots
+           #:battery-match #:match #:match-meter
+           #:root-match #:make-root-match #:root-match-constants
+           #:child-match #:make-child-match
+           #:child-match-axis #:child-match-parents
+           #:assumption #:make-assumption #:assumption-valid
            #:imug #:iint 
            #:iatom #:iatom-mug #:iatom-int #:iatom=mugatom
            #:icell #:icell-head #:icell-tail
@@ -107,21 +113,18 @@
 (defstruct match
   (meter nil :type function))
 
-(defstruct (root-match (:include match))
-  (constants (make-hash-table :test 'eql) :type hash-table))
+(defstruct (root-match (:include match)
+                       (:constructor make-root-match (constants meter)))
+  (constants nil :type hash-table))
 
-(defstruct (child-match ((:include match)
-                         (:constructor (make-child-match (axis)))))
-  (axis nil :type ideal-atom)
-  (parents (make-hash-table :test 'eq) :type hash-table))
+(defstruct (child-match (:include match)
+                        (:constructor make-child-match (axis parents meter)))
+  (axis nil :type zig)
+  (parents nil :type hash-table))
 
 (defstruct battery
   (stable (make-assumption) :type assumption)
   (match nil :type (or null match)))
-
-(defun invalidate-battery (b)
-  (setf (assumption-valid (battery-stable b)) nil)
-  (setf (battery-stable b) (make-assumption)))
 
 (defstruct (formula (:constructor make-formula (form)))
   (form nil :read-only t :type (or list symbol))
@@ -197,11 +200,10 @@
 
 (defun imug (i)
   (declare (ideal i))
-  (the mug
-       (etypecase i
-         (fixnum (murmug i))
-         (iatom (iatom-mug i))
-         (icell (icell-mug i)))))
+  (etypecase i
+    (fixnum (murmug i))
+    (iatom (iatom-mug i))
+    (icell (icell-mug i))))
 
 (defun ideep (i)
   (declare (ideal i))
@@ -217,6 +219,21 @@
            (progn
              (setf (cached-ideal a) i)
              t))))
+
+(defun speed-valid (spd)
+  (etypecase spd
+    ((or void fast stop) t)
+    (mean (assumption-valid spd))
+    (spry (assumption-valid (spry-valid spd)))
+    (slow (speed-valid (slow-parent spd)))
+    (slug (assumption-valid (cdr spd)))))
+
+(defun valid-speed (core)
+  (when-let (spd (cached-speed core))
+    (if (speed-valid spd)
+        spd
+        (progn (setf (cached-speed core) nil)
+               nil))))
 
 (defun icell-copy (i c)
   (declare (icell i))

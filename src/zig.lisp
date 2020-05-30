@@ -1,6 +1,7 @@
 (defpackage #:urbit/zig
   (:use #:cl #:urbit/math)
-  (:export #:zig #:axis->zig #:zig->axis))
+  (:export #:zig #:axis->zig #:zig->axis #:zig-common #:zig-sub-p
+           #:zig-compile-fail))
 
 (in-package #:urbit/zig)
 
@@ -36,11 +37,11 @@
   (let ((alen (length a))
         (blen (length b)))
     (if (= alen blen)
-        (when (equal a b) (values a nil))
+        (when (equal a b) (values a #*))
         (if (< alen blen)
-            (when (zig-common-head a b alen blen)
-              (values a (subseq b alen))  )
-            (when (zig-common-head b a blen alen)
+            (when (zig-common-head a b alen)
+              (values a (subseq b alen)))
+            (when (zig-common-head b a blen)
               (values b (subseq a blen)))))))
 
 (defun zig-sub-p (a b)
@@ -49,7 +50,7 @@
         (blen (length b)))
     (if (= alen blen)
         (equal a b)
-        (and (< alen blen) (zig-common-head a b alen blen)))))
+        (and (< alen blen) (zig-common-head a b alen)))))
 
 (defun zig-compile (z subject head tail)
   (declare (zig z))

@@ -3,7 +3,7 @@
         #:urbit/ideal #:urbit/data #:urbit/math #:urbit/syntax #:urbit/jets)
   (:import-from #:urbit/common #:dedata)
   (:import-from #:urbit/equality #:same)
-  (:import-from #:alexandria #:when-let*)
+  (:import-from #:alexandria #:when-let #:when-let*)
   (:export #:nock #:bottle #:in-world #:fast-hinter
            #:compile-dynamic-hint #:compile-static-hint
            #:hint-tag #:hint-next #:hint-clue
@@ -363,7 +363,7 @@
   (block
     register
     (let ((spd (or (valid-speed core)
-                   (clock *world* core))))
+                   (measure *world* core))))
       (when (typep spd 'slow)
         (handler-case
           (dedata (@name (@num @ax) hooks) clue
