@@ -257,10 +257,13 @@
             unless (cdr c) do (rplacd c 0)
             finally (return list))))
 
-(defun parent-axis (kernel)
+(defun parent-zig (kernel)
   (etypecase kernel
-    (dynamic-kernel (zig->axis (dynamic-kernel-axis kernel)))
-    (child-kernel 1)))
+    (dynamic-kernel (dynamic-kernel-axis kernel))
+    (child-kernel #*)))
+
+(defun parent-axis (kernel)
+  (zig->axis (parent-zig kernel)))
 
 (defun save-jet-pack (world)
   (jam
@@ -313,18 +316,21 @@
       (etypecase spd
         ((or void mean) nil)
         (slug t)
-        (stop (zig-sub-p spd (subseq z 1)))
+        (stop (zig-sub-p (subseq z 1) spd))
         ; spry is a struct-subtype of slow, and not treated differently here
         (slow
-          (multiple-value-bind (shared more) (zig-common z (slow-to spd))
-            (and shared (zig-changes-speed more (slow-parent spd)))))
+          (multiple-value-bind (shared more)
+            (zig-common (subseq z 1) (slow-to spd))
+            (and shared
+                 (or (zerop (length more))
+                     (zig-changes-speed more (slow-parent spd))))))
         (fast
           (or (= 1 (length z))
               (labels
                 ((recur (z k)
                    (or (kernel-static k)
                        (multiple-value-bind (shared more)
-                         (zig-common z (parent-axis k))
+                         (zig-common z (parent-zig k))
                          (when shared
                            (or (zerop (length more))
                                (zerop (bit more 0))
