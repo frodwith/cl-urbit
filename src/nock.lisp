@@ -3,6 +3,7 @@
         #:urbit/ideal #:urbit/data #:urbit/math #:urbit/syntax #:urbit/jets)
   (:import-from #:urbit/common #:dedata)
   (:import-from #:urbit/equality #:same)
+  (:import-from #:urbit/data/slimcell #:slim-cons)
   (:import-from #:alexandria #:when-let #:when-let*)
   (:export #:nock #:bottle #:in-world #:fast-hinter
            #:compile-dynamic-hint #:compile-static-hint
@@ -216,8 +217,8 @@
 
 ; nock operators implemented as macros
 
-(defmacro ^ (head tail) ; FIXME: special cells
-  `(cons ,head ,tail))
+(defmacro ^ (head tail)
+  `(slim-cons ,head ,tail))
 
 (defmacro @0 (ax)
   (case ax
