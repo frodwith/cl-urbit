@@ -1,5 +1,6 @@
 (defpackage #:urbit/data/slimcell
-  (:use #:cl #:urbit/cell-meta))
+  (:use #:cl #:urbit/cell-meta)
+  (:export #:slim-cons))
 
 (in-package #:urbit/data/slimcell)
 

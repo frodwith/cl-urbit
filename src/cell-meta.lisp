@@ -12,7 +12,7 @@
   '(or null mug core (cons mug core) icell))
 
 (defmacro define-cell-methods (klass head tail meta)
-  `(eval-when (:compile-toplevel :load-toplevel :execute)
+  `(progn
      (defmethod deep ((c ,klass))
        t)
 
@@ -79,7 +79,7 @@
        (let ((m (,meta c)))
          (typecase m
            (core m)
-           (cons (,tail m))
+           (cons (cdr m))
            (icell (icell-speed m)))))
 
      (defmethod (setf cached-speed) (val (c ,klass))

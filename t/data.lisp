@@ -1,6 +1,6 @@
 (defpackage #:urbit/tests/data
   (:use #:cl #:fiveam #:urbit/tests #:urbit/syntax
-        #:urbit/data #:urbit/equality #:urbit/ideal))
+        #:urbit/data #:urbit/equality #:urbit/ideal #:urbit/data/slimcell))
 
 (in-package #:urbit/tests/data)
 
@@ -76,3 +76,12 @@
 (defparameter *test-world* (make-world))
 (defun iconv (n) (find-ideal *test-world* n))
 (def-noun-suite ideal iconv)
+
+(defun copy-slim (in)
+  (if (deep in)
+      (slim-cons
+        (copy-slim (head in))
+        (copy-slim (tail in)))
+      in))
+
+(def-noun-suite slim copy-slim)

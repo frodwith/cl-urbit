@@ -20,6 +20,7 @@
                  (:file "data/fixnum")
                  (:file "data/bignum")
                  (:file "data/cons")
+                 (:file "data/slimcell")
                  (:file "data/iatom")
                  (:file "data/icell")
                  (:file "serial")
