@@ -303,12 +303,6 @@
     w))
 
 ; core measurement, for identifying cores that match prior registrations
-; TODO: 1) test zig-changes-speed
-;       COMMIT
-;       2) get the nock tests running again,
-;          put in cheerful copying printfs,
-;          then take them out
-;       COMMIT
 
 (defun zig-changes-speed (z spd)
   (declare (zig z) (core spd))

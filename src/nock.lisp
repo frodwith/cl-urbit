@@ -364,7 +364,7 @@
     register
     (let ((spd (or (valid-speed core)
                    (measure *world* core))))
-      (when (typep spd 'slow)
+      (unless (typep spd 'fast)
         (handler-case
           (dedata (@name (@num @ax) hooks) clue
             (case num

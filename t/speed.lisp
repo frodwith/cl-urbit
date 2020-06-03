@@ -163,5 +163,3 @@
     (is (zig-changes-speed #*111 slow-spd))
     (is (zig-changes-speed #*110 spry-spd))
     (is (zig-changes-speed #*110 slow-spd))))
-
-(run! 'zig-changes-child)

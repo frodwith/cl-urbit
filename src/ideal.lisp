@@ -149,19 +149,22 @@
 (deftype ideal-atom () '(or fixnum iatom))
 (deftype ideal () '(or ideal-atom icell))
 
+(defparameter *pretty-print-icells* nil)
+
 (defun print-icell (c &optional out)
   (print-unreadable-object (c out :type t :identity t)
-    (format out "~x" (icell-mug c))))
-;    (labels ((recur (o tail)
-;               (if (ideep o)
-;                   (progn
-;                     (unless tail (write-char #\[ out))
-;                     (recur (icell-head o) nil)
-;                     (write-char #\space out)
-;                     (recur (icell-tail o) t)
-;                     (unless tail (write-char #\] out)))
-;                   (prin1 o out))))
-;      (recur c nil))))
+    (if *pretty-print-icells*
+        (labels ((recur (o tail)
+                   (if (ideep o)
+                       (progn
+                         (unless tail (write-char #\[ out))
+                         (recur (icell-head o) nil)
+                         (write-char #\space out)
+                         (recur (icell-tail o) t)
+                         (unless tail (write-char #\] out)))
+                       (prin1 o out))))
+          (recur c nil))
+        (format out "~x" (icell-mug c)))))
 
 (defun icell-battery (c)
   (macrolet ((with-b (&body forms)

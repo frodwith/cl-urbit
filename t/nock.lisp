@@ -127,7 +127,7 @@
 ;  --
 (defparameter +ackerman-source+ [7 [7 [1 %kack] 8 [1 [7 [8 [1 0] [1 8 [1 0] 8 [1 8 [4 0 6] 6 [5 [0 2] 0 62] [0 14] 9 2 10 [6 0 2] 0 3] 9 2 0 1] 0 1] 11 [%fast 1 %dec [0 7] 0] 0 1] 7 [8 [1 0 0] [1 6 [5 [1 0] 0 12] [4 0 13] 6 [5 [1 0] 0 13] [9 2 10 [6 [8 [9 4 0 7] 9 2 10 [6 0 28] 0 2] 1 1] 0 1] 9 2 10 [6 [8 [9 4 0 7] 9 2 10 [6 0 28] 0 2] 9 2 10 [13 8 [9 4 0 7] 9 2 10 [6 0 29] 0 2] 0 1] 0 1] 0 1] 11 [%fast 1 %ack [0 7] 0] 0 1] 11 [%fast 1 %kack [1 0] 0] 0 1] 9 5 0 1])
 
-(defparameter *mock-dec-calls* 0)
+(defvar *mock-dec-calls*)
 (defun mock-dec (sam)
   (incf *mock-dec-calls*)
   (let ((i (cl-integer sam)))
@@ -147,6 +147,7 @@
 
 ; placeholder
 (test ackerman
+  (setf *mock-dec-calls* 0)
   (let ((pack nil))
     ; no mention of jets
     (is (= 7 (bottle (ack 2 2))))
