@@ -36,7 +36,7 @@
   (setf (macro-function 'nob) (macro-function 'neither-one-both)))
 
 (defun copy-speed (a b)
-  (nob a b valid-speed
+  (nob a b valid-cached-speed
        nil
        ((a b as)
         (declare (ignore a))

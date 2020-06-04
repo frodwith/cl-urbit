@@ -1,15 +1,15 @@
 (defpackage #:urbit/ideal
   (:use #:cl #:urbit/data #:urbit/mug #:urbit/common #:urbit/math)
   (:import-from #:alexandria #:if-let #:when-let)
-  (:export #:make-world
+  (:export #:make-world #:valid-cached-speed #:speed-valid
            #:world-stencils #:world-roots #:world-hinter #:world-stable
            #:kernel #:root-kernel #:child-kernel #:child-kernel-parent
            #:kernel-children #:kernel-driver #:kernel-name
            #:dynamic-kernel #:dynamic-kernel-axis
            #:stencil #:child-stencil #:child-stencil-parent
            #:stencil-hooks #:stencil-ideal #:stencil-kernel #:stencil-driver
-           #:core #:void #:mean #:fast #:spry #:slow #:slug #:stop
-           #:valid-speed #:slow-parent #:slow-to #:make-slow #:make-spry
+           #:core-speed #:void #:mean #:fast #:spry #:slow #:slug #:stop
+           #:slow-parent #:slow-to #:make-slow #:make-spry
            #:icell-battery #:battery #:battery-meter #:battery-stable
            #:battery-parent-axis #:battery-parents #:battery-roots
            #:battery-match #:match #:match-meter
@@ -20,7 +20,7 @@
            #:imug #:iint 
            #:iatom #:iatom-mug #:iatom-int #:iatom=mugatom
            #:icell #:icell-head #:icell-tail
-           #:icell-meta #:icell-mug #:icell-speed #:speed-valid
+           #:icell-meta #:icell-mug #:icell-speed
            #:find-ideal #:find-cons
            #:get-ideal-atom #:get-ideal-cell #:get-ideal
            #:formula #:make-formula #:formula-func #:formula-form
@@ -82,7 +82,7 @@
 ; TODO: roots and parents could probably be faster in most cases than
 ; hash-tables, since quite often they contain a small number of entries.
 
-(deftype core ()
+(deftype core-speed ()
   '(or void   ; not a core (cell with atom head) 
        mean   ; battery unknown to jet system (most cores)
        fast   ; matches a stencil
@@ -97,7 +97,7 @@
 ; we can never be fast til the parent is fast, so don't need an assumption
 (defstruct (slow (:constructor make-slow (to parent)))
   (to nil :type zig :read-only t)
-  (parent nil :type core :read-only t))
+  (parent nil :type core-speed :read-only t))
 
 ; we're one measly registration away from being fast, maybe!
 (defstruct (spry (:include slow)
@@ -133,14 +133,14 @@
 (defstruct fat
   (battery nil :type (or null battery))
   (formula nil :type (or null formula))
-  (core nil :type (or null core)))
+  (speed nil :type (or null core-speed)))
 
 (defstruct (icell (:constructor icons (head tail mug))
                   (:print-object print-icell))
   (head nil :read-only t :type ideal)
   (tail nil :read-only t :type ideal)
   (mug nil :read-only t :type mug)
-  (meta nil :type (or null formula battery core fat)))
+  (meta nil :type (or null formula battery core-speed fat)))
 
 (defstruct (iatom (:constructor make-iatom (int mug)))
   (int nil :read-only t :type bignum)
@@ -179,22 +179,22 @@
         (t (with-b (setf (icell-meta c)
                          (etypecase m
                            (null b)
-                           (core (make-fat :core m :battery b))
+                           (core-speed (make-fat :speed m :battery b))
                            (formula (make-fat :formula m :battery b))))))))))
 
 (defun icell-speed (c)
   (let ((m (icell-meta c)))
     (typecase m
-      (core m)
-      (fat (fat-core m)))))
+      (core-speed m)
+      (fat (fat-speed m)))))
 
 (defun (setf icell-speed) (val c)
   (let ((m (icell-meta c)))
     (typecase m
-      ((or null core) (setf (icell-meta c) val))
-      (formula (setf (icell-meta c) (make-fat :formula m :core val)))
-      (battery (setf (icell-meta c) (make-fat :battery m :core val)))
-      (fat (setf (fat-core m) val)))))
+      ((or null core-speed) (setf (icell-meta c) val))
+      (formula (setf (icell-meta c) (make-fat :formula m :speed val)))
+      (battery (setf (icell-meta c) (make-fat :battery m :speed val)))
+      (fat (setf (fat-speed m) val)))))
 
 (defun iint (i)
   (etypecase i
@@ -231,18 +231,19 @@
     (slow (speed-valid (slow-parent spd)))
     (slug (assumption-valid (cdr spd)))))
 
-(defun valid-speed (core)
+(defun valid-cached-speed (core)
   (when-let (spd (cached-speed core))
     (if (speed-valid spd)
         spd
-        (progn (setf (cached-speed core) nil)
-               nil))))
+        (progn
+          (setf (cached-speed core) nil)
+          nil))))
 
 (defun icell-copy (i c)
   (declare (icell i))
   (if-let (ispd (icell-speed i))
     (setf (cached-speed c) ispd)
-    (when-let (cspd (valid-speed c))
+    (when-let (cspd (valid-cached-speed c))
       (setf (icell-speed i) cspd)))
   (setf (cached-ideal c) i))
 

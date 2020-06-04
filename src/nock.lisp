@@ -34,7 +34,7 @@
         (t (with-f (setf (icell-meta c)
                          (etypecase m
                            (null f)
-                           (core (make-fat :core m :formula f))
+                           (core-speed (make-fat :speed m :formula f))
                            (battery (make-fat :battery m :formula f))))))))))
 
 (defun formula-function (formula)
@@ -274,7 +274,7 @@
 
 (defun copy (z old new)
   (declare (zig z))
-  (when-let (spd (valid-speed old))
+  (when-let (spd (valid-cached-speed old))
     (unless (zig-changes-speed z spd)
       (setf (cached-speed new) spd)))
   new)
@@ -363,8 +363,7 @@
   (declare (ignore subject))
   (block
     register
-    (let ((spd (or (valid-speed core)
-                   (measure *world* core))))
+    (let ((spd (get-speed *world* core)))
       (unless (typep spd 'fast)
         (handler-case
           (dedata (@name (@num @ax) hooks) clue

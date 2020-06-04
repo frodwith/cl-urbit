@@ -305,7 +305,7 @@
 ; core measurement, for identifying cores that match prior registrations
 
 (defun zig-changes-speed (z spd)
-  (declare (zig z) (core spd))
+  (declare (zig z) (core-speed spd))
   (or (zerop (bit z 0)) ; editing the battery always changes speed
       (etypecase spd
         ((or void mean) nil)
@@ -389,7 +389,7 @@
   (let ((c (gensym))
         (s (gensym)))
     `(let ((,c ,core))
-       (or (valid-speed ,c)
+       (or (valid-cached-speed ,c)
            (let ((,s (measure ,world ,c)))
              (setf (cached-speed ,c) ,s)
              ,s)))))

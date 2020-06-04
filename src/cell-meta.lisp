@@ -9,7 +9,7 @@
 ; and a meta object. DEFINE-CELL-METHODS will do the rest.
 
 (deftype cell-meta ()
-  '(or null mug core (cons mug core) icell))
+  '(or null mug core-speed (cons mug core-speed) icell))
 
 (defmacro define-cell-methods (klass head tail meta)
   `(progn
@@ -21,7 +21,7 @@
          (etypecase m
            (null nil)
            (mug m)
-           (core nil)
+           (core-speed nil)
            (cons (car m))
            (icell (icell-mug m)))))
 
@@ -29,7 +29,7 @@
        (let ((m (,meta c)))
          (typecase m
            (null (setf (,meta c) val))
-           (core (setf (,meta c) (cons val m))))))
+           (core-speed (setf (,meta c) (cons val m))))))
 
      (defmethod cached-ideal ((c ,klass))
        (let ((m (,meta c)))
@@ -39,7 +39,7 @@
      (defmethod (setf cached-ideal) ((val icell) (c ,klass))
        (let ((m (,meta c)))
          (when-let (spd (typecase m
-                          (core m)
+                          (core-speed m)
                           (cons (cdr m))))
            (setf (icell-speed val) spd))
          (setf (,head c) (icell-head val))
@@ -70,7 +70,7 @@
        (let ((m (,meta c)))
          (typecase m
            (icell (icell-head m))
-           ((or cons core) (,head c)))))
+           ((or cons core-speed) (,head c)))))
 
      (defmethod (setf cached-battery) (val (c ,klass))
        (setf (,head c) val))
@@ -78,14 +78,14 @@
      (defmethod cached-speed ((c ,klass))
        (let ((m (,meta c)))
          (typecase m
-           (core m)
+           (core-speed m)
            (cons (cdr m))
            (icell (icell-speed m)))))
 
      (defmethod (setf cached-speed) (val (c ,klass))
        (let ((m (,meta c)))
          (typecase m
-           ((or null core) (setf (,meta c) val))
+           ((or null core-speed) (setf (,meta c) val))
            (mug (setf (,meta c) (cons m val)))
            (cons (setf (cdr m) val))
            (icell (setf (icell-speed m) val)))))))
