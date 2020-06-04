@@ -21,6 +21,7 @@
                  (:file "data/bignum")
                  (:file "data/cons")
                  (:file "data/slimcell")
+                 (:file "data/core")
                  (:file "data/iatom")
                  (:file "data/icell")
                  (:file "serial")

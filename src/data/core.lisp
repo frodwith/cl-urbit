@@ -1,5 +1,6 @@
 (defpackage #:urbit/data/core
-  (:use #:cl #:urbit/data #:urbit/mug #:urbit/ideal))
+  (:use #:cl #:urbit/data #:urbit/mug #:urbit/ideal)
+  (:export #:core-cons))
 
 (in-package #:urbit/data/core)
 
@@ -53,4 +54,7 @@
   (core-speed c))
 
 (defmethod (setf cached-speed) (val (c core))
-  (setf (core-speed c) val))
+  (setf (core-speed c) val)
+  (let ((m (core-meta c)))
+    (typecase m
+      (icell (setf (icell-speed m) val)))))

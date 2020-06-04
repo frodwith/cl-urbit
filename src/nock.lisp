@@ -1,9 +1,8 @@
 (defpackage #:urbit/nock
-  (:use #:cl
-        #:urbit/ideal #:urbit/data #:urbit/math #:urbit/syntax #:urbit/jets)
+  (:use #:cl #:urbit/math #:urbit/syntax #:urbit/jets #:urbit/ideal
+        #:urbit/data #:urbit/data/core #:urbit/data/slimcell)
   (:import-from #:urbit/common #:dedata)
   (:import-from #:urbit/equality #:same)
-  (:import-from #:urbit/data/slimcell #:slim-cons)
   (:import-from #:alexandria #:when-let #:when-let*)
   (:export #:nock #:bottle #:in-world #:fast-hinter
            #:compile-dynamic-hint #:compile-static-hint
@@ -272,12 +271,12 @@
   (declare (ignore a))
   +crash+)
 
-(defun copy (z old new)
+(defun econs (z old head tail)
   (declare (zig z))
-  (when-let (spd (valid-cached-speed old))
-    (unless (zig-changes-speed z spd)
-      (setf (cached-speed new) spd)))
-  new)
+  (let ((spd (valid-cached-speed old)))
+    (if (and spd (not (zig-changes-speed z spd)))
+        (core-cons head tail spd nil)
+        (slim-cons head tail))))
 
 (defun pvax (pax)
   (map 'bit-vector (lambda (bool) (if bool 1 0)) pax))
@@ -287,15 +286,15 @@
   (destructuring-bind (tail . remain) pax
     (if (null remain)
         (if tail
-            '(copy #*1 o (^ (head o) n))
-            '(copy #*0 o (^ n (tail o)))   )
+            '(econs #*1 o (head o) n)
+            '(econs #*0 o n (tail o)))
         (let* ((side (if tail 'tail 'head))
                (more `(let ((o (,side o)))
                         ,(edit-on remain)))
                (parts (if tail
                           `((head o) ,more)
                           `(,more (tail o)))))
-          `(copy ,(pvax pax) o (^ ,@parts))))))
+          `(econs ,(pvax pax) o ,@parts)))))
 
 (defmacro @10 ((ax small) big)
   (case ax
