@@ -253,17 +253,25 @@
   `(@7 (^ ,a s) ,b))
 
 (defun call-jet (core axis-in-battery)
-  (let ((spd (get-speed *world* core)))
+  (let ((spd (core-speed core)))
     (when (typep spd 'fast)
       (when-let* ((driver (stencil-driver spd))
                   (jet (funcall driver axis-in-battery)))
         (funcall jet core)))))
 
+(defun corify (cell)
+  (typecase cell
+    (core cell)
+    (t (let ((spd (get-speed *world* cell)))
+         ; assumes get-speed will populate cached-battery
+         (core-cons (cached-battery cell) (tail cell) spd
+                    (or (cached-ideal cell) (cached-mug cell)))))))
+
 (defmacro @9 (axis core)
   (let ((jet-forms (and (> axis 1)
                         (not (tax axis))
                         `((call-jet s ,(mas axis))))))
-    `(@7 ,core
+    `(@7 (corify ,core)
          (let ((f (@0 ,axis)))
            (or ,@jet-forms (@2 s f))))))
 

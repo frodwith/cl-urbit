@@ -3,7 +3,7 @@
         #:urbit/data #:urbit/ideal #:urbit/serial)
   (:import-from #:alexandria #:if-let)
   (:import-from #:urbit/data #:exit)
-  (:export #:root #:core #:gate #:get-speed #:get-battery
+  (:export #:root #:gate #:get-speed #:get-battery
            #:measure #:zig-changes-speed
            #:install-child-stencil #:install-root-stencil
            #:load-world #:save-jet-pack #:install-jet-pack))

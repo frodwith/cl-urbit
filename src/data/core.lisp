@@ -1,6 +1,6 @@
 (defpackage #:urbit/data/core
   (:use #:cl #:urbit/data #:urbit/mug #:urbit/ideal)
-  (:export #:core-cons))
+  (:export #:core #:core-cons))
 
 (in-package #:urbit/data/core)
 
