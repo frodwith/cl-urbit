@@ -1,5 +1,5 @@
 (defpackage #:urbit/tests/data
-  (:use #:cl #:fiveam #:urbit/tests #:urbit/syntax
+  (:use #:cl #:fiveam #:urbit/tests #:urbit/syntax #:urbit/world
         #:urbit/data #:urbit/equality #:urbit/ideal #:urbit/data/slimcell))
 
 (in-package #:urbit/tests/data)
@@ -74,7 +74,7 @@
 (def-noun-suite lisp copy-tree)
 
 (defparameter *test-world* (make-world))
-(defun iconv (n) (find-ideal *test-world* n))
+(defun iconv (n) (in-world *test-world* (find-ideal n)))
 (def-noun-suite ideal iconv)
 
 (defun copy-slim (in)

@@ -1,6 +1,6 @@
 (defpackage #:urbit/jets
   (:use #:cl #:urbit/common #:urbit/math #:urbit/zig
-        #:urbit/data #:urbit/ideal #:urbit/serial)
+        #:urbit/data #:urbit/ideal #:urbit/world #:urbit/serial)
   (:import-from #:alexandria #:if-let)
   (:import-from #:urbit/data #:exit)
   (:export #:root #:gate #:get-speed #:get-battery
@@ -20,8 +20,8 @@
        (symbol-macrolet ((,place-symbol (gethash ,k ,h))) 
          ,@forms))))
 
-(defmacro root-place (root-symbol world name constant &body forms)
-  `(hash-place ,root-symbol (world-roots ,world) (cons ,constant ,name)
+(defmacro root-place (root-symbol name constant &body forms)
+  `(hash-place ,root-symbol (world-roots *world*) (cons ,constant ,name)
      ,@forms))
 
 (defmacro child-place (child-symbol parent name axis &body forms)
@@ -38,8 +38,8 @@
 
 (define-condition reinstall-kernel (error) (kernel))
 
-(defun install-root (world name constant driver)
-  (root-place r world name constant
+(defun install-root (name constant driver)
+  (root-place r name constant
     (if r
         (error 'reinstall-kernel r)
         (setq r (root-kernel constant name driver)))))
@@ -53,8 +53,8 @@
 ; kernel finding is used by stencil installation, and will create a 
 ; kernel if one has not already been installed.
 
-(defun find-root (world name constant)
-  (root-place r world name constant
+(defun find-root (name constant)
+  (root-place r name constant
     (or r (setq r (root-kernel constant name nil)))))
 
 (defun find-child (parent name axis)
@@ -77,18 +77,18 @@
   (setf (assumption-valid (battery-stable b)) nil)
   (setf (battery-stable b) (make-assumption)))
 
-(defun install-root-stencil (world name icore hooks)
+(defun install-root-stencil (name icore hooks)
   (let* ((constant (icell-tail icore))
          (battery (icell-battery (icell-head icore))))
     (flet ((make-stencil ()
-             (let* ((kernel (find-root world name constant))
+             (let* ((kernel (find-root name constant))
                     (driver (call-kernel-driver kernel nil icore hooks)))
                (stencil icore hooks kernel driver)))
            (meet (pairs)
              (invalidate-battery battery)
              (compile-root-meter (battery-stable battery) pairs))
            (save (stencil)
-             (push stencil (world-stencils world))
+             (push stencil (world-stencils *world*))
              stencil))
       (let ((match (battery-match battery)))
         (typecase match
@@ -110,20 +110,20 @@
                   (setf (match-meter match) (meet (case-pairs constants)))
                   (save stencil))))))))))
 
-(defun install-child-stencil (world name battery-ideal axis parent hooks)
+(defun install-child-stencil (name battery-ideal axis parent hooks)
   (let* ((battery (icell-battery battery-ideal))
          (match (battery-match battery)))
     (flet ((save (stencil)
-             (push stencil (world-stencils world))
+             (push stencil (world-stencils *world*))
              stencil)
            (meet (z pairs)
              (invalidate-battery battery)
-             (compile-child-meter world (battery-stable battery) z pairs))
+             (compile-child-meter (battery-stable battery) z pairs))
            (make-stencil ()
              (let* ((parentk (stencil-kernel parent))
                     (kernel (find-child parentk name axis))
                     (ideal (if (kernel-static kernel)
-                               (find-cons world battery-ideal
+                               (find-cons battery-ideal
                                           (stencil-ideal parent))
                                battery-ideal))
                     (driver (call-kernel-driver kernel parent ideal hooks)))
@@ -200,28 +200,27 @@
   (core name 3 (gate-driver sample-function)))
 
 ; INSTALL-TREE and its helpers should probably only be called by LOAD-WORLD
-(defun install-jet-children (world jet-parent parent-kernel)
+(defun install-jet-children (jet-parent parent-kernel)
   (dolist (child (jet-core-children jet-parent))
-    (install-jet-child world parent-kernel child)))
+    (install-jet-child parent-kernel child)))
 
-(defun install-jet-child (world parent-kernel child)
+(defun install-jet-child (parent-kernel child)
   (install-jet-children
-    world child (install-child
-                  parent-kernel
-                  (jet-core-name child)
-                  (get-ideal-atom world (jet-child-axis child))
-                  (jet-core-driver child))))
+    child (install-child
+            parent-kernel
+            (jet-core-name child)
+            (get-ideal-atom (jet-child-axis child))
+            (jet-core-driver child))))
 
-(defun install-jet-root (world root)
+(defun install-jet-root (root)
   (install-jet-children
-    world root (install-root
-                 world
-                 (jet-core-name root)
-                 (get-ideal-atom world (jet-root-constant root))
-                 (jet-core-driver root))))
+    root (install-root
+           (jet-core-name root)
+           (get-ideal-atom (jet-root-constant root))
+           (jet-core-driver root))))
 
-(defun install-tree (world roots)
-  (dolist (r roots) (install-jet-root world r)))
+(defun install-tree (roots)
+  (dolist (r roots) (install-jet-root r)))
 
 ; jet packs are used to persist jet registrations across worlds
 ; in general you should call INSTALL-JET-PACK indirectly by passing a saved
@@ -229,22 +228,22 @@
 ; from a world (presumably with something like %fast hints enabled)
 ; into just such a pack.
 
-(defun install-jet-pack (world pack)
+(defun install-jet-pack (pack)
   (loop for more = (cue pack #'identity #'cons) then (cdr more)
         while (consp more)
         with parents = (make-array 100 :adjustable t :fill-pointer 0)
-        for s = (macrolet ((! (e) `(get-ideal world ,e))
-                           (@ (e) `(get-ideal-atom world ,e))
-                           (^ (e) `(get-ideal-cell world ,e)))
+        for s = (macrolet ((! (e) `(get-ideal ,e))
+                           (@ (e) `(get-ideal-atom ,e))
+                           (^ (e) `(get-ideal-cell ,e)))
                   (decons (@@stem bulb) (car more)
                     (ecase stem
                       (0 (decons (@name core hooks) bulb
                            (decons (^ @) core
                              (install-root-stencil
-                               world (@ name) (^ core) (! hooks)))))
+                               (@ name) (^ core) (! hooks)))))
                       (1 (decons (@name ^battery @axis @@parent hooks) bulb
                            (install-child-stencil
-                             world (@ name) (^ battery) (@ axis) 
+                             (@ name) (^ battery) (@ axis)
                              (aref parents parent) (! hooks)))))))
         do (vector-push-extend s parents)
         finally (unless (zerop more) (error 'exit))))
@@ -265,14 +264,13 @@
 (defun parent-axis (kernel)
   (zig->axis (parent-zig kernel)))
 
-(defun save-jet-pack (world)
+(defun save-jet-pack ()
   (jam
     (find-ideal
-      world
       (zero-terminate
         (loop with parents = (make-hash-table :test 'eq)
               for i upfrom 0
-              for stencil in (reverse (world-stencils world))
+              for stencil in (reverse (world-stencils *world*))
               for kernel = (stencil-kernel stencil)
               for name = (kernel-name kernel)
               for ideal = (stencil-ideal stencil)
@@ -294,13 +292,13 @@
 ; for running real code (that deals with jets), this is the recommended
 ; toplevel call for creating a world. It's theoretically possible to
 ; install trees and jet packs into a running world, but unsupported.
-(defun load-world (&key jet-tree jet-pack hinter allow-registration)
-  (let ((w (if hinter
-               (make-world :hinter hinter :stable (not allow-registration))
-               (make-world))))
-    (install-tree w jet-tree)
-    (when jet-pack (install-jet-pack w jet-pack))
-    w))
+(defun load-world (&key jet-tree jet-pack hinter)
+  (let ((*world* (if hinter
+                     (make-world :hinter hinter)
+                     (make-world))))
+    (install-tree jet-tree)
+    (when jet-pack (install-jet-pack jet-pack))
+    *world*))
 
 ; core measurement, for identifying cores that match prior registrations
 
@@ -346,7 +344,7 @@
              ,@case-pairs
              (t (cons :slug ,assumption)))))))
 
-(defun compile-child-meter (world assumption z case-pairs)
+(defun compile-child-meter (assumption z case-pairs)
   (compile
     nil
     `(lambda (payload)
@@ -358,26 +356,21 @@
                  fail ; stop at fail axis
                  (if (not (deep parent))
                      ,z ; stop at parent axis
-                     (let ((pspd (get-speed ',world parent)))
+                     (let ((pspd (get-speed parent)))
                        (case pspd
                          ,@case-pairs
                          (t (if (typep pspd 'fast)
                                 (make-spry ,z pspd ',assumption)
                                 (make-slow ,z pspd))))))))))))
 
-(defmacro get-battery (world core)
-  (let ((s (gensym)))
-    `(let ((,s ,core))
-       (let ((bat (or (cached-battery ,s)
-                      (let ((i (get-ideal ,world (head ,s))))
-                        (setf (cached-battery ,s) i)
-                        i))))
-         (if (ideep bat)
-             bat
-             (error 'cell-required :given bat))))))
+(defun get-battery (core)
+  (or (cached-battery core)
+      (let ((i (find-ideal (head core))))
+        (setf (cached-battery core) i)
+        i)))
 
-(defun measure (world core)
-  (let ((head (get-battery world core)))
+(defun measure (core)
+  (let ((head (get-battery core)))
     (if (not (ideep head))
         :void   
         (let ((battery (icell-battery head)))
@@ -385,11 +378,11 @@
             (funcall (match-meter m) (tail core))
             (battery-stable battery)))))) ; mean
 
-(defmacro get-speed (world core)
+(defmacro get-speed (core)
   (let ((c (gensym))
         (s (gensym)))
     `(let ((,c ,core))
        (or (valid-cached-speed ,c)
-           (let ((,s (measure ,world ,c)))
+           (let ((,s (measure ,c)))
              (setf (cached-speed ,c) ,s)
              ,s)))))

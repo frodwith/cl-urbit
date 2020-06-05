@@ -16,6 +16,7 @@
                  (:file "common")
                  (:file "mug")
                  (:file "ideal")
+                 (:file "world")
                  (:file "cell-meta")
                  (:file "data/fixnum")
                  (:file "data/bignum")

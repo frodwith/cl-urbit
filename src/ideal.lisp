@@ -1,31 +1,27 @@
 (defpackage #:urbit/ideal
-  (:use #:cl #:urbit/data #:urbit/mug #:urbit/common #:urbit/math)
+  (:use #:cl #:urbit/data #:urbit/mug #:urbit/math #:urbit/common)
   (:import-from #:alexandria #:if-let #:when-let)
-  (:export #:make-world #:valid-cached-speed #:speed-valid
-           #:world-stencils #:world-roots #:world-hinter #:world-stable
-           #:kernel #:root-kernel #:child-kernel #:child-kernel-parent
-           #:kernel-children #:kernel-driver #:kernel-name
+  (:export #:kernel #:kernel-name #:kernel-driver #:kernel-children
+           #:root-kernel #:root-kernel-constant
+           #:child-kernel #:child-kernel-parent
            #:dynamic-kernel #:dynamic-kernel-axis
-           #:stencil #:child-stencil #:child-stencil-parent
-           #:stencil-hooks #:stencil-ideal #:stencil-kernel #:stencil-driver
-           #:core-speed #:void #:mean #:fast #:spry #:slow #:slug #:stop
-           #:slow-parent #:slow-to #:make-slow #:make-spry
-           #:icell-battery #:battery #:battery-meter #:battery-stable
-           #:battery-parent-axis #:battery-parents #:battery-roots
-           #:battery-match #:match #:match-meter
-           #:root-match #:make-root-match #:root-match-constants
-           #:child-match #:make-child-match
-           #:child-match-axis #:child-match-parents
+           #:stencil #:stencil-ideal #:stencil-hooks
+           #:stencil-kernel #:stencil-driver
+           #:child-stencil #:child-stencil-parent
            #:assumption #:make-assumption #:assumption-valid
-           #:imug #:iint 
-           #:iatom #:iatom-mug #:iatom-int #:iatom=mugatom
-           #:icell #:icell-head #:icell-tail
-           #:icell-meta #:icell-mug #:icell-speed
-           #:find-ideal #:find-cons
-           #:get-ideal-atom #:get-ideal-cell #:get-ideal
-           #:formula #:make-formula #:formula-func #:formula-form
+           #:core-speed #:speed-valid #:valid-cached-speed
+           #:void #:mean #:fast #:spry #:slow #:slug #:stop
+           #:make-slow #:slow-to #:slow-parent #:make-spry #:spry-valid
+           #:match #:match-meter #:root-match #:child-match
+           #:make-root-match #:root-match-constants
+           #:make-child-match #:child-match-axis #:child-match-parents
+           #:battery #:battery-stable #:battery-match
+           #:formula #:make-formula #:formula-form #:formula-func
+           #:ideal #:ideal-atom #:iatom #:make-iatom #:iatom-int #:iatom-mug
+           #:icell #:icons #:icell-head #:icell-tail #:icell-mug #:icell-meta
            #:fat #:make-fat #:fat-formula
-           #:icell=mugcell #:ideep #:icell-copy))
+           #:icell-battery #:icell-speed #:iint #:imug #:ideep
+           #:iatom=mugatom #:icell=mugcell #:icell-copy))
 
 (in-package #:urbit/ideal)
 
@@ -79,8 +75,8 @@
 ; (i.e. the samples of gates)
 
 ; icell metadata
-; TODO: roots and parents could probably be faster in most cases than
-; hash-tables, since quite often they contain a small number of entries.
+(defstruct assumption
+  (valid t :type boolean))
 
 (deftype core-speed ()
   '(or void   ; not a core (cell with atom head) 
@@ -90,9 +86,6 @@
        slow   ; child, parent not fast
        slug   ; root, wrong constant
        stop)) ; payload wrong shape at zig
-
-(defstruct assumption
-  (valid t :type boolean))
 
 ; we can never be fast til the parent is fast, so don't need an assumption
 (defstruct (slow (:constructor make-slow (to parent)))
@@ -109,6 +102,22 @@
 (deftype slug () '(cons (eql :slug) assumption))
 (deftype stop () 'zig)
 (deftype void () '(eql :void))
+
+(defun speed-valid (spd)
+  (etypecase spd
+    ((or void fast stop) t)
+    (mean (assumption-valid spd))
+    (spry (assumption-valid (spry-valid spd)))
+    (slow (speed-valid (slow-parent spd)))
+    (slug (assumption-valid (cdr spd)))))
+
+(defun valid-cached-speed (core)
+  (when-let (spd (cached-speed core))
+    (if (speed-valid spd)
+        spd
+        (progn
+          (setf (cached-speed core) nil)
+          nil))))
 
 (defstruct match
   (meter nil :type function))
@@ -223,22 +232,6 @@
              (setf (cached-ideal a) i)
              t))))
 
-(defun speed-valid (spd)
-  (etypecase spd
-    ((or void fast stop) t)
-    (mean (assumption-valid spd))
-    (spry (assumption-valid (spry-valid spd)))
-    (slow (speed-valid (slow-parent spd)))
-    (slug (assumption-valid (cdr spd)))))
-
-(defun valid-cached-speed (core)
-  (when-let (spd (cached-speed core))
-    (if (speed-valid spd)
-        spd
-        (progn
-          (setf (cached-speed core) nil)
-          nil))))
-
 (defun icell-copy (i c)
   (declare (icell i))
   (if-let (ispd (icell-speed i))
@@ -264,119 +257,3 @@
               #'icell-tail #'tail
               #'iatom=mugatom #'icell-copy #'fast)
         (icell-copy i c)))))
-
-(defun cells-hash (c)
-  (if (typep c 'icell)
-      (icell-mug c)
-      (mug c)))
-
-(defun cells= (a b)
-  (if (typep a 'icell)
-      (if (typep b 'icell)
-          (eq a b)
-          (icell=mugcell a b))
-      (icell=mugcell b a)))
-
-(sb-ext:define-hash-table-test cells= cells-hash)
-
-(defun atoms-hash (a)
-  (if (typep a 'iatom)
-      (iatom-mug a)
-      (mug a)))
-
-(defun atoms= (a b)
-  (if (typep a 'iatom)
-      (if (typep b 'iatom)
-          (eq a b)
-          (iatom=mugatom a b))
-      (iatom=mugatom b a)))
-
-(sb-ext:define-hash-table-test atoms= atoms-hash)
-
-(defun ignore-all-hints (tag clue next)
-  (declare (uint tag)
-           ; clue is null for static hints, otherwise formula
-           ((or null icell) clue)
-           (icell next))
-  (declare (ignore tag clue next))
-  nil)
-
-(defstruct world
-  ; noun hash-consing, split into two tables because
-  ; 1) smaller tables = faster lookups
-  ; 2) distinguished groups = faster hash/comparison
-  (atoms (make-hash-table :test 'atoms= :weakness :key) :read-only t)
-  (cells (make-hash-table :test 'cells= :weakness :key) :read-only t)
-  ; the whole deduplicated tree of installed kernels (see jets.lisp)
-  (roots (make-hash-table :test 'equal) :read-only t)
-  ; decisions about how to handle hints are per-world because ideals are
-  (hinter #'ignore-all-hints :type function :read-only t)
-  ; setting stable nil will cause slow speeds to check battery assumptions
-  (stable t :type boolean :read-only t)
-  ; stack/log of installed stencils, most recent first (again jets.lisp)
-  (stencils nil :type list)) 
-
-(defun hashed-ideal (table noun)
-  (let ((found (gethash noun table)))
-    (when found (setf (cached-ideal noun) found))
-    found))
-
-(defun create-iatom (atoms a)
-  (let ((int (cl-integer a)))
-    (etypecase int
-      (fixnum (setf (cached-ideal a) int)
-              int)
-      (bignum (let ((big (make-iatom int (mug a))))
-                (setf (cached-ideal a) big)
-                (setf (gethash big atoms) big)
-                big)))))
-
-(defun create-icell (atoms cells mugged)
-  (flet ((atomic (atom)
-           (let ((iatom (create-iatom atoms atom)))
-             (setf (cached-ideal atom) iatom)
-             iatom))
-         (fast (noun)
-           (or (cached-ideal noun)
-               (let ((d (deep noun)))
-                 (values (hashed-ideal (if d cells atoms) noun) d))))
-         (slow (cell head tail)
-           (let ((icell (icons head tail (murmugs (imug head) (imug tail)))))
-             (setf (cached-ideal cell) icell)
-             (setf (gethash icell cells) icell)
-             icell)))
-    (sum-cell mugged #'atomic #'fast #'slow)))
-
-(defun find-cons (world ihead itail)
-  (find-ideal-cell world (cons ihead itail)))
-
-(defun find-ideal-cell (world cell)
-  (let ((cells (world-cells world)))
-    (or (hashed-ideal cells cell)
-        (create-icell (world-atoms world) cells cell))))
-
-(defun find-ideal-atom (world a)
-  (let ((atoms (world-atoms world)))
-    (or (hashed-ideal atoms a)
-        (create-iatom atoms a))))
-
-(defun find-ideal (world noun)
-  (if (deep noun)
-      (find-ideal-cell world noun)
-      (find-ideal-atom world noun)))
-
-; world will not be evaluated unless no cached-ideal
-(defmacro idealm (finder world noun)
-  (let ((s (gensym)))
-    `(let ((,s ,noun))
-       (or (cached-ideal ,s)
-           (,finder ,world ,s)))))
-
-(defmacro get-ideal (world noun)
-  `(idealm find-ideal ,world ,noun))
-
-(defmacro get-ideal-atom (world a)
-  `(idealm find-ideal-atom ,world ,a))
-
-(defmacro get-ideal-cell (world cell)
-  `(idealm find-ideal-cell ,world ,cell))

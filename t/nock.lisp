@@ -148,7 +148,7 @@
 ; placeholder
 (test ackerman
   (setf *mock-dec-calls* 0)
-  (let ((pack nil))
+  (let (pack)
     ; no mention of jets
     (is (= 7 (bottle (ack 2 2))))
     (is (= 0 *mock-dec-calls*))
@@ -156,11 +156,12 @@
     (is (= 7 (in-world (load-world :jet-tree +ackerman-jets+) (ack 2 2))))
     (is (= 0 *mock-dec-calls*))
     ; turn fast hints on - this time the jet should fire 
-    (is (= 7 (let* ((w (load-world :jet-tree +ackerman-jets+
-                                   :hinter #'fast-hinter))
-                    (a (in-world w (ack 2 2))))
-               (setf pack (save-jet-pack w))
-               a)))
+    (is (= 7 (in-world (load-world :jet-tree +ackerman-jets+
+                                   :hinter #'fast-hinter)
+               (let ((a (ack 2 2)))
+                 (setf pack (save-jet-pack))
+                 a
+                 ))))
     (is (= +decs-per-call+ *mock-dec-calls*))
     ; call in a new world with no jets - no increase
     (is (= 7 (bottle (ack 2 2))))

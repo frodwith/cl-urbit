@@ -1,6 +1,7 @@
 (defpackage #:urbit/nock
-  (:use #:cl #:urbit/math #:urbit/syntax #:urbit/jets #:urbit/ideal
-        #:urbit/data #:urbit/data/core #:urbit/data/slimcell)
+  (:use #:cl #:urbit/math #:urbit/syntax #:urbit/jets
+        #:urbit/ideal #:urbit/world #:urbit/data
+        #:urbit/data/core #:urbit/data/slimcell)
   (:import-from #:urbit/common #:dedata)
   (:import-from #:urbit/equality #:same)
   (:import-from #:alexandria #:when-let #:when-let*)
@@ -43,24 +44,9 @@
 
 (defparameter +crash+ '(error 'exit))
 
-(defparameter *world* nil)
-
-(defmacro in-world (world &body forms)
-  `(let ((*world* ,world))
-     ,@forms))
-
-(defmacro bottle (&body forms)
-  `(in-world (make-world) ,@forms))
-
-(defun ifind (noun)
-  (or (cached-ideal noun)
-      (if *world*
-          (find-ideal *world* noun)
-          (error "nock world unbound"))))
-
 (defun nock (subject formula)
   (if (deep formula)
-      (funcall (formula-function (icell-formula (ifind formula)))
+      (funcall (formula-function (icell-formula (get-ideal-cell formula)))
                subject)
       (error 'exit)))
 
@@ -262,7 +248,7 @@
 (defun corify (cell)
   (typecase cell
     (core cell)
-    (t (let ((spd (get-speed *world* cell)))
+    (t (let ((spd (get-speed cell)))
          ; assumes get-speed will populate cached-battery
          (core-cons (cached-battery cell) (tail cell) spd
                     (or (cached-ideal cell) (cached-mug cell)))))))
@@ -370,19 +356,19 @@
   (declare (ignore subject))
   (block
     register
-    (let ((spd (get-speed *world* core)))
+    (let ((spd (get-speed core)))
       (unless (typep spd 'fast)
         (handler-case
           (dedata (@name (@num @ax) hooks) clue
             (case num
               (0 (when (and (> ax 2) (tax ax))
                    (let* ((parent (dfrag ax core))
-                          (pspeed (get-speed *world* parent)))
+                          (pspeed (get-speed parent)))
                      (when (typep pspeed 'fast)
                        (setf (cached-speed core)
                              (install-child-stencil
-                               *world* name (head core) (mas ax)
-                               pspeed (get-ideal *world* hooks)))
+                               name (head core) (mas ax)
+                               pspeed (get-ideal hooks)))
                        (return-from register))
                      (warn 'unregistered-parent
                            :name name :core core :axis ax))))
@@ -391,9 +377,9 @@
                      (unless (deep payload)
                        (setf (cached-speed core)
                              (install-root-stencil
-                               *world* name
-                               (get-ideal-cell *world* core)
-                               (get-ideal *world* hooks)))
+                               name
+                               (get-ideal-cell core)
+                               (get-ideal hooks)))
                        (return-from register)))))))
           (exit () nil))
         (warn 'bad-fast :clue clue :core core))
