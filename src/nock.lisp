@@ -1,7 +1,7 @@
 (defpackage #:urbit/nock
   (:use #:cl #:urbit/math #:urbit/zig #:urbit/syntax #:urbit/jets
         #:urbit/ideal #:urbit/world #:urbit/data
-        #:urbit/data/core #:urbit/data/slimcell)
+        #:urbit/data/core #:urbit/data/slimcell #:urbit/data/slimatom)
   (:import-from #:urbit/common #:dedata)
   (:import-from #:urbit/equality #:same)
   (:import-from #:alexandria #:when-let #:when-let*)
@@ -220,8 +220,8 @@
 (defmacro @3 (a)
   `(loob (deep ,a)))
 
-(defmacro @4 (a) ;FIXME: special bignums
-  `(1+ (cl-integer ,a)))
+(defmacro @4 (a)
+  `(slim-malt (1+ (cl-integer ,a))))
 
 (defmacro @5 (a b)
   `(loob (same ,a ,b)))
