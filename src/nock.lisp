@@ -6,6 +6,7 @@
   (:import-from #:urbit/equality #:same)
   (:import-from #:alexandria #:when-let #:when-let*)
   (:export #:nock #:bottle #:in-world #:fast-hinter
+           #:slog-hinter #:slog #:slog-priority #:slog-tank
            #:compile-dynamic-hint #:compile-static-hint
            #:hint-tag #:hint-next #:hint-clue
            #:before #:after #:around))
@@ -391,3 +392,19 @@
   (declare (ignore next))
   (when (and clue (= %fast tag))
     (cons :after #'handle-fast)))
+
+(define-condition slog ()
+  ((priority :initarg :priority :reader slog-priority :type integer)
+   (tank :initarg :tank :reader slog-tank)))
+
+(defun handle-slog (subject clue)
+  (declare (ignore subject))
+  (handler-case
+    (dedata (@pri ^tank) clue
+      (signal 'slog :priority pri :tank tank))
+    (exit () nil)))
+
+(defun slog-hinter (tag clue next)
+  (declare (ignore next))
+  (when (and clue (= %slog tag))
+    (cons :before #'handle-slog)))

@@ -16,6 +16,10 @@
            :description "test jets"
            :in nock-tests)
 
+(def-suite hint-tests
+           :description "test various utility hints"
+           :in nock-tests)
+
 (in-suite basic-nock-tests)
 
 (enable-syntax)
@@ -173,3 +177,14 @@
     (is (= 7 (in-world (load-world :jet-tree +ackerman-jets+ :jet-pack pack)
                (ack 2 2))))
     (is (= (* 2 +decs-per-call+) *mock-dec-calls*))))
+
+(in-suite hint-tests)
+
+(test slog
+  (in-world (load-world :hinter #'slog-hinter)
+    (let (c)
+      (handler-bind ((slog #'(lambda (s) (setq c s))))
+        (is (= 42 (nock 42 [11 [%slog 1 1 %leaf %h %e %l %l %o 0] 0 1]))))
+      (is (typep c 'slog))
+      (is (= 1 (slog-priority c)))
+      (is (same [%leaf %h %e %l %l %o 0] (slog-tank c))))))
