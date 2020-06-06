@@ -1,5 +1,5 @@
 (defpackage #:urbit/ideal
-  (:use #:cl #:urbit/data #:urbit/mug #:urbit/math #:urbit/common)
+  (:use #:cl #:urbit/data #:urbit/mug #:urbit/zig #:urbit/math #:urbit/common)
   (:import-from #:alexandria #:if-let #:when-let)
   (:export #:kernel #:kernel-name #:kernel-driver #:kernel-children
            #:root-kernel #:root-kernel-constant

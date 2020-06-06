@@ -1,6 +1,7 @@
 (defpackage #:urbit/tests/data
   (:use #:cl #:fiveam #:urbit/tests #:urbit/syntax #:urbit/world
-        #:urbit/data #:urbit/equality #:urbit/ideal #:urbit/data/slimcell))
+        #:urbit/data #:urbit/equality #:urbit/ideal
+        #:urbit/data/slimcell #:urbit/data/slimatom))
 
 (in-package #:urbit/tests/data)
 
@@ -82,6 +83,6 @@
       (slim-cons
         (copy-slim (head in))
         (copy-slim (tail in)))
-      in))
+      (slim-malt (cl-integer in))))
 
 (def-noun-suite slim copy-slim)

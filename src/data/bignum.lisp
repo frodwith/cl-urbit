@@ -1,40 +1,24 @@
 (defpackage #:urbit/data/bignum
-  (:use #:cl #:urbit/data)
-  (:import-from #:urbit/mug #:mug)
-  (:import-from #:urbit/ideal #:iatom #:iatom-mug))
+  (:use #:cl #:urbit/data #:urbit/bignum-meta))
 
 (in-package #:urbit/data/bignum)
 
 (defparameter *bignum-meta* (make-hash-table :test 'eq :weakness :key))
 
-(defun meta (i)
-  (gethash i *bignum-meta*))
+(defun meta (a)
+  (declare (bignum a))
+  (the bignum-meta (gethash a *bignum-meta*)))
 
-(defun (setf meta) (val i)
-  (setf (gethash i *bignum-meta*) val))
+(defun (setf meta) (val a)
+  (declare (bignum a) (bignum-meta val))
+  (setf (gethash a *bignum-meta*) val))
 
-(defmethod deep ((i bignum))
-  nil)
+(defun bignum-num (a)
+  (declare (bignum a))
+  a)
 
-(defmethod cached-mug ((i bignum))
-  (let ((m (meta i)))
-    (etypecase m
-      (null nil)
-      (mug m)
-      (iatom (iatom-mug m)))))
+(defun (setf bignum-num) (val a)
+  (declare (bignum val) (ignore a))
+  val)
 
-(defmethod (setf cached-mug) (val (i bignum))
-  (declare (mug val))
-  (let ((m (meta i)))
-    (when (null m)
-      (setf (meta i) val))))
-
-(defmethod cached-ideal ((i bignum))
-  (let ((m (meta i)))
-    (and (typep m 'iatom) m)))
-
-(defmethod (setf cached-ideal) ((val iatom) (i bignum))
-  (setf (meta i) val))
-
-(defmethod cl-integer ((i bignum))
-  i)
+(define-atom-methods bignum bignum-num meta)

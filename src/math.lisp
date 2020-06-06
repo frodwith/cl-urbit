@@ -2,7 +2,6 @@
   (:use #:cl #:cl-intbytes)
   (:export #:met #:mix #:end #:lsh #:rsh
            #:peg #:mas #:tax #:pax #:axis-parts
-           #:zig #:axis->zig #:zig->axis
            #:string->cord #:cord->string
            #:pint #:uint #:decomposable-axis))
 
@@ -88,25 +87,6 @@
                  (f (- b e))
                  (g (ash a d)))
             (+ f g)))))
-
-(deftype zig () 'bit-vector)
-
-(defun axis->zig (a)
-  "path elements of axis as zig (bit-vector)"
-  (declare (pint a))
-  (the zig (loop with len = (- (integer-length a) 1)
-                 with vec = (make-array len :element-type 'bit)
-                 for i from 0 below len
-                 for j downfrom (1- len)
-                 for cap = (if (logbitp j a) 1 0)
-                 do (setf (bit vec i) cap)
-                 finally (return vec))))
-
-(defun zig->axis (z)
-  (declare (zig z))
-  (the pint (loop for a = 1 then (+ (ash a 1) (bit z i))
-                  for i downfrom (1- (length z)) to 0
-                  finally (return a))))
 
 ; NOTE the argument type must be >= 2
 (deftype decomposable-axis () '(integer 2))

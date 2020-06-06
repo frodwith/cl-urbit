@@ -1,5 +1,5 @@
 (defpackage #:urbit/nock
-  (:use #:cl #:urbit/math #:urbit/syntax #:urbit/jets
+  (:use #:cl #:urbit/math #:urbit/zig #:urbit/syntax #:urbit/jets
         #:urbit/ideal #:urbit/world #:urbit/data
         #:urbit/data/core #:urbit/data/slimcell)
   (:import-from #:urbit/common #:dedata)
