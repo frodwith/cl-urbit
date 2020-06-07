@@ -6,7 +6,7 @@
   (:import-from #:urbit/equality #:same)
   (:import-from #:alexandria #:when-let #:when-let*)
   (:export #:nock #:bottle #:in-world #:fast-hinter
-           #:slog-hinter #:slog #:slog-priority #:slog-tank
+           #:stack-hinter #:slog-hinter #:slog #:slog-priority #:slog-tank
            #:compile-dynamic-hint #:compile-static-hint
            #:hint-tag #:hint-next #:hint-clue
            #:before #:after #:around))
@@ -174,6 +174,8 @@
                           `(@11d-before (,itag ,clue-form) ,next-form ,data))
                         (:after
                           `(@11d-after (,itag ,clue-form) ,next-form ,data))
+                        (:catch
+                          `(@11d-catch (,itag ,clue-form) ,next-form ,data))
                         (:around
                           (when (consp data)
                             (destructuring-bind (before . after) data
@@ -191,6 +193,8 @@
                         `(@11s-before ,itag ,next-form ,data))
                       (:after
                         `(@11s-after ,itag ,next-form ,data))
+                      (:catch
+                        `(@11s-catch ,itag ,next-form ,data))
                       (:around
                         (when (consp data)
                           (destructuring-bind (before . after) data
@@ -329,6 +333,21 @@
      (funcall ,handler s clu pro)
      pro))
 
+(defmacro @11s-catch (tag next handler)
+  (declare (ignore tag))
+  `(handler-case ,next
+     (exit (e)
+       (funcall ,handler s e)
+       (error e))))
+
+(defmacro @11d-catch ((tag clue) next handler)
+  (declare (ignore tag))
+  `(let ((clu ,clue))
+     (handler-case ,next
+       (exit (e)
+         (funcall ,handler s clu e)
+         (error e)))))
+
 (defmacro @11s-around (tag form before after)
   (declare (ignore tag))
   `(or (funcall ,before s)
@@ -408,3 +427,14 @@
   (declare (ignore next))
   (when (and clue (= %slog tag))
     (cons :before #'handle-slog)))
+
+(defun stack-handler (tag)
+  (lambda (subject clue exit)
+    (declare (ignore subject))
+    (push (cons tag clue) (exit-stack exit))))
+
+(defun stack-hinter (tag clue next)
+  (declare (ignore next))
+  (when clue
+    (case tag
+      ((%hunk %hand %mean %lose %spot) (cons :catch (stack-handler tag))))))

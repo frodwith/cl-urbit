@@ -1,7 +1,7 @@
 (defpackage #:urbit/data
   (:use #:cl #:urbit/math)
   (:export #:data-error #:unimplemented
-           #:exit #:atom-required #:cell-required
+           #:exit #:exit-stack #:atom-required #:cell-required
            #:deep #:head #:tail #:cl-integer #:dfrag
            #:cached-mug #:cached-ideal #:cached-battery #:cached-speed))
 
@@ -15,7 +15,9 @@
 (define-condition unimplemented (data-error)
   ((name :initarg :name :type symbol)))
 
-(define-condition exit (data-error) ())
+(define-condition exit (data-error) 
+  ((stack :initform nil :accessor exit-stack :type list)))
+
 (define-condition atom-required (exit) ())
 (define-condition cell-required (exit) ())
 
