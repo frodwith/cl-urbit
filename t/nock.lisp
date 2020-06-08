@@ -1,5 +1,5 @@
 (defpackage #:urbit/tests/nock
-  (:use #:cl #:fiveam #:urbit/tests #:urbit/syntax #:urbit/nock 
+  (:use #:cl #:fiveam #:urbit/tests #:urbit/syntax #:urbit/nock #:urbit/hints
         #:urbit/jets #:urbit/equality #:urbit/data))
 
 (in-package #:urbit/tests/nock)

@@ -31,6 +31,7 @@
                  (:file "jets")
                  (:file "equality")
                  (:file "nock")
+                 (:file "hints")
                  )))
   :description "nock runtime and urbit worker process (http://urbit.org)"
   :long-description
