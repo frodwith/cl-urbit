@@ -14,12 +14,8 @@
 
 (defun compose-hinters (a b)
   (lambda (tag clue next)
-    (or (let ((r (funcall a tag clue next)))
-;          (when r (format t "hinter a: ~a ~a ~a ~a~%" tag clue next r))
-          r)
-        (let ((r (funcall b tag clue next)))
-;          (when r (format t "hinter b: ~a ~a ~a ~a~%" tag clue next r))
-          r))))
+    (or (funcall a tag clue next)
+        (funcall b tag clue next))))
 
 ; % fast
 

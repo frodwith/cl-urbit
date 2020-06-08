@@ -385,5 +385,4 @@
        (or (valid-cached-speed ,c)
            (let ((,s (measure ,c)))
              (setf (cached-speed ,c) ,s)
-             ;(format t "measured (bat ~s) ~s~%" (cached-battery ,c) ,s)
              ,s)))))
