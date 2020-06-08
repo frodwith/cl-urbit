@@ -3,7 +3,7 @@
         #:urbit/data #:urbit/ideal #:urbit/world #:urbit/serial)
   (:import-from #:alexandria #:if-let)
   (:import-from #:urbit/data #:exit)
-  (:export #:root #:gate #:get-speed #:get-battery
+  (:export #:jet-root #:jet-core #:gate #:get-speed #:get-battery
            #:measure #:zig-changes-speed
            #:install-child-stencil #:install-root-stencil
            #:load-world #:save-jet-pack #:install-jet-pack))
@@ -162,12 +162,12 @@
   (children nil :type list))
 
 (defstruct (jet-root
-             (:constructor root (name constant driver &rest children))
+             (:constructor jet-root (name constant driver &rest children))
              (:include jet-core))
   (constant nil :type uint))
 
 (defstruct (jet-child
-             (:constructor core (name axis driver &rest children))
+             (:constructor jet-core (name axis driver &rest children))
              (:include jet-core))
   (axis nil :type uint))
 
@@ -197,7 +197,7 @@
 ; probably most of the leaf notes in your jet tree can be expressed
 ; by saying something like (GATE %add (lambda (sample) ...))
 (defun gate (name sample-function)
-  (core name 3 (gate-driver sample-function)))
+  (jet-core name 3 (gate-driver sample-function)))
 
 ; INSTALL-TREE and its helpers should probably only be called by LOAD-WORLD
 (defun install-jet-children (jet-parent parent-kernel)
@@ -385,4 +385,5 @@
        (or (valid-cached-speed ,c)
            (let ((,s (measure ,c)))
              (setf (cached-speed ,c) ,s)
+             ;(format t "measured (bat ~s) ~s~%" (cached-battery ,c) ,s)
              ,s)))))

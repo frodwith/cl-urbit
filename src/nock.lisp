@@ -178,7 +178,7 @@
                             (destructuring-bind (before . after) data
                               `(@11d-around
                                  (,itag ,clue-form)
-                                 ,next-form ,next-formula ,before ,after)))))))
+                                 ,next-form ,before ,after)))))))
                   `(@11d (,itag ,clue-form) ,next-form))))
           (let* ((itag (iint hint))
                  (hinter (funcall (world-hinter *world*)
@@ -204,8 +204,7 @@
 
 ; nock operators implemented as macros
 
-(defmacro ^ (head tail)
-  `(slim-cons ,head ,tail))
+(defmacro ^ (head tail) `(slim-cons ,head ,tail))
 
 (defmacro @0 (ax)
   (case ax
@@ -345,17 +344,18 @@
          (funcall ,handler s clu e)
          (error e)))))
 
-(defmacro @11s-around (tag form before after)
+(defmacro @11s-around (tag next before after)
   (declare (ignore tag))
-  `(or (funcall ,before s)
-       (let ((pro ,form))
-         (funcall ,after s pro)
-         pro)))
+  `(multiple-value-bind (pro token) (funcall ,before s)
+     (unless pro 
+       (setq pro ,next)
+       (funcall ,after token pro))
+     pro))
 
-(defmacro @11d-around ((tag clue) form before after)
+(defmacro @11d-around ((tag clue) next before after)
   (declare (ignore tag))
-  `(let ((clu ,clue))
-     (or (funcall ,before s clu)
-       (let ((pro ,form))
-         (funcall ,after s clu pro)
-         pro))))
+  `(multiple-value-bind (pro token) (funcall ,before s ,clue)
+     (unless pro 
+       (setq pro ,next)
+       (funcall ,after token pro))
+     pro))

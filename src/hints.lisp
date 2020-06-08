@@ -1,13 +1,25 @@
 (defpackage #:urbit/hints
   (:use #:cl #:urbit/data #:urbit/math #:urbit/ideal #:urbit/world
-        #:urbit/jets #:urbit/syntax #:urbit/common)
-  (:export #:handle-fast #:fast-hinter #:bad-fast #:unregistered-parent
+        #:urbit/jets #:urbit/syntax #:urbit/common
+        #:urbit/mug #:urbit/equality)
+  (:export #:compose-hinters
+           #:handle-fast #:fast-hinter #:bad-fast #:unregistered-parent
            #:slog #:handle-slog #:slog-hinter #:slog-priority #:slog-tank
+           #:with-fresh-memos #:memo-hinter
            #:stack-handler #:stack-hinter))
 
 (in-package #:urbit/hints)
 
 (enable-cords)
+
+(defun compose-hinters (a b)
+  (lambda (tag clue next)
+    (or (let ((r (funcall a tag clue next)))
+;          (when r (format t "hinter a: ~a ~a ~a ~a~%" tag clue next r))
+          r)
+        (let ((r (funcall b tag clue next)))
+;          (when r (format t "hinter b: ~a ~a ~a ~a~%" tag clue next r))
+          r))))
 
 ; % fast
 
@@ -75,6 +87,39 @@
   (declare (ignore next))
   (when (and clue (= %slog tag))
     (cons :before #'handle-slog)))
+
+; %memo
+; use WITH-FRESH-MEMOS to dynamically bind a fresh hash table (per road, etc)
+; TODO: use some kind of cache eviction to avoid OOMing (cacle?)
+
+(defvar *memo-table*)
+
+(defun memo= (a b)
+  (and (eq (car a) (car b))
+       (same (cdr a) (cdr b))))
+
+(defun memo-hash (k)
+  (murmugs (icell-mug (car k))
+           (mug (cdr k))))
+
+(sb-ext:define-hash-table-test memo= memo-hash)
+
+(defmacro with-fresh-memos (&body forms)
+  `(let ((*memo-table* (make-hash-table :test 'memo=)))
+     ,@forms))
+
+(defun memo-before (formula)
+  (lambda (subject clue)
+    (declare (ignore clue))
+    (let ((key (cons formula subject)))
+      (values (gethash key *memo-table*) key))))
+
+(defun memo-after (key product)
+  (setf (gethash key *memo-table*) product))
+
+(defun memo-hinter (tag clue next)
+  (when (and clue (= tag %memo))
+    (cons :around (cons (memo-before next) #'memo-after))))
 
 ; ?(%hunk %hand %mean %lose %spot)
 

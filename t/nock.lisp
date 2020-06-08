@@ -1,6 +1,7 @@
 (defpackage #:urbit/tests/nock
   (:use #:cl #:fiveam #:urbit/tests #:urbit/syntax #:urbit/nock #:urbit/hints
-        #:urbit/jets #:urbit/equality #:urbit/data))
+        #:urbit/common #:urbit/jets #:urbit/equality #:urbit/data
+        #:urbit/data/slimatom))
 
 (in-package #:urbit/tests/nock)
 
@@ -141,8 +142,9 @@
 
 (defparameter +ackerman-jets+
   (list
-    (root %kack %kack nil
-          (gate %dec #'mock-dec))))
+    (jet-root
+      %kack %kack nil
+      (gate %dec #'mock-dec))))
 
 (defun ack (n m)
   (nock [n m] (copy-tree [9 2 10 [6 0 1] +ackerman-source+])))
@@ -203,3 +205,88 @@
               (exit (e) (exit-stack e)))))
       (is (equal '((%hunk . 5) (%hand . 4) (%mean . 3) (%spot . 2) (%lose . 1))
                  stack)))))
+
+; !=
+; =<  fib
+; =~  %42
+; ~%  %kern  ~  ~
+; |%
+; ++  version  +
+; --
+; ~%  %one  +  ~
+; |%
+; ++  dec
+;   ~/  %dec
+;   |=  a=@
+;   ?:  =(0 a)  !!
+;   =|  i=@
+;   |-  ^-  @
+;   =/  n  +(i)
+;   ?:  =(n a)
+;     i
+;   $(i n)
+; ::
+; ++  add
+;   ~/  %add
+;   |=  [a=@ b=@]
+;   ?:  =(b 0)  a
+;   %=  $
+;     a  +(a)
+;     b  (dec b)
+;   ==
+; --
+; ~%  %two  +  ~
+; |%
+; ++  fib
+;   ~/  %fib
+;   |=  n=@
+;   ^-  @  ~+
+;   ?:  =(0 n)  0
+;   ?:  =(1 n)  1
+;   =/  a  (dec n)
+;   =/  b  (dec a)
+;   %+  add
+;     $(n a)
+;   $(n b)
+; --  ==
+
+(defparameter +memo-source+
+  [7 [7 [1 42] 7 [8 [1 0 3] 11 [%fast 1 %kern [1 0] 0] 0 1] 7 [8 [1 [7 [8 [1 0 0] [1 6 [5 [0 13] 1 0] [0 12] 9 2 10 [6 [4 0 12] 8 [9 5 0 7] 9 2 10 [6 0 29] 0 2] 0 1] 0 1] 11 [%fast 1 %add [0 7] 0] 0 1] 7 [8 [1 0] [1 6 [5 [1 0] 0 6] [0 0] 8 [1 0] 8 [1 8 [4 0 6] 6 [5 [0 2] 0 62] [0 14] 9 2 10 [6 0 2] 0 3] 9 2 0 1] 0 1] 11 [%fast 1 %dec [0 7] 0] 0 1] 11 [%fast 1 %one [0 3] 0] 0 1] 8 [1 7 [8 [1 0] [1 11 [%memo 1 0] 6 [5 [1 0] 0 6] [1 0] 6 [5 [1 1] 0 6] [1 1] 8 [8 [9 5 0 15] 9 2 10 [6 0 14] 0 2] 8 [8 [9 5 0 31] 9 2 10 [6 0 6] 0 2] 8 [9 4 0 63] 9 2 10 [6 [7 [0 3] 9 2 10 [6 0 6] 0 7] 7 [0 3] 9 2 10 [6 0 2] 0 7] 0 2] 0 1] 11 [%fast 1 %fib [0 7] 0] 0 1] 11 [%fast 1 %two [0 3] 0] 0 1] 9 2 0 1])
+
+(defun memo-dec (sample)
+  (dedata (@@i) sample
+    (if (zerop i)
+        (error 'exit)
+        (slim-malt (1- i)))))
+
+(defun memo-add (sample)
+  (dedata (@@a @@b) sample
+    (slim-malt (+ a b))))
+
+(defvar *memo-count*)
+
+(defun memo-fib (sample)
+  (declare (ignore sample))
+  (incf *memo-count*)
+  nil)
+
+(defparameter +memo-jets+
+  (list
+    (jet-root
+      %kern 42 nil
+      (jet-core
+        %one 1 nil
+        (gate %dec #'memo-dec)
+        (gate %add #'memo-add)
+        (jet-core
+          %two 1 nil
+          (gate %fib #'memo-fib))))))
+
+(test memo
+  (in-world (load-world :hinter (compose-hinters #'memo-hinter #'fast-hinter)
+                        :jet-tree +memo-jets+)
+    (with-fresh-memos
+      (let ((*memo-count* 0))
+        (is (= 55 (nock 0 [9 2 10 [6 1 10] (copy-tree +memo-source+)])))
+        ; 177 without memoization
+        (is (= 19 *memo-count*))))))
