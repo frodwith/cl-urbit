@@ -133,6 +133,7 @@
 (defparameter +ackerman-source+ [7 [7 [1 %kack] 8 [1 [7 [8 [1 0] [1 8 [1 0] 8 [1 8 [4 0 6] 6 [5 [0 2] 0 62] [0 14] 9 2 10 [6 0 2] 0 3] 9 2 0 1] 0 1] 11 [%fast 1 %dec [0 7] 0] 0 1] 7 [8 [1 0 0] [1 6 [5 [1 0] 0 12] [4 0 13] 6 [5 [1 0] 0 13] [9 2 10 [6 [8 [9 4 0 7] 9 2 10 [6 0 28] 0 2] 1 1] 0 1] 9 2 10 [6 [8 [9 4 0 7] 9 2 10 [6 0 28] 0 2] 9 2 10 [13 8 [9 4 0 7] 9 2 10 [6 0 29] 0 2] 0 1] 0 1] 0 1] 11 [%fast 1 %ack [0 7] 0] 0 1] 11 [%fast 1 %kack [1 0] 0] 0 1] 9 5 0 1])
 
 (defvar *mock-dec-calls*)
+
 (defun mock-dec (sam)
   (incf *mock-dec-calls*)
   (let ((i (cl-integer sam)))
@@ -151,10 +152,9 @@
 
 (defparameter +decs-per-call+ 26)
 
-; placeholder
 (test ackerman
-  (setf *mock-dec-calls* 0)
-  (let (pack)
+  (let (pack
+        (*mock-dec-calls* 0))
     ; no mention of jets
     (is (= 7 (bottle (ack 2 2))))
     (is (= 0 *mock-dec-calls*))
@@ -290,3 +290,35 @@
         (is (= 55 (nock 0 [9 2 10 [6 1 10] (copy-tree +memo-source+)])))
         ; 177 without memoization
         (is (= 19 *memo-count*))))))
+
+(test fast-parent
+  (macrolet ((pfp (parent &body forms)
+               `(multiple-value-bind (valid axis)
+                  (urbit/hints::parse-fast-parent ,parent)
+                  ,@forms)))
+    (pfp [11 %slog 1 0]
+      (is-true valid)
+      (is (null axis)))
+    (pfp [11 %slog 11 %slog 1 0]
+      (is-true valid)
+      (is (null axis)))
+    (pfp [11 %slog 11 %slog 1 1]
+      (is (not valid))
+      (is (null axis)))
+    (pfp [11 %slog 11 %foo 0 1]
+      (is (not valid))
+      (is (null axis)))
+    (pfp [11 %slog 11 %foo 0 4]
+      (is (not valid))
+      (is (null axis)))
+    (pfp [11 %slog 11 %foo 0 7]
+      (is-true valid)
+      (is (= 7 axis)))))
+
+(test fast-name
+  (macrolet ((p (&rest args) `(urbit/hints::parse-fast-name ,@args)))
+    (is (= %foo (p %foo)))
+    (is (= %barbazquux (p %barbazquux)))
+    (is (= %foo42 (p [%foo 42])))
+    (is (null (p [1 42 %foo])))
+    (is (null (p [%foo 0 42])))))

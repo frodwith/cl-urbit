@@ -28,38 +28,71 @@
   ((clue :initarg :clud)
    (core :initarg :core)))
 
+(defun parse-fast-name (name)
+  (if (not (deep name))
+      name
+      (let ((str (head name))
+            (num (tail name)))
+        (unless (or (deep str) (deep num))
+          (string->cord (format nil "~a~d" (cord->string str) num))))))
+
+(defun parse-fast-parent (parent)
+  ; skip hints and give (t nil) for root, (t ax) for child, or nil
+  (loop for n = parent then tail
+        while (deep n)
+        for head = (head n)
+        until (deep head)
+        for tail = (tail n)
+        do (case (cl-integer head)
+             (0 (return
+                  (unless (deep tail)
+                    (let ((ax (cl-integer tail)))
+                      (when (and (> ax 2) (tax ax))
+                        (values t ax))))))
+             (1 (return
+                  (unless (deep tail)
+                    (when (zerop tail)
+                      (values t nil)))))
+             (11 (if (deep tail)
+                     (setq tail (tail tail))
+                     (return nil)))
+             (t (return nil)))))
+
 (defun handle-fast (subject clue core)
   (declare (ignore subject))
-  (block
-    register
-    (let ((spd (get-speed core)))
-      (unless (typep spd 'fast)
-        (handler-case
-          (dedata (@name (@num @ax) hooks) clue
-            (case num
-              (0 (when (and (> ax 2) (tax ax))
-                   (let* ((parent (dfrag ax core))
-                          (pspeed (get-speed parent)))
-                     (when (typep pspeed 'fast)
-                       (setf (cached-speed core)
-                             (install-child-stencil
-                               name (head core) (mas ax)
-                               pspeed (get-ideal hooks)))
-                       (return-from register))
-                     (warn 'unregistered-parent
-                           :name name :core core :axis ax))))
-              (1 (when (zerop ax)
-                   (let ((payload (tail core)))
-                     (unless (deep payload)
-                       (setf (cached-speed core)
-                             (install-root-stencil
-                               name
-                               (get-ideal-cell core)
-                               (get-ideal hooks)))
-                       (return-from register)))))))
-          (exit () nil))
-        (warn 'bad-fast :clue clue :core core))
-      (setf (cached-speed core) spd))))
+  (let ((spd (get-speed core)))
+    (unless (typep spd 'fast)
+      (symbol-macrolet ((bad '(warn 'bad-fast :clue clue :core core)))
+        (macrolet ((sure (test w &body forms)
+                     `(if ,test (progn ,@forms) ,w)))
+          (sure (deep clue) bad
+            (let ((name (parse-fast-name (head clue))))
+              (sure name bad
+                (let* ((more (tail clue)))
+                  (sure (deep more) bad
+                    (let ((pform (head more))
+                          (hooks (tail more)))
+                      (multiple-value-bind (valid axis)
+                        (parse-fast-parent pform)
+                        (sure valid bad
+                          (if (null axis)
+                            (let ((payload (tail core)))
+                              (sure (not (deep payload)) bad
+                                (setf (cached-speed core)
+                                      (install-root-stencil
+                                        name
+                                        (get-ideal-cell core)
+                                        (get-ideal hooks)))))
+                            (let* ((parent (dfrag axis core))
+                                   (pspeed (get-speed parent)))
+                              (sure (typep pspeed 'fast)
+                                    (warn 'unregistered-parent
+                                          :name name :core core :axis axis)
+                                    (setf (cached-speed core)
+                                          (install-child-stencil
+                                            name (head core) (mas axis)
+                                            pspeed
+                                            (get-ideal hooks)))))))))))))))))))
 
 (defun fast-hinter (tag clue next)
   (declare (ignore next))
@@ -118,6 +151,7 @@
     (cons :around (cons (memo-before next) #'memo-after))))
 
 ; ?(%hunk %hand %mean %lose %spot)
+; TODO: should make 5 handlers and pick rather than make a closure
 
 (defun stack-handler (tag)
   (lambda (subject clue exit)
