@@ -200,7 +200,7 @@
                 `(@11s ,itag ,next-form)))))))
 
 (defun compile-12 (a)
-  `(@12 ,a))
+  `(@12 ,(compile-noun a)))
 
 ; nock operators implemented as macros
 
@@ -262,9 +262,48 @@
          (let ((f (@0 ,axis)))
            (or ,@jet-forms (@2 s f))))))
 
+(defun slam (gate sample)
+  (let ((gate-speed (get-speed gate))
+        (battery (get-battery gate)))
+    (if (typep gate-speed 'void)
+        (error 'cell-required :given battery)
+        (let* ((context (tail (tail gate)))
+               (payload (slim-cons sample context))
+               (mutant-speed (if (zig-changes-speed #*10 gate-speed)
+                                 (measure-battery battery payload)
+                                 gate-speed))
+              (subject (core-cons battery payload mutant-speed nil)))
+          (or (call-jet subject 1)
+              (funcall (formula-function (icell-formula battery))
+                       subject))))))
+
+(define-condition need (error)
+  ((sample :initarg :argument :reader need-sample)))
+
+(define-condition meta (error)
+  ((cause :initarg :cause :reader meta-cause :type condition)))
+
+(defvar *meta-gate*)
+
 (defmacro @12 (a)
-  (declare (ignore a))
-  +crash+)
+  `(if (boundp *meta-gate*)
+       (let* ((sam ,a)
+              (pro (handler-case (slam *meta-gate* sam)
+                     (exit (e) (error 'meta :cause e)))))
+         (if (deep pro)
+             (let ((u (tail pro)))
+               (if (deep u)
+                   (tail u)
+                   (exit-with (cons %hunk sam))))
+             (error 'need :sample sam)))
+       ,+crash+))
+
+(defmacro soft (fly &body forms)
+  `(let ((*meta-gate* ,fly))
+     (handler-case (values :success ,@forms)
+       (meta (e) (error (meta-cause e)))
+       (need (e) (values :block (need-sample e)))
+       (exit (e) (values :error (exit-stack e))))))
 
 (defun econs (z old head tail)
   (declare (zig z))

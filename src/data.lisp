@@ -1,7 +1,7 @@
 (defpackage #:urbit/data
   (:use #:cl #:urbit/math)
   (:export #:data-error #:unimplemented
-           #:exit #:exit-stack #:atom-required #:cell-required
+           #:exit #:exit-with #:exit-stack #:atom-required #:cell-required
            #:deep #:head #:tail #:cl-integer #:dfrag
            #:cached-mug #:cached-ideal #:cached-battery #:cached-speed))
 
@@ -17,6 +17,11 @@
 
 (define-condition exit (data-error) 
   ((stack :initform nil :accessor exit-stack :type list)))
+
+(defun exit-with (stack-item)
+  (let ((e (make-condition 'exit)))
+    (push stack-item (exit-stack ex))
+    (error e)))
 
 (define-condition atom-required (exit) ())
 (define-condition cell-required (exit) ())

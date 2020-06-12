@@ -4,7 +4,7 @@
   (:import-from #:alexandria #:if-let)
   (:import-from #:urbit/data #:exit)
   (:export #:jet-root #:jet-core #:gate #:get-speed #:get-battery
-           #:measure #:zig-changes-speed
+           #:measure #:measure-battery #:zig-changes-speed
            #:install-child-stencil #:install-root-stencil
            #:load-world #:save-jet-pack #:install-jet-pack))
 
@@ -369,14 +369,18 @@
         (setf (cached-battery core) i)
         i)))
 
+(defun measure-battery (battery-icell payload)
+  (declare (icell battery-icell))
+  (let ((bat (icell-battery battery-icell)))
+    (if-let (m (battery-match bat))
+      (funcall (match-meter m) payload)
+      (battery-stable bat)))) ; mean
+
 (defun measure (core)
-  (let ((head (get-battery core)))
-    (if (not (ideep head))
-        :void   
-        (let ((battery (icell-battery head)))
-          (if-let (m (battery-match battery))
-            (funcall (match-meter m) (tail core))
-            (battery-stable battery)))))) ; mean
+  (let ((battery (get-battery core)))
+    (if (ideep battery)
+        (measure-battery battery (tail core))
+        :void)))
 
 (defmacro get-speed (core)
   (let ((c (gensym))
