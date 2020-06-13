@@ -21,6 +21,9 @@
            :description "test various utility hints"
            :in nock-tests)
 
+(def-suit soft-tests
+          :description "test virtualization/scry")
+
 (in-suite basic-nock-tests)
 
 (enable-syntax)
@@ -322,3 +325,89 @@
     (is (= %foo42 (p [%foo 42])))
     (is (null (p [1 42 %foo])))
     (is (null (p [%foo 0 42])))))
+
+(in-suite soft-tests)
+
+(defmacro soft-success (got expected)
+  (let ((g (gensym) (e (gensym))))
+    `(let ((,g ,got) (,e ,expected))
+       (is (zerop (car g)))
+       (is (same ,e (cdr ,g))))))
+
+(defmacro soft-blocks (got expected-tail)
+  (let ((g (gensym) (e (gensym))))
+    `(let ((,g ,got) (,e ,expected-tail))
+       (is (= 1 (car ,g)))
+       (is (same ,e (tail (cdr ,g)))))))
+
+(defmacro soft-never (got)
+  `(is (= 2 (car ,got))))
+
+(defmacro soft-throws (&body forms)
+  (signals exit ,@forms))
+
+(defparameter +wisher-source+ [1 12 [1 151 %atom 116 0] 0 1])
+
+(defun soft-scry (path &rest gates)
+  (labels ((rec (gates)
+             (destructuring-bind (g . more) gates
+               (multiple-value-bind (key val)
+                 (soft g
+                   (if (null more)
+                       (nock path (copy-tree +wisher-source+))
+                       (rec more)))
+                 (cons (case key
+                         (:success 0)
+                         (:block 1)
+                         (:error 2))
+                       val)))))
+    (rec gates)))
+
+(defun soft-test-fly ()
+  (copy-tree [[6 [6 [3 0 13] [1 1] 1 0] [1 0 0] 6 [5 [0 26] 1 98] [1 0] 6 [5 [0 26] 1 99] [0 0] 1 0 0 42] 0 0]))
+
+(defun soft-cd ()
+  (copy-tree [99 100]))
+
+(defun soft-bc ()
+  (copy-tree [98 99 0]))
+
+(defun soft-abcd ()
+  (copy-tree [97 98 99 100]))
+
+(test basic
+  (bottle
+    (let ((always42 (copy-tree [[1 0 0 42] 0])))
+      (soft (soft-success (soft-scry 0 always42) 42)))))
+
+(test crash
+  (bottle
+    (let ((crash (copy-tree [[0 0] 0 0])))
+      (soft-throws (soft-scry 0 crash)))))
+
+(test full
+  (bottle
+    (let ((cd (soft-cd))
+          (bc (soft-bc))
+          (abcd (soft-abcd))
+          (test (soft-test-fly)))
+      (soft-never (soft-scry 0 test))
+      (soft-throws (soft-scry cd test))
+      (soft-blocks (soft-scry bc test) bc)
+      (soft-success (soft-scry abcd test) 42))))
+
+(test top
+  (bottle
+    (soft-throws (nock 0 (copy-tree [12 [1 0] 1 97 98 99 0])))))
+
+(test nested
+  (bottle
+    (let ((pass-thru (copy-tree [1 [[1 0] [1 0] 12 [0 12] 0 13] 0 0]))
+          (cd (soft-cd)) 
+          (bc (soft-bc))
+          (abcd (soft-abcd)) 
+          (test (soft-test-fly)))
+      (soft-success (soft-scry abcd test pass-thru pass-thru) 42)
+      (soft-blocks (soft-scry bc test pass-thru) bc)
+      (soft-throws (soft-scry 0 test pass-thru))
+      (soft-throws (soft-scry cd test)))))
