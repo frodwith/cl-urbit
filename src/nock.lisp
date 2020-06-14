@@ -356,6 +356,12 @@
        (funcall ,after token pro))
      pro))
 
+; we make use of the condition system because it allows us to directly express
+; the desired control flow, but not all environments have sufficiently rich
+; constructs. Alternatively, a stack of djinn gates can pushed onto in soft and
+; popped from on 12, and a special wrapper exit can thrown when slamming the
+; djinn gate exits, handled by soft by rethrowing the wrapped exit.
+
 (define-condition wish ()
   ((sample :initarg :sample :reader wish-sample)))
 
