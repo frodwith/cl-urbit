@@ -1,10 +1,10 @@
 (defpackage #:urbit/jets
-  (:use #:cl #:urbit/common #:urbit/math #:urbit/zig
+  (:use #:cl #:urbit/common #:urbit/math #:urbit/zig #:urbit/data/core
         #:urbit/data #:urbit/ideal #:urbit/world #:urbit/serial)
   (:import-from #:alexandria #:if-let)
   (:import-from #:urbit/data #:exit)
   (:export #:jet-root #:jet-core #:gate #:get-speed #:get-battery
-           #:measure #:measure-battery #:zig-changes-speed
+           #:measure #:measure-battery #:zig-changes-speed #:cell->core
            #:install-child-stencil #:install-root-stencil
            #:load-world #:save-jet-pack #:install-jet-pack))
 
@@ -344,24 +344,60 @@
              ,@case-pairs
              (t (cons :slug ,assumption)))))))
 
+(defmacro get-speed (core)
+  (let ((c (gensym))
+        (s (gensym)))
+    `(let ((,c ,core))
+       (or (valid-cached-speed ,c)
+           (let ((,s (measure ,c)))
+             (setf (cached-speed ,c) ,s)
+             ,s)))))
+
+(defun cell->core (cell)
+  (typecase cell
+    (core cell)
+    (t (let ((spd (get-speed cell)))
+         ; assumes get-speed will populate cached-battery
+         (core-cons (cached-battery cell) (tail cell) spd
+                    (or (cached-ideal cell) (cached-mug cell)))))))
+
+(defun zig-compile-parent-frag (z payload)
+  (let ((len (length z)))
+    (if (zerop len)
+        `(if (deep ,payload)
+             (get-speed ,payload)
+             (values nil ,z))
+        (let* ((less (1- len))
+               (last-accessor (if (zerop (bit z less)) 'head 'tail))
+               (subz (subseq z 0 less)))
+          `(multiple-value-bind (last-cell fail)
+             ,(zig-compile-fail subz payload 'head 'tail 'deep)
+             (if (null last-cell)
+                 (values nil fail)
+                 (if (not (deep last-cell))
+                     (values nil ,subz)
+                     (let ((core-cell (,last-accessor last-cell)))
+                       (if (not (deep core-cell))
+                           (values nil ,z)
+                           (let ((core (cell->core core-cell)))
+                             (setf (,last-accessor last-cell) core)
+                             (core-speed core)))))))))))
+
 (defun compile-child-meter (assumption z case-pairs)
   (compile
     nil
     `(lambda (payload)
        (if (not (deep payload))
            #* ; stop whole payload
-           (multiple-value-bind (parent fail)
-             ,(zig-compile-fail z 'payload 'head 'tail 'deep)
-             (if (null parent)
+           (multiple-value-bind (pspd fail)
+             ,(zig-compile-parent-frag z 'payload)
+             (if (null pspd)
                  fail ; stop at fail axis
-                 (if (not (deep parent))
-                     ,z ; stop at parent axis
-                     (let ((pspd (get-speed parent)))
-                       (case pspd
-                         ,@case-pairs
-                         (t (if (typep pspd 'fast)
-                                (make-spry ,z pspd ',assumption)
-                                (make-slow ,z pspd))))))))))))
+                 (case pspd
+                   ,@case-pairs
+                   (t (if (typep pspd 'fast)
+                          (make-spry ,z pspd ',assumption)
+                          (make-slow ,z pspd))))))))))
 
 (defun get-battery (core)
   (or (cached-battery core)
@@ -381,12 +417,3 @@
     (if (ideep battery)
         (measure-battery battery (tail core))
         :void)))
-
-(defmacro get-speed (core)
-  (let ((c (gensym))
-        (s (gensym)))
-    `(let ((,c ,core))
-       (or (valid-cached-speed ,c)
-           (let ((,s (measure ,c)))
-             (setf (cached-speed ,c) ,s)
-             ,s)))))
