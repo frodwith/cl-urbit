@@ -58,6 +58,26 @@
                      (return nil)))
              (t (return nil)))))
 
+(defun frag-to-parent (axis core)
+  (if (= 1 axis)
+      (cell->core core)
+      (loop for a = axis then (mas a)
+            for o = core then (if (deep o)
+                                  (if (tax a) (tail o) (head o))
+                                  (return nil))
+            while (> a 3)
+            finally (if (not (deep o))
+                        (return nil)
+                        (let* ((head (= 2 a))
+                               (cnoun (if head (head o) (tail o))))
+                          (if (deep cnoun)
+                              (let ((parent (cell->core cnoun)))
+                                (if head
+                                    (setf (head o) parent)
+                                    (setf (tail o) parent))
+                                (return parent))
+                              (return nil)))))))
+
 (defun handle-fast (subject clue core)
   (declare (ignore subject))
   (let ((spd (get-speed core)))
@@ -83,16 +103,19 @@
                                         name
                                         (get-ideal-cell core)
                                         (get-ideal hooks)))))
-                            (let* ((parent (dfrag axis core))
-                                   (pspeed (get-speed parent)))
-                              (sure (typep pspeed 'fast)
-                                    (warn 'unregistered-parent
-                                          :name name :core core :axis axis)
-                                    (setf (cached-speed core)
-                                          (install-child-stencil
-                                            name (head core) (mas axis)
-                                            pspeed
-                                            (get-ideal hooks)))))))))))))))))))
+                            (let ((parent (frag-to-parent axis core)))
+                              (symbol-macrolet
+                                ((unregistered (warn 'unregistered-parent
+                                                     :name name :core core
+                                                     :axis axis)))
+                                (sure parent unregistered
+                                  (let ((pspd (core-speed parent)))
+                                    (sure (typep pspd 'fast) unregistered
+                                      (setf (cached-speed core)
+                                            (install-child-stencil
+                                              name (head core) (mas axis)
+                                              pspd
+                                              (get-ideal hooks))))))))))))))))))))))
 
 (defun fast-hinter (tag clue next)
   (declare (ignore next))
