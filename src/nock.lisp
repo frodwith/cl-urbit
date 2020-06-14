@@ -1,6 +1,6 @@
 (defpackage #:urbit/nock
   (:use #:cl #:urbit/math #:urbit/zig #:urbit/jets #:urbit/equality
-        #:urbit/ideal #:urbit/world #:urbit/data #:urbit/common
+        #:urbit/ideal #:urbit/world #:urbit/data #:urbit/common #:urbit/syntax
         #:urbit/data/core #:urbit/data/slimcell #:urbit/data/slimatom)
   (:import-from #:alexandria #:when-let #:when-let*)
   (:export #:nock #:bottle #:in-world #:soft #:need #:need-sample
@@ -262,22 +262,6 @@
          (let ((f (@0 ,axis)))
            (or ,@jet-forms (@2 s f))))))
 
-(defun slam (gate sample)
-  (let ((gate-speed (get-speed gate))
-        (battery (get-battery gate)))
-    (if (typep gate-speed 'void)
-        (error 'cell-required :given battery)
-        (let* ((context (tail (tail gate)))
-
-               (payload (slim-cons sample context))
-               (mutant-speed (if (zig-changes-speed #*10 gate-speed)
-                                 (measure-battery battery payload)
-                                 gate-speed))
-              (subject (core-cons battery payload mutant-speed nil)))
-          (or (call-jet subject 1)
-              (funcall (formula-function (icell-formula battery))
-                       subject))))))
-
 (defun econs (z old head tail)
   (declare (zig z))
   (let ((spd (valid-cached-speed old)))
@@ -372,35 +356,51 @@
        (funcall ,after token pro))
      pro))
 
-(define-condition escape ()
-  ((sample :initarg :sample :reader escape-sample)))
+(define-condition wish ()
+  ((sample :initarg :sample :reader wish-sample)))
 
 (define-condition need (error)
   ((sample :initarg :sample :reader need-sample)))
 
-(defparameter +hunk+ (string->cord "hunk"))
+(enable-syntax)
 
 (defmacro @12 (a)
-  `(let ((sam ,a))
-     (or (restart-case (signal 'escape :sample sam)
-           (meta-respond (r)
-             (if (deep r)
-                 (let ((u (tail r)))
+  `(let ((sample ,a))
+     (or (restart-case (signal 'wish :sample sample)
+           (meta-grant (boon)
+             (if (deep boon)
+                 (let ((u (tail boon)))
                    (if (deep u)
                        (tail u)
-                       (exit-with (cons +hunk+ sam))))
-                 (error 'need :sample sam))))
+                       (exit-with [%hunk sample])))
+                 (error 'need :sample sample))))
          ,+crash+)))
 
-(defun escape-handler (fly)
-  (lambda (e)
-    (handler-case
-      (invoke-restart 'meta-respond (slam fly (escape-sample e)))
-      (exit (e) (invoke-restart 'meta-crash e)))))
+(defun slam (gate sample)
+  (let ((gate-speed (get-speed gate))
+        (battery (get-battery gate)))
+    (if (typep gate-speed 'void)
+        (error 'cell-required :given battery)
+        (let* ((context (tail (tail gate)))
+               (payload (slim-cons sample context))
+               (mutant-speed (if (zig-changes-speed #*10 gate-speed)
+                                 (measure-battery battery payload)
+                                 gate-speed))
+              (subject (core-cons battery payload mutant-speed nil)))
+          (or (call-jet subject 1)
+              (funcall (formula-function (icell-formula battery))
+                       subject))))))
 
-(defmacro soft (fly &body forms)
+(defun djinn (gate)
+  (lambda (wish)
+    (let* ((sample (wish-sample wish))
+           (response (handler-case (slam gate sample)
+                       (exit (e) (invoke-restart 'meta-crash e)))))
+      (invoke-restart 'meta-grant response))))
+
+(defmacro soft (gate &body forms)
   `(restart-case
-     (handler-bind ((escape (escape-handler ,fly)))
+     (handler-bind ((wish (djinn ,gate)))
        (handler-case (values :success (progn ,@forms))
          (need (e) (values :block (need-sample e)))
          (exit (e) (values :error (exit-stack e)))))
