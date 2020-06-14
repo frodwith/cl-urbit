@@ -356,31 +356,16 @@
        (funcall ,after token pro))
      pro))
 
-; we make use of the condition system because it allows us to directly express
-; the desired control flow, but not all environments have sufficiently rich
-; constructs. Alternatively, a stack of djinn gates can pushed onto in soft and
-; popped from on 12, and a special wrapper exit can thrown when slamming the
-; djinn gate exits, handled by soft by rethrowing the wrapped exit.
-
-(define-condition wish ()
-  ((sample :initarg :sample :reader wish-sample)))
+; get the effect of establishing a new "toplevel" by dynamically binding to nil
+(defparameter *djinn-stack* nil)
 
 (define-condition need (error)
   ((sample :initarg :sample :reader need-sample)))
 
-(enable-syntax)
+(define-condition meta ()
+  ((exit :initarg :exit :reader meta-exit)))
 
-(defmacro @12 (a)
-  `(let ((sample ,a))
-     (or (restart-case (signal 'wish :sample sample)
-           (meta-grant (boon)
-             (if (deep boon)
-                 (let ((u (tail boon)))
-                   (if (deep u)
-                       (tail u)
-                       (exit-with [%hunk sample])))
-                 (error 'need :sample sample))))
-         ,+crash+)))
+(enable-syntax)
 
 (defun slam (gate sample)
   (let ((gate-speed (get-speed gate))
@@ -397,18 +382,24 @@
               (funcall (formula-function (icell-formula battery))
                        subject))))))
 
-(defun djinn (gate)
-  (lambda (wish)
-    (let* ((sample (wish-sample wish))
-           (response (handler-case (slam gate sample)
-                       (exit (e) (invoke-restart 'meta-crash e)))))
-      (invoke-restart 'meta-grant response))))
+(defmacro @12 (a)
+  `(if (null *djinn-stack*)
+      ,+crash+
+      (let* ((sample ,a)
+             (djinn (car *djinn-stack*))
+             (boon (let ((*djinn-stack* (cdr *djinn-stack*)))
+                     (handler-case (slam djinn sample)
+                       (exit (e) (error 'meta :exit e))))))
+        (if (deep boon)
+            (let ((u (tail boon)))
+              (if (deep u)
+                  (tail u)
+                  (exit-with [%hunk sample])))
+            (error 'need :sample sample)))))
 
 (defmacro soft (gate &body forms)
-  `(restart-case
-     (handler-bind ((wish (djinn ,gate)))
-       (handler-case (values :success (progn ,@forms))
-         (need (e) (values :block (need-sample e)))
-         (exit (e) (values :error (exit-stack e)))))
-     (meta-crash (e)
-       (error e))))
+  `(let ((*djinn-stack* (cons ,gate *djinn-stack*)))
+     (handler-case (values :success (progn ,@forms))
+       (exit (e) (values :error (exit-stack e)))
+       (need (n) (values :block (need-sample n)))
+       (meta (m) (error (meta-exit m))))))
