@@ -21,8 +21,9 @@
            :description "test various utility hints"
            :in nock-tests)
 
-(def-suit soft-tests
-          :description "test virtualization/scry")
+(def-suite soft-tests
+           :description "test virtualization/scry"
+           :in nock-tests)
 
 (in-suite basic-nock-tests)
 
@@ -329,13 +330,13 @@
 (in-suite soft-tests)
 
 (defmacro soft-success (got expected)
-  (let ((g (gensym) (e (gensym))))
+  (let ((g (gensym)) (e (gensym)))
     `(let ((,g ,got) (,e ,expected))
-       (is (zerop (car g)))
+       (is (zerop (car ,g)))
        (is (same ,e (cdr ,g))))))
 
 (defmacro soft-blocks (got expected-tail)
-  (let ((g (gensym) (e (gensym))))
+  (let ((g (gensym)) (e (gensym)))
     `(let ((,g ,got) (,e ,expected-tail))
        (is (= 1 (car ,g)))
        (is (same ,e (tail (cdr ,g)))))))
@@ -344,26 +345,34 @@
   `(is (= 2 (car ,got))))
 
 (defmacro soft-throws (&body forms)
-  (signals exit ,@forms))
+  `(signals exit ,@forms))
 
-(defparameter +wisher-source+ [1 12 [1 151 %atom 116 0] 0 1])
+(defparameter +wisher-source+ [12 [1 151 %atom 116 0] 0 1])
 
 (defun soft-scry (path &rest gates)
   (labels ((rec (gates)
-             (destructuring-bind (g . more) gates
-               (multiple-value-bind (key val)
-                 (soft g
-                   (if (null more)
-                       (nock path (copy-tree +wisher-source+))
-                       (rec more)))
-                 (cons (case key
-                         (:success 0)
-                         (:block 1)
-                         (:error 2))
-                       val)))))
-    (rec gates)))
+             (soft (car gates)
+               (let ((more (cdr gates)))
+                 (if (null more)
+                     (nock path (copy-tree +wisher-source+))
+                     (multiple-value-bind (key val) (rec (cdr gates))
+                       (ecase key
+                         (:success val)
+                         (:block (error 'need :sample val))
+                         (:error (let ((e (make-condition 'exit)))
+                                   (setf (exit-stack e) val)
+                                   (error e))))))))))
+    (multiple-value-bind (key val) (rec gates)
+      (ecase key
+        (:success (cons 0 val))
+        (:block (cons 1 val))
+        (:error (cons 2 val))))))
 
 (defun soft-test-fly ()
+  ; [~ ~] on empty path,
+  ; block on paths starting with /b,
+  ; !! crash on /c,
+  ; else ``42
   (copy-tree [[6 [6 [3 0 13] [1 1] 1 0] [1 0 0] 6 [5 [0 26] 1 98] [1 0] 6 [5 [0 26] 1 99] [0 0] 1 0 0 42] 0 0]))
 
 (defun soft-cd ()
@@ -375,17 +384,17 @@
 (defun soft-abcd ()
   (copy-tree [97 98 99 100]))
 
-(test basic
+(test soft-basic
   (bottle
-    (let ((always42 (copy-tree [[1 0 0 42] 0])))
-      (soft (soft-success (soft-scry 0 always42) 42)))))
+    (let ((always42 (copy-tree [[1 0 0 42] 0 0])))
+      (soft-success (soft-scry 0 always42) 42))))
 
-(test crash
+(test soft-crash
   (bottle
     (let ((crash (copy-tree [[0 0] 0 0])))
       (soft-throws (soft-scry 0 crash)))))
 
-(test full
+(test soft-full
   (bottle
     (let ((cd (soft-cd))
           (bc (soft-bc))
@@ -396,18 +405,18 @@
       (soft-blocks (soft-scry bc test) bc)
       (soft-success (soft-scry abcd test) 42))))
 
-(test top
+(test soft-top
   (bottle
     (soft-throws (nock 0 (copy-tree [12 [1 0] 1 97 98 99 0])))))
 
-(test nested
+(test soft-nested
   (bottle
-    (let ((pass-thru (copy-tree [1 [[1 0] [1 0] 12 [0 12] 0 13] 0 0]))
+    (let ((pass-thru (copy-tree [[[1 0] [1 0] 12 [0 12] 0 13] [0 0] 0]))
           (cd (soft-cd)) 
           (bc (soft-bc))
           (abcd (soft-abcd)) 
           (test (soft-test-fly)))
       (soft-success (soft-scry abcd test pass-thru pass-thru) 42)
-      (soft-blocks (soft-scry bc test pass-thru) bc)
-      (soft-throws (soft-scry 0 test pass-thru))
-      (soft-throws (soft-scry cd test)))))
+      (soft-blocks (soft-scry bc test pass-thru pass-thru) bc)
+      (soft-never (soft-scry 0 test pass-thru pass-thru))
+      (soft-never (soft-scry cd test pass-thru pass-thru)))))

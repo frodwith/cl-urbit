@@ -20,7 +20,7 @@
 
 (defun exit-with (stack-item)
   (let ((e (make-condition 'exit)))
-    (push stack-item (exit-stack ex))
+    (push stack-item (exit-stack e))
     (error e)))
 
 (define-condition atom-required (exit) ())

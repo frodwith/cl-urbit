@@ -3,7 +3,7 @@
         #:urbit/ideal #:urbit/world #:urbit/data #:urbit/common
         #:urbit/data/core #:urbit/data/slimcell #:urbit/data/slimatom)
   (:import-from #:alexandria #:when-let #:when-let*)
-  (:export #:nock #:bottle #:in-world
+  (:export #:nock #:bottle #:in-world #:soft #:need #:need-sample
            #:compile-dynamic-hint #:compile-static-hint
            #:hint-tag #:hint-next #:hint-clue
            #:before #:after #:around))
@@ -268,6 +268,7 @@
     (if (typep gate-speed 'void)
         (error 'cell-required :given battery)
         (let* ((context (tail (tail gate)))
+
                (payload (slim-cons sample context))
                (mutant-speed (if (zig-changes-speed #*10 gate-speed)
                                  (measure-battery battery payload)
@@ -276,34 +277,6 @@
           (or (call-jet subject 1)
               (funcall (formula-function (icell-formula battery))
                        subject))))))
-
-(define-condition need (error)
-  ((sample :initarg :argument :reader need-sample)))
-
-(define-condition meta (error)
-  ((cause :initarg :cause :reader meta-cause :type condition)))
-
-(defvar *meta-gate*)
-
-(defmacro @12 (a)
-  `(if (boundp *meta-gate*)
-       (let* ((sam ,a)
-              (pro (handler-case (slam *meta-gate* sam)
-                     (exit (e) (error 'meta :cause e)))))
-         (if (deep pro)
-             (let ((u (tail pro)))
-               (if (deep u)
-                   (tail u)
-                   (exit-with (cons %hunk sam))))
-             (error 'need :sample sam)))
-       ,+crash+))
-
-(defmacro soft (fly &body forms)
-  `(let ((*meta-gate* ,fly))
-     (handler-case (values :success ,@forms)
-       (meta (e) (error (meta-cause e)))
-       (need (e) (values :block (need-sample e)))
-       (exit (e) (values :error (exit-stack e))))))
 
 (defun econs (z old head tail)
   (declare (zig z))
@@ -398,3 +371,38 @@
        (setq pro ,next)
        (funcall ,after token pro))
      pro))
+
+(define-condition escape ()
+  ((sample :initarg :sample :reader escape-sample)))
+
+(define-condition need (error)
+  ((sample :initarg :sample :reader need-sample)))
+
+(defparameter +hunk+ (string->cord "hunk"))
+
+(defmacro @12 (a)
+  `(let ((sam ,a))
+     (or (restart-case (signal 'escape :sample sam)
+           (meta-respond (r)
+             (if (deep r)
+                 (let ((u (tail r)))
+                   (if (deep u)
+                       (tail u)
+                       (exit-with (cons +hunk+ sam))))
+                 (error 'need :sample sam))))
+         ,+crash+)))
+
+(defun escape-handler (fly)
+  (lambda (e)
+    (handler-case
+      (invoke-restart 'meta-respond (slam fly (escape-sample e)))
+      (exit (e) (invoke-restart 'meta-crash e)))))
+
+(defmacro soft (fly &body forms)
+  `(restart-case
+     (handler-bind ((escape (escape-handler ,fly)))
+       (handler-case (values :success (progn ,@forms))
+         (need (e) (values :block (need-sample e)))
+         (exit (e) (values :error (exit-stack e)))))
+     (meta-crash (e)
+       (error e))))
