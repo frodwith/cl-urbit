@@ -329,46 +329,51 @@
 
 (in-suite soft-tests)
 
-(defmacro soft-success (got expected)
-  (let ((g (gensym)) (e (gensym)))
-    `(let ((,g ,got) (,e ,expected))
-       (is (zerop (car ,g)))
-       (is (same ,e (cdr ,g))))))
+(defmacro succeeds (expected got)
+  (let ((key (gensym))
+        (val (gensym)))
+    `(multiple-value-bind (,key ,val) ,got
+       (is (eq :success ,key))
+       (is (same ,expected ,val)))))
 
-(defmacro soft-blocks (got expected-tail)
-  (let ((g (gensym)) (e (gensym)))
-    `(let ((,g ,got) (,e ,expected-tail))
-       (is (= 1 (car ,g)))
-       (is (same ,e (tail (cdr ,g)))))))
+(defmacro blocks (expected-tail got)
+  (let ((key (gensym))
+        (val (gensym)))
+    `(multiple-value-bind (,key ,val) ,got
+       (is (eq :block ,key))
+       (is (same ,expected-tail (tail ,val))))))
 
-(defmacro soft-never (got)
-  `(is (= 2 (car ,got))))
+(defmacro hunks (got)
+  (let ((key (gensym))
+        (val (gensym)))
+    `(multiple-value-bind (,key ,val) ,got
+       (declare (ignore ,val))
+       (is (eq :error ,key)))))
 
-(defmacro soft-throws (&body forms)
+(defmacro exits (&body forms)
   `(signals exit ,@forms))
 
 (defparameter +wisher-source+ [12 [1 151 %atom 116 0] 0 1])
 
-(defun soft-scry (path &rest gates)
+(defmacro layers ((&rest gates) &body forms)
   (labels ((rec (gates)
-             (soft (car gates)
-               (let ((more (cdr gates)))
-                 (if (null more)
-                     (nock path (copy-tree +wisher-source+))
-                     (multiple-value-bind (key val) (rec (cdr gates))
-                       (ecase key
-                         (:success val)
-                         (:block (error 'need :sample val))
-                         (:error (let ((e (make-condition 'exit)))
-                                   (setf (exit-stack e) val)
-                                   (error e))))))))))
-    (multiple-value-bind (key val) (rec gates)
-      (ecase key
-        (:success (cons 0 val))
-        (:block (cons 1 val))
-        (:error (cons 2 val))))))
+             (destructuring-bind (gate . more) gates
+               (if (null more)
+                   `(soft ,gate ,@forms)
+                   `(soft ,gate
+                      (multiple-value-bind (key val) ,(rec (cdr gates))
+                        (ecase key
+                          (:success val)
+                          (:block (error 'need :sample val))
+                          (:error (let ((e (make-condition 'exit)))
+                                    (setf (exit-stack e) val)
+                                    (error e))))))))))
+    (rec gates)))
 
-(defun soft-test-fly ()
+(defun scry (path)
+  (nock path (copy-tree +wisher-source+)))
+
+(defun soft-test-djinn ()
   ; [~ ~] on empty path,
   ; block on paths starting with /b,
   ; !! crash on /c,
@@ -384,30 +389,30 @@
 (defun soft-abcd ()
   (copy-tree [97 98 99 100]))
 
+(test soft-top
+  (bottle
+    (exits (nock 0 (copy-tree [12 [1 0] 1 97 98 99 0])))))
+
 (test soft-basic
   (bottle
     (let ((always42 (copy-tree [[1 0 0 42] 0 0])))
-      (soft-success (soft-scry 0 always42) 42))))
+      (succeeds 42 (soft always42 (scry 0))))))
 
 (test soft-crash
   (bottle
     (let ((crash (copy-tree [[0 0] 0 0])))
-      (soft-throws (soft-scry 0 crash)))))
+      (exits (soft crash (scry 0))))))
 
 (test soft-full
   (bottle
     (let ((cd (soft-cd))
           (bc (soft-bc))
           (abcd (soft-abcd))
-          (test (soft-test-fly)))
-      (soft-never (soft-scry 0 test))
-      (soft-throws (soft-scry cd test))
-      (soft-blocks (soft-scry bc test) bc)
-      (soft-success (soft-scry abcd test) 42))))
-
-(test soft-top
-  (bottle
-    (soft-throws (nock 0 (copy-tree [12 [1 0] 1 97 98 99 0])))))
+          (test (soft-test-djinn)))
+      (hunks (soft test (scry 0)))
+      (exits (soft test (scry cd)))
+      (blocks bc (soft test (scry bc)))
+      (succeeds 42 (soft test (scry abcd))))))
 
 (test soft-nested
   (bottle
@@ -415,8 +420,8 @@
           (cd (soft-cd)) 
           (bc (soft-bc))
           (abcd (soft-abcd)) 
-          (test (soft-test-fly)))
-      (soft-success (soft-scry abcd test pass-thru pass-thru) 42)
-      (soft-blocks (soft-scry bc test pass-thru pass-thru) bc)
-      (soft-never (soft-scry 0 test pass-thru pass-thru))
-      (soft-never (soft-scry cd test pass-thru pass-thru)))))
+          (test (soft-test-djinn)))
+      (succeeds 42 (layers (test pass-thru pass-thru) (scry abcd)))
+      (blocks bc (layers (test pass-thru pass-thru) (scry bc)))
+      (hunks (layers (test pass-thru pass-thru) (scry 0)))
+      (exits (layers (test pass-thru pass-thru) (scry cd))))))

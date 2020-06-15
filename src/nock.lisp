@@ -354,8 +354,8 @@
 (define-condition need (error)
   ((sample :initarg :sample :reader need-sample)))
 
-(define-condition meta ()
-  ((exit :initarg :exit :reader meta-exit)))
+(define-condition skip ()
+  ((wrapped :initarg :wrap :reader skip-wrapped :type condition)))
 
 (enable-syntax)
 
@@ -381,7 +381,7 @@
              (djinn (car *djinn-stack*))
              (boon (let ((*djinn-stack* (cdr *djinn-stack*)))
                      (handler-case (slam djinn sample)
-                       (exit (e) (error 'meta :exit e))))))
+                       ((or skip exit) (e) (error 'skip :wrap e))))))
         (if (deep boon)
             (let ((u (tail boon)))
               (if (deep u)
@@ -390,8 +390,9 @@
             (error 'need :sample sample)))))
 
 (defmacro soft (gate &body forms)
-  `(let ((*djinn-stack* (cons ,gate *djinn-stack*)))
-     (handler-case (values :success (progn ,@forms))
-       (exit (e) (values :error (exit-stack e)))
-       (need (n) (values :block (need-sample n)))
-       (meta (m) (error (meta-exit m))))))
+  `(handler-case
+     (values :success (let ((*djinn-stack* (cons ,gate *djinn-stack*)))
+                        ,@forms))
+     (exit (e) (values :error (exit-stack e)))
+     (need (n) (values :block (need-sample n)))
+     (skip (s) (error (skip-wrapped s)))))
