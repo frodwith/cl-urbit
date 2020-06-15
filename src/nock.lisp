@@ -355,7 +355,7 @@
   ((sample :initarg :sample :reader need-sample)))
 
 (define-condition skip ()
-  ((wrapped :initarg :wrap :reader skip-wrapped :type condition)))
+  ((wrapped :initarg :wrap :reader skip-wrapped :type (or exit skip))))
 
 (enable-syntax)
 
