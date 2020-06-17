@@ -355,7 +355,8 @@
   ((sample :initarg :sample :reader need-sample)))
 
 (define-condition skip ()
-  ((wrapped :initarg :wrap :reader skip-wrapped :type (or exit skip))))
+  ((levels :initform 1 :accessor skip-levels :type (integer 0))
+   (wrapped :initarg :wrap :reader skip-wrapped :type exit)))
 
 (enable-syntax)
 
@@ -381,7 +382,9 @@
              (djinn (car *djinn-stack*))
              (boon (let ((*djinn-stack* (cdr *djinn-stack*)))
                      (handler-case (slam djinn sample)
-                       ((or skip exit) (e) (error 'skip :wrap e))))))
+                       (exit (e) (error 'skip :wrap e))
+                       (skip (s) (incf (skip-levels s))
+                                 (error s))))))
         (if (deep boon)
             (let ((u (tail boon)))
               (if (deep u)
@@ -395,4 +398,9 @@
                         ,@forms))
      (exit (e) (values :error (exit-stack e)))
      (need (n) (values :block (need-sample n)))
-     (skip (s) (error (skip-wrapped s)))))
+     (skip (s) (let ((less (1- (skip-levels s))))
+                 (if (zerop less)
+                     (error (skip-wrapped s))
+                     (progn
+                       (setf (skip-levels s) less)
+                       (error s)))))))
