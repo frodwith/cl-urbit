@@ -1,7 +1,7 @@
 (defpackage #:urbit/common
   (:use #:cl #:urbit/data)
   (:import-from #:urbit/math #:uint)
-  (:export #:sum-cell #:sum-noun #:cell= #:shallow
+  (:export #:sum-cell #:sum-noun #:cell= #:shallow #:loob
            #:denoun #:dedata #:decons))
 
 (in-package #:urbit/common)
@@ -35,6 +35,9 @@
         (if deep
             (sum-cell noun atomic fast slow)
             (funcall atomic noun)))))
+
+(defun loob (bool)
+  (if bool 0 1))
 
 ; helper for cell=, to convert a boolan value to :same or :diff when there is
 ; no possibility of :deep

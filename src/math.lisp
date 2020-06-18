@@ -1,8 +1,7 @@
 (defpackage #:urbit/math
-  (:use #:cl #:cl-intbytes)
+  (:use #:cl)
   (:export #:met #:mix #:end #:lsh #:rsh
-           #:peg #:mas #:tax #:pax #:axis-parts
-           #:string->cord #:cord->string
+           #:peg #:cap #:mas #:tax #:pax #:axis-parts
            #:pint #:uint #:decomposable-axis))
 
 (in-package #:urbit/math)
@@ -54,25 +53,6 @@
   (declare (uint b n a))
   (the uint (ash a (- (ash n b)))))
 
-; cords
-(defun string->cord (s)
-  (declare (string s))
-  (loop with len = (length s)
-        with oct = (make-array len)
-        for c across s
-        for i below len
-        do (setf (aref oct i) (char-code c))
-        finally (return (octets->uint oct len))))
-
-(defun cord->string (a)
-  (declare (uint a))
-  (loop with len = (met 3 a)
-        with str = (make-string len)
-        for o across (int->octets a len)
-        for i below len
-        do (setf (schar str i) (code-char o))
-        finally (return str)))
-
 ; axis functions
 
 (defun peg (a b)
@@ -102,6 +82,10 @@
   "boolean - is axis in tail?"
   (declare (decomposable-axis a))
   (the boolean (logbitp (- (integer-length a) 2) a)))
+
+(defun cap (a)
+  (declare (decomposable-axis a))
+  (if (tax a) 3 2))
 
 (defun pax (a)
   "list of path elements (t=tail, nil=head) for axis"

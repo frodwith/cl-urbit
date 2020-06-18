@@ -3,7 +3,7 @@
         #:urbit/ideal #:urbit/world #:urbit/data #:urbit/common #:urbit/syntax
         #:urbit/data/core #:urbit/data/slimcell #:urbit/data/slimatom)
   (:import-from #:alexandria #:when-let #:when-let*)
-  (:export #:nock #:bottle #:in-world #:soft #:need #:need-sample
+  (:export #:nock #:slam #:bottle #:in-world #:soft #:need #:need-sample
            #:compile-dynamic-hint #:compile-static-hint
            #:hint-tag #:hint-next #:hint-clue
            #:before #:after #:around))
@@ -55,9 +55,6 @@
 
 (defun compile-cell (c)
   (formula-form (icell-formula c)))
-
-(defun loob (bool)
-  (if bool 0 1))
 
 (defmacro split (expr (head tail) &body forms)
   (let ((s (gensym)))

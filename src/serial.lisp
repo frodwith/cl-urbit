@@ -1,7 +1,8 @@
 (defpackage #:urbit/serial
   (:use #:cl #:urbit/math #:urbit/data #:urbit/ideal
+        #:urbit/data/slimcell #:urbit/data/slimatom
         #:cl-intbytes #:trivial-bit-streams)
-  (:export #:jam #:cue #:jam-to-write #:cue-from-read))
+  (:export #:jam #:cue #:jam-to-write #:cue-from-read #:cue-pill))
 
 (in-package #:urbit/serial)
 
@@ -135,3 +136,15 @@
 
 (defun cue (int atom-fn cell-fn)
   (cue-from-read (read-from-int int) atom-fn cell-fn))
+
+(defun cue-from-stream (s atom-fn cell-fn)
+  (cue-from-read (make-stream-input-callback s) atom-fn cell-fn))
+
+(defun cue-slim-from-stream (s)
+  (cue-from-stream s #'slim-malt #'slim-cons))
+
+(defun cue-pill (path)
+  (with-open-file (s path :direction :input
+                          :if-does-not-exist :error
+                          :element-type '(unsigned-byte 8))
+    (cue-slim-from-stream s)))

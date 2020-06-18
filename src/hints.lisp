@@ -1,8 +1,8 @@
 (defpackage #:urbit/hints
   (:use #:cl #:urbit/data #:urbit/math #:urbit/ideal #:urbit/world
-        #:urbit/jets #:urbit/syntax #:urbit/common
+        #:urbit/jets #:urbit/syntax #:urbit/common #:urbit/convert
         #:urbit/mug #:urbit/equality)
-  (:export #:compose-hinters
+  (:export #:compose-hinters #:+handle-slog+ #:handle-memo #:handle-stack
            #:handle-fast #:fast-hinter #:bad-fast #:unregistered-parent
            #:slog #:handle-slog #:slog-hinter #:slog-priority #:slog-tank
            #:with-fresh-memos #:memo-hinter
@@ -128,17 +128,19 @@
   ((priority :initarg :priority :reader slog-priority :type integer)
    (tank :initarg :tank :reader slog-tank)))
 
-(defun handle-slog (subject clue)
+(defun slog-handler (subject clue)
   (declare (ignore subject))
   (handler-case
     (dedata (@pri ^tank) clue
       (signal 'slog :priority pri :tank tank))
     (exit () nil)))
 
+(defparameter +handle-slog+ (cons :before #'slog-handler))
+
 (defun slog-hinter (tag clue next)
   (declare (ignore next))
   (when (and clue (= %slog tag))
-    (cons :before #'handle-slog)))
+    +handle-slog+))
 
 ; %memo
 ; use WITH-FRESH-MEMOS to dynamically bind a fresh hash table (per road, etc)
@@ -169,9 +171,12 @@
 (defun memo-after (key product)
   (setf (gethash key *memo-table*) product))
 
+(defun handle-memo (next)
+  (cons :around (cons (memo-before next) #'memo-after)))
+
 (defun memo-hinter (tag clue next)
   (when (and clue (= tag %memo))
-    (cons :around (cons (memo-before next) #'memo-after))))
+    (handle-memo next)))
 
 ; ?(%hunk %hand %mean %lose %spot)
 ; TODO: should make 5 handlers and pick rather than make a closure
@@ -181,9 +186,12 @@
     (declare (ignore subject))
     (push (cons tag clue) (exit-stack exit))))
 
+(defun handle-stack (tag)
+  (cons :catch (stack-handler tag)))
+
 (defun stack-hinter (tag clue next)
   (declare (ignore next))
   (when clue
     (case tag
       ((%hunk %hand %mean %lose %spot)
-       (cons :catch (stack-handler tag))))))
+       (handle-stack tag)))))

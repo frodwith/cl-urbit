@@ -11,7 +11,6 @@
                 :components
                 ((:file "math")
                  (:file "zig")
-                 (:file "syntax")
                  (:file "data")
                  (:file "common")
                  (:file "mug")
@@ -27,11 +26,14 @@
                  (:file "data/core")
                  (:file "data/iatom")
                  (:file "data/icell")
+                 (:file "convert")
+                 (:file "syntax")
                  (:file "serial")
                  (:file "jets")
                  (:file "equality")
                  (:file "nock")
                  (:file "hints")
+                 (:file "hoon/k141")
                  )))
   :description "nock runtime and urbit worker process (http://urbit.org)"
   :long-description

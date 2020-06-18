@@ -1,6 +1,5 @@
 (defpackage #:urbit/syntax
-  (:use #:cl #:named-readtables)
-  (:import-from #:urbit/math #:string->cord)
+  (:use #:cl #:named-readtables #:urbit/convert)
   (:export #:brackets #:cords #:all
            #:enable-brackets #:enable-cords #:enable-syntax
            #:arity-error #:cord-error))
