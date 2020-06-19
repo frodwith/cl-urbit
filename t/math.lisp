@@ -44,12 +44,6 @@
   (is (= 10 (rsh 3 3 #xa000000)))
   (is (= 10 (rsh 3 3 #xa111111))))
 
-(test cords
-  (is (= 97 (string->cord "a")))
-  (is (= 1953718630 (string->cord "fast")))
-  (is (string= "dEtErMiNiStIc"
-               (cord->string 7866321123923179247042781529444))))
-
 (test mas-test
   (is (= 1 (mas 2)))
   (is (= 1 (mas 3)))
