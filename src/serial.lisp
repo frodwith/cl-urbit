@@ -58,6 +58,28 @@
                    (take stack))))))
         (give ideal nil)))))
 
+(defparameter +fixnum-bits+ (integer-length most-positive-fixnum))
+
+; trivial-bit-streams read-bits will build the integer incrementally.
+; we avoid some overhead by reading fixnums-at-a-time, and make a nicer
+; api by just bailing if the bits aren't available
+(defun chunk-bits (bit-stream bits-to-read)
+  (multiple-value-bind (whole left) (truncate bits-to-read +fixnum-bits+)
+    (multiple-value-bind (big len)
+      (loop for total = 0 then (logior total (ash fix len))
+            for len upfrom 0 by +fixnum-bits+
+            for i below whole
+            for fix = (multiple-value-bind (n bits-read)
+                        (read-bits +fixnum-bits+ bit-stream)
+                        (if (= bits-read +fixnum-bits+)
+                            n
+                            (error 'exit)))
+            finally (return (values total len)))
+      (multiple-value-bind (r got) (read-bits left bit-stream)
+        (if (= got left)
+            (logior big (ash r len))
+            (error 'exit))))))
+
 ; see trivial-bit-streams for read-fn
 ; atom-fn will be passed a common lisp integer to make atoms
 ; cell-fn is passed head and tail to make cells
@@ -66,15 +88,12 @@
     (let ((cursor 0)
           (refs (make-hash-table :test 'eql)))
       (labels ((bits (n)
-                 (loop with done = 0
-                       with accu = 0
-                       for left = (- n done)
-                       until (= 0 left)
-                       do (multiple-value-bind (int got) (read-bits left s)
-                            (setq accu (logxor (ash int done) accu))
-                            (setq done (+ done got)))
-                       finally (progn (setq cursor (+ cursor done))
-                                      (return accu))))
+                 (case n
+                   (0 0)
+                   (1 (incf cursor)
+                      (read-bit s))
+                   (t (setq cursor (+ cursor n))
+                      (chunk-bits s n))))
                (one ()
                  (incf cursor)
                  (let ((b (read-bit s)))
