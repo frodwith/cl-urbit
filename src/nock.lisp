@@ -231,17 +231,37 @@
      (t ,+crash+)))
 
 (defmacro @7 (a b)
-  `(let ((s ,a)) ,b))
+  `(let ((s ,a))
+     (declare (ignorable s))
+     ,b))
 
 (defmacro @8 (a b)
   `(@7 (^ ,a s) ,b))
 
+(defparameter *fast-profile* (make-hash-table))
+
+(defun kernel-label (kernel)
+  (format nil "~{~A~^/~}"
+          (loop for k = kernel then (child-kernel-parent k)
+                collecting (urbit/convert:cord->string (kernel-name k))
+                until (typep k 'root-kernel))))
+
+(defun fast-profile-report ()
+  (sort (loop for n being the hash-values of *fast-profile*
+              using (hash-key spd)
+              collect (cons (kernel-label (stencil-kernel spd)) n))
+        #'> :key #'cdr))
+
 (defun call-jet (core axis-in-battery)
   (let ((spd (core-speed core)))
     (when (typep spd 'fast)
-      (when-let* ((driver (stencil-driver spd))
-                  (jet (funcall driver axis-in-battery)))
-        (funcall jet core)))))
+      (or (when-let* ((driver (stencil-driver spd))
+                      (jet (funcall driver axis-in-battery)))
+            (funcall jet core))
+          (progn
+            (setf (gethash spd *fast-profile*)
+                  (1+ (or (gethash spd *fast-profile*) 0)))
+            nil)))))
 
 (defmacro @9 (axis core)
   (let ((jet-forms (and (> axis 1)

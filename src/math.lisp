@@ -1,6 +1,7 @@
 (defpackage #:urbit/math
   (:use #:cl)
-  (:export #:met #:mix #:end #:lsh #:rsh
+  (:export #:met #:mix #:end #:lsh #:rsh #:bex #:add #:dec #:div
+           #:hmax #:hmin #:hmod #:mul #:sub #:dvr #:con
            #:peg #:cap #:mas #:tax #:pax #:axis-parts
            #:pint #:uint #:decomposable-axis))
 
@@ -41,6 +42,10 @@
   (declare (uint a b))
   (the uint (logxor a b)))
 
+(defun con (a b)
+  (declare (uint a b))
+  (the uint (logior a b)))
+
 (defun end (b n a)
   (declare (uint b n a))
   (the uint (low-bits (ash n b) a)))
@@ -53,20 +58,67 @@
   (declare (uint b n a))
   (the uint (ash a (- (ash n b)))))
 
+(defun bex (a)
+  (declare (uint a))
+  (the uint (ash 1 a)))
+
+(defun add (a b)
+  (declare (uint a))
+  (the uint (+ a b)))
+
+(defun dec (a)
+  (declare (pint a))
+  (1- a))
+
+(defun div (a b)
+  (declare (uint a))
+  (declare (pint b))
+  (the uint (truncate a b)))
+
+(defun dvr (a b)
+  (declare (uint a))
+  (declare (pint b))
+  (the (values uint uint) (truncate a b)))
+
+(defun mul (a b)
+  (declare (uint a b))
+  (the uint (* a b)))
+
+(defun hmod (a b)
+  (declare (uint a))
+  (declare (pint b))
+  (multiple-value-bind (q r) (truncate a b)
+    (declare (ignore q))
+    (the uint r)))
+
+(defun hmax (a b)
+  (declare (uint a b))
+  (if (> a b) a b))
+
+(defun hmin (a b)
+  (declare (uint a b))
+  (if (< a b) a b))
+
+(defun sub (a b)
+  (declare (uint a b))
+  (the uint (- a b)))
+
 ; axis functions
 
 (defun peg (a b)
-  (declare (uint a b))
-  (if (= 1 a)
-      b
-      (if (= 1 b)
-          a
-          (let* ((c (integer-length b))
-                 (d (1- c))
-                 (e (ash 1 d))
-                 (f (- b e))
-                 (g (ash a d)))
-            (+ f g)))))
+  (declare (pint b)
+           (uint b))
+  (the uint
+       (if (= 1 a)
+           b
+           (if (= 1 b)
+               a
+               (let* ((c (integer-length b))
+                      (d (1- c))
+                      (e (ash 1 d))
+                      (f (- b e))
+                      (g (ash a d)))
+                 (+ f g))))))
 
 ; NOTE the argument type must be >= 2
 (deftype decomposable-axis () '(integer 2))

@@ -51,7 +51,6 @@
 (defmacro with-lite-boot (pill-path &body forms)
   `(let ((arv (cue-pill ,pill-path)))
      (format t "lite: arvo formula ~x~%" (mug arv))
-     (break)
      (let* ((*life-source* (copy-tree [7 [2 [0 3] 0 2] 0 7]))
             (*wish-source* (copy-tree [9 2 10 [6 0 3] 9 22 0 2]))
             (*ivory-kernel* (lite arv)))
@@ -95,11 +94,27 @@
     (lambda ()
       (print-wall
         (let ((input (read-cord in)))
-          (in-world world (slam rep input))  )
+          (in-world world (slam rep input)))
         out))))
+
+(defun log-unregistered (w)
+  (format t "unregistered: ~a at axis ~a~%"
+          (cord->string (unregistered-name w))
+          (unregistered-axis w)))
+
+(defun log-slog (w)
+  (let ((tank (slog-tank w)))
+    (handler-case
+      (dedata (@@tag tape) tank 
+        (case tag
+          (%leaf (write-line (tape->string tape)))
+          (t (error 'exit))))
+      (exit () (format t "weird slog ~a~%" tank)))))
 
 (defun test-toplevel ()
   (with-input-from-string (in "(add 40 2)")
     (with-output-to-string (out)
-      (funcall (make-toplevel "/home/pdriver/code/cl-urbit/ivory.pill"
-                              in out)))))
+      (handler-bind 
+        ((unregistered-parent #'log-unregistered)
+         (slog #'log-slog))
+        (funcall (make-toplevel #P"/tmp/ivory.pill" in out))))))

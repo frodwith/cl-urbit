@@ -4,6 +4,7 @@
         #:urbit/mug #:urbit/equality)
   (:export #:compose-hinters #:+handle-slog+ #:handle-memo #:handle-stack
            #:handle-fast #:fast-hinter #:bad-fast #:unregistered-parent
+           #:unregistered-name #:unregistered-axis #:unregistered-core
            #:slog #:handle-slog #:slog-hinter #:slog-priority #:slog-tank
            #:with-fresh-memos #:memo-hinter
            #:stack-handler #:stack-hinter))
@@ -20,9 +21,9 @@
 ; % fast
 
 (define-condition unregistered-parent (warning)
-  ((name :type uint :initarg :name)
-   (axis :type uint :initarg :axis)
-   (core :initarg :core)))
+  ((name :type uint :initarg :name :reader unregistered-name)
+   (axis :type uint :initarg :axis :reader unregistered-axis)
+   (core :initarg :core :reader unregistered-core)))
 
 (define-condition bad-fast (warning)
   ((clue :initarg :clud)
@@ -30,11 +31,13 @@
 
 (defun parse-fast-name (name)
   (if (not (deep name))
-      name
+      (cl-integer name)
       (let ((str (head name))
             (num (tail name)))
         (unless (or (deep str) (deep num))
-          (string->cord (format nil "~a~d" (cord->string str) num))))))
+          (string->cord (format nil "~a~d"
+                                (cord->string (cl-integer str))
+                                (cl-integer num)))))))
 
 (defun parse-fast-parent (parent)
   ; skip hints and give (t nil) for root, (t ax) for child, or nil
@@ -61,10 +64,12 @@
 (defun frag-to-parent (axis core)
   (if (= 1 axis)
       (cell->core core)
-      (loop for a = axis then (mas a)
-            for o = core then (if (deep o)
-                                  (if (tax a) (tail o) (head o))
+      (loop for o = core then (if (deep o)
+                                  (if (tax a)
+                                      (tail o)
+                                      (head o))
                                   (return nil))
+            for a = axis then (mas a)
             while (> a 3)
             finally (if (not (deep o))
                         (return nil)
