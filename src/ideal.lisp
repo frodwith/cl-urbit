@@ -21,7 +21,7 @@
            #:icell #:icons #:icell-head #:icell-tail #:icell-mug #:icell-meta
            #:fat #:make-fat #:fat-formula
            #:icell-battery #:icell-speed #:iint #:imug #:ideep
-           #:iatom=mugatom #:icell=mugcell #:icell-copy))
+           #:ideal-atom=mugatom #:icell=mugcell #:icell-copy))
 
 (in-package #:urbit/ideal)
 
@@ -223,7 +223,7 @@
     (icell t)
     (ideal-atom nil)))
 
-(defun iatom=mugatom (i a)
+(defun ideal-atom=mugatom (i a)
   (or (eql i a) ; takes care of actual fixnums (no cached mug)
       (and (not (cached-ideal a))
            (= (iatom-mug i) (cached-mug a))
@@ -255,5 +255,5 @@
               #'ideep #'deep
               #'icell-head #'head
               #'icell-tail #'tail
-              #'iatom=mugatom #'icell-copy #'fast)
+              #'ideal-atom=mugatom #'icell-copy #'fast)
         (icell-copy i c)))))

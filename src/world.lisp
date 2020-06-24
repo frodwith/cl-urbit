@@ -40,8 +40,8 @@
   (if (typep a 'iatom)
       (if (typep b 'iatom)
           (eq a b)
-          (iatom=mugatom a b))
-      (iatom=mugatom b a)))
+          (ideal-atom=mugatom a b))
+      (ideal-atom=mugatom b a)))
 
 (sb-ext:define-hash-table-test atoms= atoms-hash)
 

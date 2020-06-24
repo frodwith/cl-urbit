@@ -51,14 +51,13 @@
   (setf (head b) (head a))
   (setf (tail b) (tail a)))
 
-; compare an iatom with a non-eql, non-ideal atom
-(defun iatom=mundane (i a)
-  (let ((m (cached-mug a)))
-    (if m
-        (iatom=mugatom i a) 
-        (when (= (iatom-int i) (cl-integer a))
+; compare an ideal atom with a non-eql, non-ideal atom
+(defun ideal-atom=mundane (i a)
+  (if-let (m (cached-mug a))
+    (ideal-atom=mugatom i a)
+    (when (= (iint i) (cl-integer a))
           (setf (cached-ideal a) i)
-          t))))
+          t)))
 
 ; compare and unify two atoms, ignoring the mug slot
 (defun nomug-atom= (a b)
@@ -85,7 +84,7 @@
   (flet ((atomic (i a)
            (if-let (ai (cached-ideal a))
              (eql i ai)
-             (iatom=mundane i a)))
+             (ideal-atom=mundane i a)))
          (fast (i c)
            (if-let (ci (cached-ideal c))
              (shallow (eq i ci))
@@ -109,7 +108,7 @@
                 (nomug-atom= a b)
                 ((a b ai)
                  (declare (ignore a))
-                 (iatom=mugatom ai b))
+                 (ideal-atom=mugatom ai b))
                 ((ai bi) (eql ai bi))))
          (unify (a b)
            (copy-parts a b)
@@ -141,7 +140,7 @@
                       (mugatom=unmugatom a b am)))
                 ((a b ai)
                  (declare (ignore a))
-                 (iatom=mundane ai b))
+                 (ideal-atom=mundane ai b))
                 ((ai bi) (eql ai bi))))
          (unify (a b)
            (setf (cached-mug b) (cached-mug a))
@@ -184,7 +183,7 @@
                      ((am bm) (and (= am bm) (nomug-atom= a b))))
                 ((a b ai)
                  (declare (ignore a))
-                 (iatom=mundane ai b))
+                 (ideal-atom=mundane ai b))
                 ((ai bi) (eql ai bi))))
          (unify (a b)
            (nob a b cached-mug
@@ -225,7 +224,7 @@
 ; compare an ideal with a non-ideal noun
 (defun ideal=mundane (a b)
   (deep= (ideep a) (deep b)
-         (iatom=mundane a b)
+         (ideal-atom=mundane a b)
          (icell=mundane a b)))
 
 ; compare non-eq non-ideal nouns with equal mugs
