@@ -3,7 +3,7 @@
         #:urbit/data #:urbit/ideal #:urbit/world #:urbit/serial)
   (:import-from #:alexandria #:if-let)
   (:import-from #:urbit/data #:exit)
-  (:export #:jet-root #:jet-core #:gate #:get-speed #:get-battery
+  (:export #:jet-root #:jet-core #:gate #:gate-driver #:get-speed #:get-battery
            #:measure #:measure-battery #:zig-changes-speed #:cell->core
            #:install-child-stencil #:install-root-stencil
            #:load-world #:save-jet-pack #:install-jet-pack))
@@ -88,6 +88,7 @@
              (invalidate-battery battery)
              (compile-root-meter (battery-stable battery) pairs))
            (save (stencil)
+             (format t "saving ~a~%" (urbit/convert:cord->string name))
              (push stencil (world-stencils *world*))
              stencil))
       (let ((match (battery-match battery)))
@@ -114,6 +115,7 @@
   (let* ((battery (icell-battery battery-ideal))
          (match (battery-match battery)))
     (flet ((save (stencil)
+             (format t "saving ~a~%" (urbit/convert:cord->string name))
              (push stencil (world-stencils *world*))
              stencil)
            (meet (z pairs)

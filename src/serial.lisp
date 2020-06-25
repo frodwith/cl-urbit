@@ -2,7 +2,8 @@
   (:use #:cl #:urbit/math #:urbit/data #:urbit/ideal
         #:urbit/data/slimcell #:urbit/data/slimatom
         #:cl-intbytes #:trivial-bit-streams)
-  (:export #:jam #:cue #:jam-to-write #:cue-from-read #:cue-pill))
+  (:export #:jam #:cue #:jam-to-write #:cue-from-read
+           #:cue-slim-from-int #:cue-pill))
 
 (in-package #:urbit/serial)
 
@@ -57,8 +58,6 @@
                        (progn (save a) (zero) (mat i)))
                    (take stack))))))
         (give ideal nil)))))
-
-(defparameter +fixnum-bits+ (integer-length most-positive-fixnum))
 
 ; trivial-bit-streams read-bits will build the integer incrementally.
 ; we avoid some overhead by reading fixnums-at-a-time, and make a nicer
@@ -159,8 +158,14 @@
 (defun cue-from-stream (s atom-fn cell-fn)
   (cue-from-read (make-stream-input-callback s) atom-fn cell-fn))
 
+(defun cue-slim-from-read (read-fn)
+  (cue-from-read read-fn #'slim-malt #'slim-cons))
+
+(defun cue-slim-from-int (int)
+  (cue-slim-from-read (read-from-int int)))
+
 (defun cue-slim-from-stream (s)
-  (cue-from-stream s #'slim-malt #'slim-cons))
+  (cue-slim-from-read (make-stream-input-callback s)))
 
 (defun cue-pill (path)
   (with-open-file (s path :direction :input

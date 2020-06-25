@@ -3,7 +3,8 @@
         #:urbit/ideal #:urbit/world #:urbit/data #:urbit/common #:urbit/syntax
         #:urbit/data/core #:urbit/data/slimcell #:urbit/data/slimatom)
   (:import-from #:alexandria #:when-let #:when-let*)
-  (:export #:nock #:slam #:bottle #:in-world #:soft #:need #:need-sample
+  (:export #:bottle #:in-world #:need #:need-sample
+           #:nock #:slam #:make-slam #:soft
            #:compile-dynamic-hint #:compile-static-hint
            #:hint-tag #:hint-next #:hint-clue
            #:before #:after #:around))
@@ -377,20 +378,26 @@
 
 (enable-syntax)
 
-(defun slam (gate sample)
+(defun make-slam (gate)
   (let ((gate-speed (get-speed gate))
         (battery (get-battery gate)))
     (if (typep gate-speed 'void)
         (error 'cell-required :given battery)
-        (let* ((context (tail (tail gate)))
-               (payload (slim-cons sample context))
-               (mutant-speed (if (zig-changes-speed #*10 gate-speed)
-                                 (measure-battery battery payload)
-                                 gate-speed))
-              (subject (core-cons battery payload mutant-speed nil)))
-          (or (call-jet subject 1)
-              (funcall (formula-function (icell-formula battery))
-                       subject))))))
+        (let ((context (tail (tail gate)))
+              (nock (formula-function (icell-formula battery))))
+          (flet ((pay (sample) (slim-cons sample context))
+                 (slam (payload spd)
+                   (let ((subject (core-cons battery payload spd nil)))
+                     (or (call-jet subject 1) (funcall nock subject)))))
+            (if (zig-changes-speed #*10 gate-speed)
+                (lambda (sample)
+                  (let ((payload (pay sample)))
+                    (slam payload (measure-battery battery payload))))
+                (lambda (sample)
+                  (slam (pay sample) gate-speed))))))))
+
+(defun slam (gate sample)
+  (funcall (make-slam gate) sample))
 
 (defmacro @12 (a)
   `(if (null *djinn-stack*)

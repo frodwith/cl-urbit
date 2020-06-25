@@ -1,6 +1,7 @@
 (defpackage #:urbit/hoon/k141
   (:use #:cl #:urbit/jets #:urbit/common #:urbit/syntax #:urbit/mug
         #:urbit/convert #:urbit/math #:urbit/data #:urbit/hints
+        #:urbit/nock #:urbit/equality #:urbit/serial #:urbit/world
         #:urbit/data/slimatom #:urbit/data/slimcell)
   (:export #:load-k141))
 
@@ -41,34 +42,108 @@
     `(gfn ,(or cord-name (symbol-cord name)) ,names
        (,name ,@names))))
 
+(defun nlist->vector (list)
+  (loop with vec = (make-array 10 :adjustable t :fill-pointer 0)
+        for n = list then (tail n)
+        while (deep n)
+        do (vector-push-extend (head n) vec)
+        finally (nlist-end n vec)))
+
+(defmacro nlist-end (list value)
+  `(if (zerop (cl-integer ,list))
+       (return ,value)
+       (error 'exit)))
+
 ; jets that don't really belong anywhere else in the runtime just live
 ; here for now - later it might make sense to group them into modules
+
+(defun can (bloq list)
+  (declare (uint bloq))
+  (loop for n = list then (tail n)
+        while (deep n)
+        for pair = (head n)
+        for bloqs = (cl-integer (head pair))
+        for data = (end bloq bloqs (cl-integer (tail pair)))
+        for r = data then (logior (ash data size) r)
+        summing bloqs into size
+        finally (nlist-end n r)))
+
+(defun cat (a b c)
+  (declare (uint a b c))
+  (logior b (lsh a (met a b) c)))
+
+(defun rap (bloq list)
+  (declare (uint bloq))
+  (loop for n = list then (tail n)
+        while (deep n)
+        for i = (cl-integer (head n))
+        for r = i then (cat bloq r i)
+        finally (nlist-end n r)))
+
+(defun rep (bloq list)
+  (declare (uint bloq))
+  (loop with size = (ash 1 bloq)
+        for n = list then (tail n)
+        while (deep n)
+        for c upfrom 0 by size
+        for i = (ldb (byte size 0) (cl-integer (head n)))
+        for r = i then (logior r (ash i c))
+        finally (nlist-end n r)))
+
+(defun cut (bloq from-end bloq-count atom)
+  (declare (uint bloq from-end bloq-count atom))
+  (ldb (byte (ash bloq-count bloq)
+             (ash from-end bloq))
+       atom))
+
+(defun dor (a b)
+  (labels ((rec (a b)
+             (or (same a b)
+                 (if (deep a)
+                     (when (deep b)
+                       (let ((ha (head a))
+                             (hb (head b)))
+                         (if (same ha hb)
+                             (rec (tail a) (tail b))
+                             (rec ha hb))))
+                     (or (deep b)
+                         (< (cl-integer a) (cl-integer b)))))))
+    (loob (rec a b))))
+
+(defun gor (a b)
+  (let ((c (mug a))
+        (d (mug b)))
+    (if (= c d)
+        (dor a b)
+        (loob (< c d)))))
+
+(defun mor (a b)
+  (let ((c (murmug (mug a)))
+        (d (murmug (mug b))))
+    (if (= c d)
+        (dor a b)
+        (loob (< c d)))))
+
 (defun rip (b a)
   (declare (uint b a))
   (if (zerop a)
       0
       (let* ((size (ash 1 b))
              (len (integer-length a))
-             (partial-bits (mod len size)))
+             (partial-bits (mod len size))
+             (malt (if (> size +fixnum-bits+) #'slim-malt #'identity)))
           (loop with ipos = (- len partial-bits)
                 with last-bits = (ldb (byte partial-bits ipos) a)
                 for r = (if (> last-bits 0)
-                            (slim-cons (m last-bits) 0)
+                            (slim-cons (funcall malt last-bits) 0)
                             0)
-                then (slim-cons (m part) r)
+                then (slim-cons (funcall malt part) r)
                 for pos from (- ipos size) downto 0 by size
                 for part = (ldb (byte size pos) a)
                 finally (return r)))))
 
 (defun weld (a b)
-  (loop with v = (loop with v = (make-array 100 :adjustable t
-                                            :fill-pointer 0)
-                       for l = a then (tail l)
-                       while (deep l)
-                       do (vector-push-extend (head l) v)
-                       finally (if (zerop (cl-integer l))
-                                   (return v)
-                                   (error 'exit)))
+  (loop with v = (nlist->vector a)
         for r = b then (slim-cons (aref v i) r)
         for i from (1- (length v)) downto 0
         finally (return r)))
@@ -81,12 +156,32 @@
       (let ((murmurhash:*hash-size* 32))
         (murmurhash:murmurhash key :seed syd))))
 
-(defun slag (a b)
-  (declare (uint a))
-  (loop for n = b then (tail n)
-        for i below a
+(defun flop (list)
+  (loop for n = list then (tail n)
+        for r = 0 then (slim-cons i r)
         while (deep n)
-        finally (return n)))
+        for i = (head n)
+        finally (nlist-end n r)))
+
+(defun lent (list)
+  (loop for i upfrom 0
+        for n = list then (tail n)
+        while (deep n)
+        finally (nlist-end n i)))
+
+(defun reap (times item)
+  (declare (uint times))
+  (loop for r = 0 then (slim-cons item r)
+        repeat times
+        finally (return r)))
+
+(defun turn (list gate)
+  (loop with slam = (make-slam gate)
+        with vec = (nlist->vector list)
+        for r = 0 then (slim-cons pro r)
+        for i from (1- (length vec)) downto 0
+        for pro = (funcall slam (aref vec i))
+        finally (return r)))
 
 (defparameter +jets+
   (list
@@ -131,25 +226,45 @@
               (peg a b)))
         (jet-core
           %two 1 nil
-          (raw-gate 2 slag)      ; 691
-          (math-gate 1 bex)      ; 801
-          (math-gate 3 end)      ; 825
-          (math-gate 3 lsh)      ; 839
-          (math-gate 2 met)      ; 845
-          (gfn %rip (@@bloq @@a) ; 893
+          (raw-gate 2 turn)
+          (math-gate 1 bex)
+          (gfn %can (@@bloq list)
+            (m (can bloq list)))
+          (math-gate 3 cat)
+          (gfn %cut (@@a (@@b @@c) @@d)
+            (m (cut a b c d)))
+          (math-gate 3 end)
+          (math-gate 3 lsh)
+          (math-gate 2 met)
+          (gfn %rap (@@bloq list)
+            (rap bloq list))
+          (gfn %rep (@@bloq list)
+            (rep bloq list))
+          (gfn %rip (@@bloq @@a)
             (rip bloq a))
-          (math-gate 3 rsh)      ; 900
-          (math-gate 2 con)      ; 947
-          (math-gate 2 mix)      ; 981
-          (jet-core              ; 1001
+          (math-gate 3 rsh)
+          (math-gate 2 con)
+          (math-gate 2 dis)
+          (math-gate 2 mix)
+          (raw-gate 1 mug)
+          (raw-gate 2 dor)
+          (raw-gate 2 gor)
+          (raw-gate 2 mor)
+          (raw-gate 1 flop)
+          (raw-gate 1 lent)
+          (gfn %reap (@@times item)
+            (reap times item))
+          (gfn %jam (n)
+            (jam (find-ideal n)))
+          (gfn %cue (@@a)
+            (cue-slim-from-int a))
+          (jet-core
             %muk 27
             (gate-driver
               (lambda (sample)
                 (dedata (@@syd @@len @@key) sample
                   (muk syd len key)))))
-          (raw-gate 1 mug)       ; 1059
-          (raw-gate 2 weld)      ; 1910
-          )))))
+          (raw-gate 2 weld))))))
 
 (defun k141-hinter (tag clue next)
   (when clue

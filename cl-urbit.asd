@@ -34,6 +34,7 @@
                  (:file "nock")
                  (:file "hints")
                  (:file "hoon/k141")
+                 (:file "hoon/ivory")
                  )))
   :description "nock runtime and urbit worker process (http://urbit.org)"
   :long-description

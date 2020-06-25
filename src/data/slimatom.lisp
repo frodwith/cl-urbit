@@ -1,10 +1,10 @@
 (defpackage #:urbit/data/slimatom
   (:use #:cl #:urbit/data #:urbit/bignum-meta)
-  (:export #:slim-malt))
+  (:export #:slim-malt #:make-slimatom))
 
 (in-package #:urbit/data/slimatom)
 
-(defstruct slimatom
+(defstruct (slimatom (:constructor make-slimatom (num &optional meta)))
   (num nil :type bignum)
   (meta nil :type bignum-meta))
 
@@ -13,4 +13,4 @@
 (defun slim-malt (a &optional mug)
   (etypecase a
     (fixnum a)
-    (bignum (make-slimatom :num a :meta mug))))
+    (bignum (make-slimatom a mug))))

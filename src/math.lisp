@@ -1,11 +1,13 @@
 (defpackage #:urbit/math
   (:use #:cl)
   (:export #:met #:mix #:end #:lsh #:rsh #:bex #:add #:dec #:div
-           #:hmax #:hmin #:hmod #:mul #:sub #:dvr #:con
+           #:hmax #:hmin #:hmod #:mul #:sub #:dvr #:con #:dis
            #:peg #:cap #:mas #:tax #:pax #:axis-parts
-           #:pint #:uint #:decomposable-axis))
+           #:pint #:uint #:decomposable-axis #:+fixnum-bits+))
 
 (in-package #:urbit/math)
+
+(defparameter +fixnum-bits+ (integer-length most-positive-fixnum))
 
 ; primitive operations on common lisp integers.
 
@@ -45,6 +47,10 @@
 (defun con (a b)
   (declare (uint a b))
   (the uint (logior a b)))
+
+(defun dis (a b)
+  (declare (uint a b))
+  (the uint (logand a b)))
 
 (defun end (b n a)
   (declare (uint b n a))
