@@ -1,5 +1,6 @@
 (defpackage #:urbit/hoon/k141
-  (:use #:cl #:urbit/jets #:urbit/common #:urbit/syntax #:urbit/mug
+  (:use #:cl #:ironclad #:cl-intbytes
+        #:urbit/jets #:urbit/common #:urbit/syntax #:urbit/mug
         #:urbit/convert #:urbit/math #:urbit/data #:urbit/hints
         #:urbit/nock #:urbit/equality #:urbit/serial #:urbit/world
         #:urbit/data/slimatom #:urbit/data/slimcell)
@@ -42,17 +43,17 @@
     `(gfn ,(or cord-name (symbol-cord name)) ,names
        (,name ,@names))))
 
+(defmacro nlist-end (list value)
+  `(if (zerop (cl-integer ,list))
+       (return ,value)
+       (error 'exit)))
+
 (defun nlist->vector (list)
   (loop with vec = (make-array 10 :adjustable t :fill-pointer 0)
         for n = list then (tail n)
         while (deep n)
         do (vector-push-extend (head n) vec)
         finally (nlist-end n vec)))
-
-(defmacro nlist-end (list value)
-  `(if (zerop (cl-integer ,list))
-       (return ,value)
-       (error 'exit)))
 
 ; jets that don't really belong anywhere else in the runtime just live
 ; here for now - later it might make sense to group them into modules
@@ -183,6 +184,24 @@
         for pro = (funcall slam (aref vec i))
         finally (return r)))
 
+(defun shal (len ruz)
+  (declare (uint len ruz))
+  (octets->uint
+    (digest-sequence :sha512 (int->octets ruz len))
+    64))
+
+(defun shan (ruz)
+  (declare (uint ruz))
+  (octets->uint
+    (reverse (digest-sequence :sha1 (int->octets ruz (met 3 ruz))))
+    20))
+
+(defun shay (len ruz)
+  (declare (uint len ruz))
+  (octets->uint
+    (digest-sequence :sha256 (int->octets ruz len))
+    32))
+
 (defparameter +jets+
   (list
     (jet-root
@@ -255,7 +274,7 @@
           (gfn %reap (@@times item)
             (reap times item))
           (gfn %jam (n)
-            (jam (find-ideal n)))
+            (jam (get-ideal n)))
           (gfn %cue (@@a)
             (cue-slim-from-int a))
           (jet-core
@@ -264,7 +283,34 @@
               (lambda (sample)
                 (dedata (@@syd @@len @@key) sample
                   (muk syd len key)))))
-          (raw-gate 2 weld))))))
+          (raw-gate 2 weld)
+          (jet-core
+            %tri 1 nil
+            (math-gate 2 shal)
+            (math-gate 1 shan)
+            (math-gate 2 shay)
+            (jet-core
+              %qua 1 nil
+              (gfn %trip (@@cord)
+                (cord->tape cord))
+              (gfn %mink ((subject formula) scry)
+                (multiple-value-bind (tag val)
+                  (with-fresh-memos (soft scry (nock subject formula)))
+                  (ecase tag
+                    (:success (slim-cons 0 val))
+                    (:block (slim-cons 1 (tail val)))
+                    (:error (slim-cons 2 val)))))
+              (jet-core
+                %mule 3
+                (lambda (kernel parent-stencil hooks ideal)
+                  (declare (ignore ideal))
+                  (break)
+                  (let ((mute (hook %mute kernel hooks parent-stencil)))
+                    (lambda (axis)
+                      (when (= axis 1)
+                        (lambda (core)
+                          (slam (funcall mute core)
+                                (head (tail core))))))))))))))))
 
 (defun k141-hinter (tag clue next)
   (when clue

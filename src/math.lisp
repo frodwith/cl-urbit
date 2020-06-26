@@ -2,7 +2,7 @@
   (:use #:cl)
   (:export #:met #:mix #:end #:lsh #:rsh #:bex #:add #:dec #:div
            #:hmax #:hmin #:hmod #:mul #:sub #:dvr #:con #:dis
-           #:peg #:cap #:mas #:tax #:pax #:axis-parts
+           #:peg #:cap #:mas #:tax #:pax #:axis-parts #:low-bits
            #:pint #:uint #:decomposable-axis #:+fixnum-bits+))
 
 (in-package #:urbit/math)

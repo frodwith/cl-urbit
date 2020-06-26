@@ -6,8 +6,7 @@
            #:handle-fast #:fast-hinter #:bad-fast #:unregistered-parent
            #:unregistered-name #:unregistered-axis #:unregistered-core
            #:slog #:handle-slog #:slog-hinter #:slog-priority #:slog-tank
-           #:with-fresh-memos #:memo-hinter
-           #:stack-handler #:stack-hinter))
+           #:with-fresh-memos #:memo-hinter #:stack-hinter #:handle-stack))
 
 (in-package #:urbit/hints)
 
@@ -183,20 +182,26 @@
   (when (and clue (= tag %memo))
     (handle-memo next)))
 
-; ?(%hunk %hand %mean %lose %spot)
-; TODO: should make 5 handlers and pick rather than make a closure
+(defun make-stack-handler (tag)
+  (cons :catch
+        (lambda (subject clue exit)
+          (declare (ignore subject))
+          (push (cons tag clue) (exit-stack exit)))))
 
-(defun stack-handler (tag)
-  (lambda (subject clue exit)
-    (declare (ignore subject))
-    (push (cons tag clue) (exit-stack exit))))
+(defparameter +handle-hunk+ (make-stack-handler %hunk))
+(defparameter +handle-hand+ (make-stack-handler %hand))
+(defparameter +handle-mean+ (make-stack-handler %mean))
+(defparameter +handle-lose+ (make-stack-handler %lose))
+(defparameter +handle-spot+ (make-stack-handler %spot))
 
 (defun handle-stack (tag)
-  (cons :catch (stack-handler tag)))
+  (case tag
+    (%hunk +handle-hunk+)
+    (%hand +handle-hand+)
+    (%mean +handle-mean+)
+    (%lose +handle-lose+)
+    (%spot +handle-spot+)))
 
 (defun stack-hinter (tag clue next)
   (declare (ignore next))
-  (when clue
-    (case tag
-      ((%hunk %hand %mean %lose %spot)
-       (handle-stack tag)))))
+  (when clue (handle-stack tag)))

@@ -5,7 +5,7 @@
   (:import-from #:urbit/data #:exit)
   (:export #:jet-root #:jet-core #:gate #:gate-driver #:get-speed #:get-battery
            #:measure #:measure-battery #:zig-changes-speed #:cell->core
-           #:install-child-stencil #:install-root-stencil
+           #:install-child-stencil #:install-root-stencil #:parent-axis
            #:load-world #:save-jet-pack #:install-jet-pack))
 
 (in-package #:urbit/jets)

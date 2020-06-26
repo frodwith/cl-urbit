@@ -1,8 +1,12 @@
 (defpackage #:urbit/convert
   (:use #:cl #:cl-intbytes #:urbit/data #:urbit/data/slimcell #:urbit/math)
-  (:export #:string->tape #:tape->string #:string->cord #:cord->string))
+  (:export #:string->tape #:tape->string
+           #:string->cord #:cord->string
+           #:cord->tape #:tape->cord))
 
 (in-package #:urbit/convert)
+
+(deftype cord () '(integer 0))
 
 (defun string->tape (str &key (cell-fn #'slim-cons))
   (loop for tap = 0 then (funcall cell-fn c tap)
@@ -31,10 +35,26 @@
         finally (return (octets->uint oct len))))
 
 (defun cord->string (a)
-  (declare (type (integer 0) a))
+  (declare (cord a))
   (loop with len = (met 3 a)
         with str = (make-string len)
         for o across (int->octets a len)
         for i below len
         do (setf (schar str i) (code-char o))
         finally (return str)))
+
+(defun cord->tape (a)
+  (declare (cord a))
+  (loop with len = (met 3 a)
+        for tape = 0 then (cons c tape)
+        for c across (reverse (int->octets a len))
+        finally (return tape)))
+
+(defun tape->cord (tape)
+  (loop with oct = (make-array 10 :adjustable t :fill-pointer 0
+                               :element-type '(unsigned-byte 8))
+        for n = tape then (tail n)
+        while (deep n)
+        for c = (low-bits 8 (head n))
+        do (vector-push-extend c oct)
+        finally (return (octets->uint oct (length oct)))))

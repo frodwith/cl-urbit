@@ -4,7 +4,7 @@
         #:urbit/data/core #:urbit/data/slimcell #:urbit/data/slimatom)
   (:import-from #:alexandria #:when-let #:when-let*)
   (:export #:bottle #:in-world #:need #:need-sample
-           #:nock #:slam #:make-slam #:soft
+           #:nock #:slam #:make-slam #:soft #:hook
            #:compile-dynamic-hint #:compile-static-hint
            #:hint-tag #:hint-next #:hint-clue
            #:before #:after #:around))
@@ -428,3 +428,26 @@
                      (progn
                        (setf (skip-levels s) less)
                        (error s)))))))
+
+(defun hook (name kernel ilist parent)
+  (declare (uint name) (type (or null stencil) parent))
+  (labels ((formula (name kernel ilist parent)
+             (or (loop for n = ilist then (icell-tail n)
+                       while (ideep n)
+                       for pair = (icell-head n)
+                       do (when (ideep pair)
+                            (let ((hook-name (icell-head pair))
+                                  (hook-formula (icell-tail pair)))
+                              (when (and (ideep hook-formula)
+                                         (same hook-name name))
+                                (return hook-formula)))))
+                 (when parent
+                   (let ((pax (parent-axis kernel))
+                         (pkern (stencil-kernel parent))
+                         (phooks (stencil-hooks parent))
+                         (grandpa (when (typep parent 'child-stencil)
+                                    (child-stencil-parent parent))))
+                     (when-let (inner (formula name pkern phooks grandpa))
+                       (find-ideal `(7 (0 . ,pax) . ,inner))))))))
+    (when-let (found (formula name kernel ilist parent))
+      (formula-function (icell-formula found)))))
