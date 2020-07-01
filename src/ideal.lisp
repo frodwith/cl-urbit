@@ -6,7 +6,7 @@
            #:child-kernel #:child-kernel-parent
            #:dynamic-kernel #:dynamic-kernel-axis
            #:stencil #:stencil-ideal #:stencil-hooks
-           #:stencil-kernel #:stencil-driver
+           #:stencil-kernel #:stencil-jet #:stencil-dispatch
            #:child-stencil #:child-stencil-parent
            #:assumption #:make-assumption #:assumption-valid
            #:core-speed #:speed-valid #:valid-cached-speed
@@ -50,15 +50,16 @@
              (:constructor dynamic-kernel (parent name axis driver)))
   (axis nil :type zig :read-only t))
 
-(defstruct (stencil (:constructor stencil (ideal hooks kernel driver)))
+(defstruct (stencil (:constructor stencil (ideal hooks kernel jet)))
   (ideal nil :type ideal :read-only t) ; battery or static core (see kernel)
   (hooks nil :type ideal :read-only t) ; unprocessed hook list
   (kernel nil :type kernel :read-only t)
-  (driver nil :type (or null function) :read-only t))
+  (jet nil :type (or null function) :read-only t)
+  (dispatch nil :type (or null symbol))) ; updated as arms are requested
 
 (defstruct (child-stencil
              (:include stencil)
-             (:constructor child-stencil (parent ideal hooks kernel driver)))
+             (:constructor child-stencil (parent ideal hooks kernel jet)))
   (parent nil :type stencil :read-only t))
 
 ; ideals - values which represent "ideal" noun values. while there may be many

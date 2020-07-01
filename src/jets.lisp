@@ -3,7 +3,8 @@
         #:urbit/data #:urbit/ideal #:urbit/world #:urbit/serial)
   (:import-from #:alexandria #:if-let)
   (:import-from #:urbit/data #:exit)
-  (:export #:jet-root #:jet-core #:jet-deaf-gate
+  (:export #:kernel-label #:kernel-static
+           #:jet-root #:jet-core #:jet-deaf-gate
            #:deaf #:trap #:gate #:deaf-gate-driver
            #:get-speed #:get-battery #:measure #:measure-battery
            #:zig-changes-speed #:cell->core #:parent-axis
@@ -85,20 +86,14 @@
                 collecting (urbit/convert:cord->string (kernel-name k))
                 until (typep k 'root-kernel))))
 
-; for debugging - remove
-;(defun print-stencil (stencil)
-;  (let ((k (stencil-kernel stencil)))
-;    (format t "~a(~a)~%" (kernel-label k) (if (typep k 'root-kernel)
-;                                                 "root"
-;                                                 (parent-axis k)))))
-
 (defun install-root-stencil (name icore hooks)
   (let* ((constant (icell-tail icore))
-         (battery (icell-battery (icell-head icore))))
+         (battery-ideal (icell-head icore))
+         (battery (icell-battery battery-ideal)))
     (flet ((make-stencil ()
              (let* ((kernel (find-root name constant))
-                    (driver (call-kernel-driver kernel nil icore hooks)))
-               (stencil icore hooks kernel driver)))
+                    (jet (call-kernel-driver kernel nil icore hooks)))
+               (stencil icore hooks kernel jet)))
            (meet (pairs)
              (invalidate-battery battery)
              (compile-root-meter (battery-stable battery) pairs))
@@ -141,8 +136,8 @@
                                (find-cons battery-ideal
                                           (stencil-ideal parent))
                                battery-ideal))
-                    (driver (call-kernel-driver kernel parent ideal hooks)))
-               (child-stencil parent ideal hooks kernel driver)))) 
+                    (jet (call-kernel-driver kernel parent ideal hooks)))
+               (child-stencil parent ideal hooks kernel jet))))
       (typecase match
         (root-match (error 'payload-conflict :battery battery)) 
         (null

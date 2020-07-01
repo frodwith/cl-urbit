@@ -103,6 +103,8 @@
             (in-world world
               (with-fresh-memos
                 (slam rep input))))
+;                (sb-sprof:with-profiling (:report :flat :loop nil)
+;                  (slam rep input)))))
           out))))
 
 (defun log-unregistered (w)

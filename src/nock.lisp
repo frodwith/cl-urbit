@@ -2,7 +2,7 @@
   (:use #:cl #:urbit/math #:urbit/zig #:urbit/jets #:urbit/equality
         #:urbit/ideal #:urbit/world #:urbit/data #:urbit/common #:urbit/syntax
         #:urbit/data/core #:urbit/data/slimcell #:urbit/data/slimatom)
-  (:import-from #:alexandria #:when-let #:when-let*)
+  (:import-from #:alexandria #:when-let #:when-let* #:if-let)
   (:export #:bottle #:in-world #:need #:need-sample
            #:icell-function #:cell-function
            #:nock #:slam #:make-slam #:soft #:resolve-hook #:call-hook
@@ -14,12 +14,14 @@
 
 ; helpers
 
-(defun compile-form (form)
-  (compile nil `(lambda (s)
-                  (declare (ignorable s) ; ignore unused subject (i.e. [1 1])
-                           ; delete unreachable note (code after crash) (SBCL ONLY)
-                           (sb-ext:muffle-conditions sb-ext:compiler-note))
-                  ,form)))
+(defun compile-form (name form)
+  (compile
+    name
+    `(lambda (s)
+       (declare (ignorable s) ; ignore unused subject (i.e. [1 1])
+                ; delete unreachable note (code after crash) (SBCL ONLY)
+                (sb-ext:muffle-conditions sb-ext:compiler-note))
+       ,form)))
 
 (defun icell-formula (c)
   (macrolet ((with-f (&body forms)
@@ -40,7 +42,7 @@
 (defun formula-function (formula)
   (or (formula-func formula)
       (setf (formula-func formula)
-            (compile-form (formula-form formula)))))
+            (compile-form nil (formula-form formula)))))
 
 (defun icell-function (icell)
   (formula-function (icell-formula icell)))
@@ -245,32 +247,13 @@
 (defmacro @8 (a b)
   `(@7 (^ ,a s) ,b))
 
-(defparameter *fast-profile* (make-hash-table))
-
-(defstruct profile
-  (calls 0 :type (integer 0))
-  (spent 0 :type (integer 0)))
-
-(defvar *current-start*)
-
-(defun fast-profile-report ()
-  (sort (loop for n being the hash-values of *fast-profile*
-              using (hash-key spd)
-              collect (cons (urbit/jets::kernel-label (stencil-kernel spd)) n))
-        #'> :key #'cdr))
-
 (defun call-jet (core axis-in-battery)
   (let ((spd (core-speed core)))
     (when (typep spd 'fast)
-      (or (when-let* ((driver (stencil-driver spd))
-                      (jet (funcall driver axis-in-battery)))
-            (funcall jet core))
-          (let ((total (or (gethash spd *fast-profile*) 0)))
-            (let* ((*current-start* (get-internal-run-time))
-                   (pro (nock core (dfrag axis-in-battery (head core))))
-                   (took (- (get-internal-run-time) *current-start*)))
-              (setf (gethash spd *fast-profile*) (+ took total))
-              pro))))))
+      (funcall
+        (funcall (or (stencil-dispatch spd) (first-stencil-dispatch spd))
+                 axis-in-battery)
+        core))))
 
 (defmacro @9 (axis core)
   (let ((jet-forms (and (> axis 1)
@@ -279,9 +262,6 @@
     `(@7 (cell->core ,core)
          (let ((f (@0 ,axis)))
            (or ,@jet-forms (@2 s f))))))
-;           (or ,@jet-forms
-;               (let ((pro (@2 s f)))
-;                 pro))))))
 
 (defun econs (z old head tail)
   (declare (zig z))
@@ -428,6 +408,49 @@
                   (tail u)
                   (exit-with [%hunk sample])))
             (error 'need :sample sample)))))
+
+(defun compile-stencil-arm (battery name axis)
+  (loop for n = battery then (if tail (icell-tail n) (icell-head n))
+        for tail in (unless (= 1 axis) (pax axis))
+        unless (ideep n) do (return nil) end
+        finally (let ((form (formula-form (icell-formula n)))
+                      (name (intern
+                              (string-upcase
+                                (format nil "~a/~a" (peg 2 axis) name)))))
+                  (return (compile-form name form)))))
+
+(defun compile-stencil-dispatch (stencil battery name sfx jet arms)
+  (let ((dis `(case axis
+                ,@arms
+                (t (let ((arms ',arms)
+                         (battery ',battery)
+                         (sfx ',sfx)
+                         (stencil ',stencil))
+                     (if-let (arm (compile-stencil-arm battery sfx axis))
+                       (progn
+                         (setf (stencil-dispatch stencil)
+                               (compile-stencil-dispatch
+                                 stencil battery ',name sfx jet
+                                 (cons `(,axis ',arm) arms)))
+                         arm)
+                       (error 'exit)))))))
+    (compile
+      name
+      `(lambda (axis)
+         (let ((jet ',jet))
+           ,(if jet
+                `(or (funcall jet axis) ,dis)
+                dis))))))
+
+(defun first-stencil-dispatch (stencil)
+  (let* ((kernel (stencil-kernel stencil))
+         (label (kernel-label kernel))
+         (ideal (stencil-ideal stencil))
+         (jet (stencil-jet stencil))
+         (battery (if (kernel-static kernel) (icell-head ideal) ideal))
+         (name (intern (string-upcase (format nil "dispatch/~a" label)))))
+    (setf (stencil-dispatch stencil)
+          (compile-stencil-dispatch stencil battery name label jet nil))))
 
 (defmacro soft (gate &body forms)
   `(handler-case
