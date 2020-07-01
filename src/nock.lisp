@@ -4,6 +4,7 @@
         #:urbit/data/core #:urbit/data/slimcell #:urbit/data/slimatom)
   (:import-from #:alexandria #:when-let #:when-let*)
   (:export #:bottle #:in-world #:need #:need-sample
+           #:icell-function #:cell-function
            #:nock #:slam #:make-slam #:soft #:hook
            #:compile-dynamic-hint #:compile-static-hint
            #:hint-tag #:hint-next #:hint-clue
@@ -41,13 +42,18 @@
       (setf (formula-func formula)
             (compile-form (formula-form formula)))))
 
-(defparameter +crash+ '(error 'exit))
+(defun icell-function (icell)
+  (formula-function (icell-formula icell)))
+
+(defun cell-function (cell)
+  (icell-function (get-ideal-cell cell)))
 
 (defun nock (subject formula)
   (if (deep formula)
-      (funcall (formula-function (icell-formula (get-ideal-cell formula)))
-               subject)
+      (funcall (cell-function formula) subject)
       (error 'exit)))
+
+(defparameter +crash+ '(error 'exit))
 
 (defun compile-noun (i)
   (if (ideep i)
@@ -241,16 +247,16 @@
 
 (defparameter *fast-profile* (make-hash-table))
 
-(defun kernel-label (kernel)
-  (format nil "~{~A~^/~}"
-          (loop for k = kernel then (child-kernel-parent k)
-                collecting (urbit/convert:cord->string (kernel-name k))
-                until (typep k 'root-kernel))))
+(defstruct profile
+  (calls 0 :type (integer 0))
+  (spent 0 :type (integer 0)))
+
+(defvar *current-start*)
 
 (defun fast-profile-report ()
   (sort (loop for n being the hash-values of *fast-profile*
               using (hash-key spd)
-              collect (cons (kernel-label (stencil-kernel spd)) n))
+              collect (cons (urbit/jets::kernel-label (stencil-kernel spd)) n))
         #'> :key #'cdr))
 
 (defun call-jet (core axis-in-battery)
@@ -259,10 +265,12 @@
       (or (when-let* ((driver (stencil-driver spd))
                       (jet (funcall driver axis-in-battery)))
             (funcall jet core))
-          (progn
-            (setf (gethash spd *fast-profile*)
-                  (1+ (or (gethash spd *fast-profile*) 0)))
-            nil)))))
+          (let ((total (or (gethash spd *fast-profile*) 0)))
+            (let* ((*current-start* (get-internal-run-time))
+                   (pro (nock core (dfrag axis-in-battery (head core))))
+                   (took (- (get-internal-run-time) *current-start*)))
+              (setf (gethash spd *fast-profile*) (+ took total))
+              pro))))))
 
 (defmacro @9 (axis core)
   (let ((jet-forms (and (> axis 1)
@@ -271,6 +279,9 @@
     `(@7 (cell->core ,core)
          (let ((f (@0 ,axis)))
            (or ,@jet-forms (@2 s f))))))
+;           (or ,@jet-forms
+;               (let ((pro (@2 s f)))
+;                 pro))))))
 
 (defun econs (z old head tail)
   (declare (zig z))
@@ -384,7 +395,7 @@
     (if (typep gate-speed 'void)
         (error 'cell-required :given battery)
         (let ((context (tail (tail gate)))
-              (nock (formula-function (icell-formula battery))))
+              (nock (icell-function battery)))
           (flet ((pay (sample) (slim-cons sample context))
                  (slam (payload spd)
                    (let ((subject (core-cons battery payload spd nil)))
@@ -429,25 +440,34 @@
                        (setf (skip-levels s) less)
                        (error s)))))))
 
-(defun hook (name kernel ilist parent)
-  (declare (uint name) (type (or null stencil) parent))
-  (labels ((formula (name kernel ilist parent)
-             (or (loop for n = ilist then (icell-tail n)
-                       while (ideep n)
-                       for pair = (icell-head n)
-                       do (when (ideep pair)
-                            (let ((hook-name (icell-head pair))
-                                  (hook-formula (icell-tail pair)))
-                              (when (and (ideep hook-formula)
-                                         (same hook-name name))
-                                (return hook-formula)))))
-                 (when parent
-                   (let ((pax (parent-axis kernel))
-                         (pkern (stencil-kernel parent))
-                         (phooks (stencil-hooks parent))
-                         (grandpa (when (typep parent 'child-stencil)
-                                    (child-stencil-parent parent))))
-                     (when-let (inner (formula name pkern phooks grandpa))
-                       (find-ideal `(7 (0 . ,pax) . ,inner))))))))
-    (when-let (found (formula name kernel ilist parent))
-      (formula-function (icell-formula found)))))
+(defun hook (name kernel parent-stencil hooks &key (skip 0))
+  (declare (uint name skip))
+  (labels ((formula (name kernel parent-stencil hooks skip)
+             (or (when (zerop skip)
+                   (loop for n = hooks then (icell-tail n)
+                         while (ideep n)
+                         for pair = (icell-head n)
+                         do (when (ideep pair)
+                              (let ((hook-name (icell-head pair))
+                                    (hook-formula (icell-tail pair)))
+                                (when (and (ideep hook-formula)
+                                           (= name (iint hook-name)))
+                                  (return hook-formula))))))
+                 (when parent-stencil
+                   (when-let
+                     (inner
+                       (formula
+                         name
+                         (stencil-kernel parent-stencil)
+                         (and (typep parent-stencil 'child-stencil)
+                              (child-stencil-parent parent-stencil))
+                         (stencil-hooks parent-stencil)
+                         (1- skip)))
+                     (let ((pax (peg 3 (parent-axis kernel))))
+                       (if (zerop skip)
+                           (find-ideal `(7 (0 . ,pax) . ,inner))
+                           inner)))))))
+    (when-let (found (formula name kernel parent-stencil hooks skip))
+      (let ((fn (icell-function found)))
+        (lambda (core)
+          (nullify-exit (funcall fn core)))))))

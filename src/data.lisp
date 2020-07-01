@@ -1,7 +1,7 @@
 (defpackage #:urbit/data
   (:use #:cl #:urbit/math)
-  (:export #:data-error #:unimplemented
-           #:exit #:exit-with #:exit-stack #:atom-required #:cell-required
+  (:export #:data-error #:unimplemented #:atom-required #:cell-required
+           #:exit #:exit-with #:exit-stack #:nullify-exit
            #:deep #:head #:tail #:cl-integer #:dfrag
            #:cached-mug #:cached-ideal #:cached-battery #:cached-speed))
 
@@ -22,6 +22,10 @@
   (let ((e (make-condition 'exit)))
     (push stack-item (exit-stack e))
     (error e)))
+
+(defmacro nullify-exit (&body forms)
+  `(handler-case (progn ,@forms)
+     (exit () nil)))
 
 (define-condition atom-required (exit) ())
 (define-condition cell-required (exit) ())

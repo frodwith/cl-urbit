@@ -75,7 +75,7 @@
 (defun print-tape (tape &optional out)
   (loop for n = tape then (tail n)
         while (deep n)
-        for c = (head n)
+        for c = (code-char (cl-integer (head n)))
         do (write-char c out)))
 
 (defun print-wall (w &optional out)
@@ -85,17 +85,25 @@
         do (print-tape tape out)
         do (terpri)))
 
+(defmacro with-prints (&body forms)
+  `(handler-bind
+     ((unregistered-parent #'log-unregistered)
+      (slog #'log-slog))
+     ,@forms))
+
 (defun make-toplevel (ivory-path in out)
-  (let* ((world (load-k141 t))
+  (let* ((world (with-prints (load-k141 t)))
          (rep (in-world world
                 (with-fresh-memos
                   (with-lite-boot ivory-path
                     (wish +rep-hoon+))))))
     (lambda ()
       (print-wall
-        (let ((input (read-cord in)))
-          (in-world world (slam rep input)))
-        out))))
+          (let ((input (read-cord in)))
+            (in-world world
+              (with-fresh-memos
+                (slam rep input))))
+          out))))
 
 (defun log-unregistered (w)
   (format t "unregistered: ~a at axis ~a~%"
@@ -111,10 +119,9 @@
           (t (error 'exit))))
       (exit () (format t "weird slog ~a~%" tank)))))
 
+(defvar *test-output*)
+
 (defun test-toplevel ()
   (with-input-from-string (in "(add 40 2)")
     (with-output-to-string (out)
-      (handler-bind 
-        ((unregistered-parent #'log-unregistered)
-         (slog #'log-slog))
-        (funcall (make-toplevel #P"/tmp/ivory.pill" in out))))))
+      (funcall (make-toplevel #P"/tmp/ivory.pill" in out)))))

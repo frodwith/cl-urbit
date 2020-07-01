@@ -46,8 +46,10 @@
 (defun cord->tape (a)
   (declare (cord a))
   (loop with len = (met 3 a)
+        with vec = (int->octets a len)
         for tape = 0 then (cons c tape)
-        for c across (reverse (int->octets a len))
+        for i from (1- len) downto 0
+        for c = (aref vec i)
         finally (return tape)))
 
 (defun tape->cord (tape)

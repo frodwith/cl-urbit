@@ -3,9 +3,11 @@
         #:urbit/data #:urbit/ideal #:urbit/world #:urbit/serial)
   (:import-from #:alexandria #:if-let)
   (:import-from #:urbit/data #:exit)
-  (:export #:jet-root #:jet-core #:gate #:gate-driver #:get-speed #:get-battery
-           #:measure #:measure-battery #:zig-changes-speed #:cell->core
-           #:install-child-stencil #:install-root-stencil #:parent-axis
+  (:export #:jet-root #:jet-core #:jet-deaf-gate
+           #:deaf #:trap #:gate #:deaf-gate-driver
+           #:get-speed #:get-battery #:measure #:measure-battery
+           #:zig-changes-speed #:cell->core #:parent-axis
+           #:install-child-stencil #:install-root-stencil
            #:load-world #:save-jet-pack #:install-jet-pack))
 
 (in-package #:urbit/jets)
@@ -77,6 +79,19 @@
   (setf (assumption-valid (battery-stable b)) nil)
   (setf (battery-stable b) (make-assumption)))
 
+(defun kernel-label (kernel)
+  (format nil "~{~A~^/~}"
+          (loop for k = kernel then (child-kernel-parent k)
+                collecting (urbit/convert:cord->string (kernel-name k))
+                until (typep k 'root-kernel))))
+
+; for debugging - remove
+;(defun print-stencil (stencil)
+;  (let ((k (stencil-kernel stencil)))
+;    (format t "~a(~a)~%" (kernel-label k) (if (typep k 'root-kernel)
+;                                                 "root"
+;                                                 (parent-axis k)))))
+
 (defun install-root-stencil (name icore hooks)
   (let* ((constant (icell-tail icore))
          (battery (icell-battery (icell-head icore))))
@@ -88,7 +103,6 @@
              (invalidate-battery battery)
              (compile-root-meter (battery-stable battery) pairs))
            (save (stencil)
-             (format t "saving ~a~%" (urbit/convert:cord->string name))
              (push stencil (world-stencils *world*))
              stencil))
       (let ((match (battery-match battery)))
@@ -115,7 +129,6 @@
   (let* ((battery (icell-battery battery-ideal))
          (match (battery-match battery)))
     (flet ((save (stencil)
-             (format t "saving ~a~%" (urbit/convert:cord->string name))
              (push stencil (world-stencils *world*))
              stencil)
            (meet (z pairs)
@@ -188,18 +201,31 @@
 ;     (when (= 1 axis-in-battery) 
 ;       (lambda (core) nil))))
 
-(defun gate-driver (sample-function)
-  (lambda (kernel parent-stencil hooks ideal)
+; most drivers are deaf (they ignore "extra" driver info)
+(defun deaf (axis-fn)
+  (lambda (kernel parent-stencil ideal hooks)
     (declare (ignore kernel parent-stencil ideal hooks))
-    (lambda (axis)
-      (when (= axis 1)
-        (lambda (core)
-          (funcall sample-function (head (tail core))))))))
+    axis-fn))
+
+; most common axis-fn - whole battery is formula, nothing else defined
+(defun trap (core-fn)
+  (lambda (axis)
+    (when (= axis 1)
+      core-fn)))
+
+; most common core-fn - only the sample is examined
+(defun gate (sample-fn)
+  (lambda (core)
+    (funcall sample-fn (head (tail core)))))
+
+; most common driver is a deaf gate driver
+(defun deaf-gate-driver (sample-fn)
+  (deaf (trap (gate sample-fn))))
 
 ; probably most of the leaf notes in your jet tree can be expressed
-; by saying something like (GATE %add (lambda (sample) ...))
-(defun gate (name sample-function)
-  (jet-core name 3 (gate-driver sample-function)))
+; by saying something like (JET-DEAF-GATE %add (lambda (sample) ...))
+(defun jet-deaf-gate (name sample-fn)
+  (jet-core name 3 (deaf-gate-driver sample-fn)))
 
 ; INSTALL-TREE and its helpers should probably only be called by LOAD-WORLD
 (defun install-jet-children (jet-parent parent-kernel)

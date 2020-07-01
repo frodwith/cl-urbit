@@ -1,6 +1,6 @@
 (defpackage #:urbit/data/slimcell
   (:use #:cl #:urbit/cell-meta)
-  (:export #:slim-cons))
+  (:export #:slim-cons #:slim-tuple))
 
 (in-package #:urbit/data/slimcell)
 
@@ -12,3 +12,10 @@
   (meta nil :type cell-meta))
 
 (define-cell-methods slimcell slimcell-head slimcell-tail slimcell-meta)
+
+(defmacro slim-tuple (&rest elements)
+  (labels ((rec (es)
+             (if (null (cdr es))
+                 (car es)
+                 `(slim-cons ,(car es) ,(rec (cdr es))))))
+    (and elements (rec elements))))

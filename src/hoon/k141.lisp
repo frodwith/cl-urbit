@@ -4,6 +4,7 @@
         #:urbit/convert #:urbit/math #:urbit/data #:urbit/hints
         #:urbit/nock #:urbit/equality #:urbit/serial #:urbit/world
         #:urbit/data/slimatom #:urbit/data/slimcell)
+  (:import-from #:alexandria #:when-let #:when-let* #:if-let)
   (:export #:load-k141))
 
 (in-package #:urbit/hoon/k141)
@@ -17,9 +18,9 @@
 
 (defmacro gfn (name pattern &body forms)
   (let ((sam (gensym)))
-    `(gate ,name
-           (lambda (,sam)
-             (dedata ,pattern ,sam ,@forms)))))
+    `(jet-deaf-gate ,name
+       (lambda (,sam)
+         (dedata ,pattern ,sam ,@forms)))))
 
 (defmacro gcmp (name cmp)
   `(gfn ,name (@@a @@b) (loob (,cmp a b))))
@@ -202,6 +203,182 @@
     (digest-sequence :sha256 (int->octets ruz len))
     32))
 
+; "partial memoization" caches for the hoon compiler
+
+; a version of the hoon compiler is specified as the battery of ut and an
+; icell for ut's static context. these are weakrefs, so losing all references
+; to a hoon compiler clears its caches.
+(defun versioned-compiler-cache (table ut-battery ut-context size)
+  (if-let (top (gethash ut-battery table))
+    (or (gethash ut-context top)
+        (setf (gethash ut-context top) (make-compiler-cache size)))
+    (let* ((top (make-hash-table :test 'eq :weakness :key)))
+      (setf (gethash ut-battery table) top)
+      (setf (gethash ut-context top) (make-compiler-cache size)))))
+
+; each cached compiler function gets its own versioned table,
+; capped at a fixed number of entries, keyed on noun sameness
+(defmacro define-compiler-cache (name size)
+  (let ((table (intern (format nil "*~a-table*" name))))
+    `(progn
+       (defparameter ,table (make-hash-table :test 'eq :weakness :key))
+       (defun ,name (ut-battery ut-context)
+         (versioned-compiler-cache ,table ut-battery ut-context ,size)))))
+
+; each cache is keyed by a noun key (get relevants pieces of subject)
+; empty goes down to zero from the initial value, after which each put
+; into the table is preceded by an eviction (clock algorithm)
+(sb-ext:define-hash-table-test same mug)
+(defstruct (compiler-cache (:constructor make-compiler-cache (empty)))
+  (empty 0 :type (integer 0)) 
+  (table (make-hash-table :test 'same) :type hash-table :read-only t)
+  (clock nil :type list))
+
+; we cycle around all the entries in the table, marking warm things cold
+; until we find a cold thing, and evict it
+(defun compiler-cache-evict (cache)
+  (let ((table (compiler-cache-table cache)))
+    (loop named outer 
+          do (loop for ((key . node) . more) on (compiler-cache-clock cache)
+                   do (if (car node)
+                          (setf (car node) nil)
+                          (progn
+                            (setf (compiler-cache-clock cache) more)
+                            (remhash key table)
+                            (return-from outer))))
+          do (setf (compiler-cache-clock cache) 
+                   (loop for k being the hash-keys of table
+                         using (hash-value v)
+                         collect (cons k v))))))
+
+(defun compiler-cache-lookup (cache key compute)
+  (let ((table (compiler-cache-table cache)))
+    (if-let (node (gethash key table))
+      (progn ; the act of looking up a key causes it to be marked warm
+        (setf (car node) t)
+        (cdr node))
+      (let ((value (funcall compute))
+            (slots (compiler-cache-empty cache)))
+        (if (zerop slots)
+            (compiler-cache-evict cache)
+            (setf (compiler-cache-empty cache) (1- slots)))
+        (setf (gethash key table) (cons t value))
+        value))))
+
+(defun compute-gate (gate)
+  (lambda ()
+    (nock gate (head gate))))
+
+(defun unpack-ut (ut-core)
+  (let* ((upay (tail ut-core))
+         (pen (get-ideal-cell (tail (tail upay)))))
+    (values (head upay) pen (get-battery ut-core))))
+
+(defun look-in (core ut-battery ut-context cache-fn noun-key)
+  (compiler-cache-lookup (funcall cache-fn ut-battery ut-context)
+    noun-key
+    (compute-gate core)))
+
+(defparameter +large-cache+ 1024)
+(defparameter +small-cache+ 256)
+
+; the cache sizes are arbitrary - tune them? i took a guess at which ones
+; should be bigger, but the main idea is that you can size them independently,
+; and they don't step on each others' values.
+(define-compiler-cache nest-cache +large-cache+)
+(defun nest-driver (kernel parent-stencil ideal hooks)
+  (declare (ignore ideal))
+  (when-let (vet-hook (hook %vet kernel parent-stencil hooks :skip 3))
+    (trap
+      (lambda (core)
+        (let* ((nest-in (tail core))
+               (in-pay (tail nest-in))
+               (in-sam (head in-pay))
+               (seg (head in-sam))
+               (reg (head (tail in-sam)))
+               (nest (tail in-pay))
+               (nest-pay (tail nest))
+               (nest-sam (head nest-pay))
+               (ref (tail nest-sam))
+               (ut (tail nest-pay)))
+          (when-let (vet (funcall vet-hook ut))
+            (multiple-value-bind (sut but pen) (unpack-ut ut)
+              (look-in core but pen #'nest-cache
+                       (slim-tuple seg reg vet sut ref)))))))))
+
+(defun vet-sut-sam (kernel parent-stencil hooks cache-fn)
+  (when-let (vet-hook (hook %vet kernel parent-stencil hooks :skip 1))
+    (trap
+      (lambda (core)
+        (let* ((pay (tail core))
+               (sam (head pay))
+               (ut (tail pay)))
+          (when-let (vet (funcall vet-hook ut))
+            (multiple-value-bind (sut but pen) (unpack-ut ut)
+              (look-in core but pen cache-fn
+                       (slim-tuple vet sut sam)))))))))
+
+(defun vrf-sut-sam (kernel parent-stencil hooks cache-fn)
+  (when-let* ((vet-hook (hook %vet kernel parent-stencil hooks :skip 1))
+              (fab-hook (hook %fab kernel parent-stencil hooks :skip 1)))
+    (trap
+      (lambda (core)
+        (let* ((pay (tail core))
+               (sam (head pay))
+               (ut (tail pay)))
+          (when-let* ((vet (funcall vet-hook ut))
+                      (fab (funcall fab-hook ut)))
+            (multiple-value-bind (sut but pen) (unpack-ut ut)
+              (look-in core but pen cache-fn
+                       (slim-tuple vet fab sut sam)))))))))
+
+(define-compiler-cache crop-cache +small-cache+)
+(defun crop-driver (kernel parent-stencil ideal hooks)
+  (declare (ignore ideal))
+  (vet-sut-sam kernel parent-stencil hooks #'crop-cache))
+
+(define-compiler-cache fish-cache +small-cache+)
+(defun fish-driver (kernel parent-stencil ideal hooks)
+  (declare (ignore ideal))
+  (vet-sut-sam kernel parent-stencil hooks #'fish-cache))
+
+(define-compiler-cache fond-cache +small-cache+)
+(defun fond-driver (kernel parent-stencil ideal hooks)
+  (declare (ignore ideal))
+  (vet-sut-sam kernel parent-stencil hooks #'fond-cache))
+
+(define-compiler-cache fuse-cache +small-cache+)
+(defun fuse-driver (kernel parent-stencil ideal hooks)
+  (declare (ignore ideal))
+  (vet-sut-sam kernel parent-stencil hooks #'fuse-cache))
+
+(define-compiler-cache mint-cache +large-cache+)
+(defun mint-driver (kernel parent-stencil ideal hooks)
+  (declare (ignore ideal))
+  (vrf-sut-sam kernel parent-stencil hooks #'mint-cache))
+
+(define-compiler-cache mull-cache +large-cache+)
+(defun mull-driver (kernel parent-stencil ideal hooks)
+  (declare (ignore ideal))
+  (vet-sut-sam kernel parent-stencil hooks #'mull-cache))
+
+(define-compiler-cache peek-cache +small-cache+)
+(defun peek-driver (kernel parent-stencil ideal hooks)
+  (declare (ignore ideal))
+  (vet-sut-sam kernel parent-stencil hooks #'peek-cache))
+
+(define-compiler-cache play-cache +small-cache+)
+(defun play-driver (kernel parent-stencil ideal hooks)
+  (declare (ignore ideal))
+  (vrf-sut-sam kernel parent-stencil hooks #'play-cache))
+
+(define-compiler-cache rest-cache +small-cache+)
+(defun rest-driver (kernel parent-stencil ideal hooks)
+  (declare (ignore ideal))
+  (vet-sut-sam kernel parent-stencil hooks #'rest-cache))
+
+; the actual jet tree
+
 (defparameter +jets+
   (list
     (jet-root
@@ -279,7 +456,7 @@
             (cue-slim-from-int a))
           (jet-core
             %muk 27
-            (gate-driver
+            (deaf-gate-driver
               (lambda (sample)
                 (dedata (@@syd @@len @@key) sample
                   (muk syd len key)))))
@@ -302,22 +479,43 @@
                     (:error (slim-cons 2 val)))))
               (jet-core
                 %mule 3
-                (lambda (kernel parent-stencil hooks ideal)
+                (lambda (kernel parent-stencil ideal hooks)
                   (declare (ignore ideal))
+                  ; with partial evaluation (or just a 0 sample?) the
+                  ; mute gate could be produced outside the driver
                   (break)
-                  (let ((mute (hook %mute kernel hooks parent-stencil)))
-                    (lambda (axis)
-                      (when (= axis 1)
-                        (lambda (core)
-                          (slam (funcall mute core)
-                                (head (tail core))))))))))))))))
+                  (when-let (hook (hook %mute kernel parent-stencil hooks))
+                    (trap
+                      (lambda (core)
+                        (when-let (mute (funcall hook core))
+                          (let ((sample (head (tail core))))
+                            (nullify-exit (slam mute sample)))))))))
+              (jet-core
+                %pen 1 nil
+                (jet-core
+                  %ut 7 nil
+                  (jet-core %crop 3 #'crop-driver)
+                  (jet-core %fish 3 #'fish-driver)
+                  (jet-core %fond 3 #'fond-driver)
+                  (jet-core %fuse 3 #'fuse-driver)
+                  (jet-core %mint 3 #'mint-driver)
+                  (jet-core %mull 3 #'mull-driver)
+                  (jet-core %peek 3 #'peek-driver)
+                  (jet-core %play 3 #'play-driver)
+                  (jet-core %rest 3 #'rest-driver)
+                  (jet-core
+                    %nest 3 nil
+                    (jet-core
+                      %nest-in 3 nil
+                      (jet-core %nest-dext 1 #'nest-driver))))))))))))
 
 (defun k141-hinter (tag clue next)
   (when clue
     (case tag
       (%slog +handle-slog+)
       (%memo (handle-memo next))
-      ((%hunk %hand %mean %lose %spot) (handle-stack tag)))))
+      )))
+      ;((%hunk %hand %mean %lose %spot) (handle-stack tag)))))
 
 (defun load-k141 (&optional fast-hints-enabled)
   (load-world :jet-tree +jets+

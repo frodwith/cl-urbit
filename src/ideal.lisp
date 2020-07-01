@@ -171,7 +171,7 @@
                          (write-char #\space out)
                          (recur (icell-tail o) t)
                          (unless tail (write-char #\] out)))
-                       (prin1 o out))))
+                       (prin1 (iint o) out))))
           (recur c nil))
         (format out "~x" (icell-mug c)))))
 
