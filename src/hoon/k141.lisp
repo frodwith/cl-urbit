@@ -288,7 +288,7 @@
 (define-compiler-cache nest-cache +large-cache+)
 (defun nest-driver (kernel parent-stencil ideal hooks)
   (declare (ignore ideal))
-  (when-let (vet-hook (hook %vet kernel parent-stencil hooks :skip 3))
+  (when-let (veth (resolve-hook %vet kernel parent-stencil hooks :skip 3))
     (trap
       (lambda (core)
         (let* ((nest-in (tail core))
@@ -301,33 +301,33 @@
                (nest-sam (head nest-pay))
                (ref (tail nest-sam))
                (ut (tail nest-pay)))
-          (when-let (vet (funcall vet-hook ut))
+          (when-let (vet (call-hook veth ut))
             (multiple-value-bind (sut but pen) (unpack-ut ut)
               (look-in core but pen #'nest-cache
                        (slim-tuple seg reg vet sut ref)))))))))
 
 (defun vet-sut-sam (kernel parent-stencil hooks cache-fn)
-  (when-let (vet-hook (hook %vet kernel parent-stencil hooks :skip 1))
+  (when-let (veth (resolve-hook %vet kernel parent-stencil hooks :skip 1))
     (trap
       (lambda (core)
         (let* ((pay (tail core))
                (sam (head pay))
                (ut (tail pay)))
-          (when-let (vet (funcall vet-hook ut))
+          (when-let (vet (call-hook veth ut))
             (multiple-value-bind (sut but pen) (unpack-ut ut)
               (look-in core but pen cache-fn
                        (slim-tuple vet sut sam)))))))))
 
 (defun vrf-sut-sam (kernel parent-stencil hooks cache-fn)
-  (when-let* ((vet-hook (hook %vet kernel parent-stencil hooks :skip 1))
-              (fab-hook (hook %fab kernel parent-stencil hooks :skip 1)))
+  (when-let* ((veth (resolve-hook %vet kernel parent-stencil hooks :skip 1))
+              (fabh (resolve-hook %fab kernel parent-stencil hooks :skip 1)))
     (trap
       (lambda (core)
         (let* ((pay (tail core))
                (sam (head pay))
                (ut (tail pay)))
-          (when-let* ((vet (funcall vet-hook ut))
-                      (fab (funcall fab-hook ut)))
+          (when-let* ((vet (call-hook veth ut))
+                      (fab (call-hook fabh ut)))
             (multiple-value-bind (sut but pen) (unpack-ut ut)
               (look-in core but pen cache-fn
                        (slim-tuple vet fab sut sam)))))))))
@@ -484,10 +484,11 @@
                   ; with partial evaluation (or just a 0 sample?) the
                   ; mute gate could be produced outside the driver
                   (break)
-                  (when-let (hook (hook %mute kernel parent-stencil hooks))
+                  (when-let
+                    (muth (resolve-hook %mute kernel parent-stencil hooks))
                     (trap
                       (lambda (core)
-                        (when-let (mute (funcall hook core))
+                        (when-let (mute (call-hook muth core))
                           (let ((sample (head (tail core))))
                             (nullify-exit (slam mute sample)))))))))
               (jet-core
@@ -514,8 +515,8 @@
     (case tag
       (%slog +handle-slog+)
       (%memo (handle-memo next))
-      )))
-      ;((%hunk %hand %mean %lose %spot) (handle-stack tag)))))
+;      )))
+      ((%hunk %hand %mean %lose %spot) (handle-stack tag)))))
 
 (defun load-k141 (&optional fast-hints-enabled)
   (load-world :jet-tree +jets+

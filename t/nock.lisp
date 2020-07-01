@@ -149,7 +149,7 @@
   (list
     (jet-root
       %kack %kack nil
-      (gate %dec #'mock-dec))))
+      (jet-deaf-gate %dec #'mock-dec))))
 
 (defun ack (n m)
   (nock [n m] (copy-tree [9 2 10 [6 0 1] +ackerman-source+])))
@@ -280,11 +280,11 @@
       %kern 42 nil
       (jet-core
         %one 1 nil
-        (gate %dec #'memo-dec)
-        (gate %add #'memo-add)
+        (jet-deaf-gate %dec #'memo-dec)
+        (jet-deaf-gate %add #'memo-add)
         (jet-core
           %two 1 nil
-          (gate %fib #'memo-fib))))))
+          (jet-deaf-gate %fib #'memo-fib))))))
 
 (test memo
   (in-world (load-world :hinter (compose-hinters #'memo-hinter #'fast-hinter)

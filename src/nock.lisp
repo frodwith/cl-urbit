@@ -5,7 +5,7 @@
   (:import-from #:alexandria #:when-let #:when-let*)
   (:export #:bottle #:in-world #:need #:need-sample
            #:icell-function #:cell-function
-           #:nock #:slam #:make-slam #:soft #:hook
+           #:nock #:slam #:make-slam #:soft #:resolve-hook #:call-hook
            #:compile-dynamic-hint #:compile-static-hint
            #:hint-tag #:hint-next #:hint-clue
            #:before #:after #:around))
@@ -172,17 +172,17 @@
                     (destructuring-bind (tag . data) hinter
                       (case tag
                         (:before
-                          `(@11d-before (,itag ,clue-form) ,next-form ,data))
+                          `(@11d-before (,itag ,clue-form) ,next-form ',data))
                         (:after
-                          `(@11d-after (,itag ,clue-form) ,next-form ,data))
+                          `(@11d-after (,itag ,clue-form) ,next-form ',data))
                         (:catch
-                          `(@11d-catch (,itag ,clue-form) ,next-form ,data))
+                          `(@11d-catch (,itag ,clue-form) ,next-form ',data))
                         (:around
                           (when (consp data)
                             (destructuring-bind (before . after) data
                               `(@11d-around
                                  (,itag ,clue-form)
-                                 ,next-form ,before ,after)))))))
+                                 ,next-form ',before ',after)))))))
                   `(@11d (,itag ,clue-form) ,next-form))))
           (let* ((itag (iint hint))
                  (hinter (funcall (world-hinter *world*)
@@ -191,16 +191,16 @@
                   (destructuring-bind (tag . data) hinter
                     (case tag
                       (:before
-                        `(@11s-before ,itag ,next-form ,data))
+                        `(@11s-before ,itag ,next-form ',data))
                       (:after
-                        `(@11s-after ,itag ,next-form ,data))
+                        `(@11s-after ,itag ,next-form ',data))
                       (:catch
-                        `(@11s-catch ,itag ,next-form ,data))
+                        `(@11s-catch ,itag ,next-form ',data))
                       (:around
                         (when (consp data)
                           (destructuring-bind (before . after) data
                             `(@11s-around ,itag ,next-form
-                                          ,before ,after)))))))
+                                          ',before ',after)))))))
                 `(@11s ,itag ,next-form)))))))
 
 (defun compile-12 (a)
@@ -348,18 +348,20 @@
 
 (defmacro @11s-catch (tag next handler)
   (declare (ignore tag))
-  `(handler-case ,next
-     (exit (e)
-       (funcall ,handler s e)
-       (error e))))
+  `(handler-bind
+     ((exit (lambda (e)
+              (funcall ,handler s clu e)
+              nil)))
+     ,next))
 
 (defmacro @11d-catch ((tag clue) next handler)
   (declare (ignore tag))
   `(let ((clu ,clue))
-     (handler-case ,next
-       (exit (e)
-         (funcall ,handler s clu e)
-         (error e)))))
+     (handler-bind
+       ((exit (lambda (e)
+                (funcall ,handler s clu e)
+                nil)))
+       ,next)))
 
 (defmacro @11s-around (tag next before after)
   (declare (ignore tag))
@@ -440,7 +442,10 @@
                        (setf (skip-levels s) less)
                        (error s)))))))
 
-(defun hook (name kernel parent-stencil hooks &key (skip 0))
+(defun call-hook (hook-fn subject)
+  (nullify-exit (funcall hook-fn subject)))
+
+(defun resolve-hook (name kernel parent-stencil hooks &key (skip 0))
   (declare (uint name skip))
   (labels ((formula (name kernel parent-stencil hooks skip)
              (or (when (zerop skip)
@@ -468,6 +473,4 @@
                            (find-ideal `(7 (0 . ,pax) . ,inner))
                            inner)))))))
     (when-let (found (formula name kernel parent-stencil hooks skip))
-      (let ((fn (icell-function found)))
-        (lambda (core)
-          (nullify-exit (funcall fn core)))))))
+      (icell-function found))))
