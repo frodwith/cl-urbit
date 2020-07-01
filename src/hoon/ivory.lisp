@@ -91,7 +91,7 @@
       (slog #'log-slog))
      ,@forms))
 
-(defun make-toplevel (ivory-path in out)
+(defun make-toplevel (ivory-path)
   (let* ((world (with-prints (load-k141 t)))
          (rep (in-world world
                 (with-fresh-memos
@@ -99,13 +99,14 @@
                     (wish +rep-hoon+))))))
     (lambda ()
       (print-wall
-          (let ((input (read-cord in)))
+          (let ((input (read-cord *standard-input*)))
             (in-world world
-              (with-fresh-memos
-                (slam rep input))))
+              (with-prints
+                (with-fresh-memos
+                  (slam rep input)))))
 ;                (sb-sprof:with-profiling (:report :flat :loop nil)
 ;                  (slam rep input)))))
-          out))))
+          *standard-output*))))
 
 (defun log-unregistered (w)
   (format t "unregistered: ~a at axis ~a~%"
@@ -121,9 +122,12 @@
           (t (error 'exit))))
       (exit () (format t "weird slog ~a~%" tank)))))
 
-(defvar *test-output*)
+(defun save-hoon-and-die (exe-path pill-path)
+  (sb-ext:save-lisp-and-die exe-path
+    :executable t
+    :toplevel (make-toplevel pill-path)))
 
 (defun test-toplevel ()
   (with-input-from-string (in "(add 40 2)")
     (with-output-to-string (out)
-      (funcall (make-toplevel #P"/tmp/ivory.pill" in out)))))
+      (funcall (make-toplevel #P"/tmp/ivory.pill")))))
