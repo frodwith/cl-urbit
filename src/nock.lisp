@@ -414,9 +414,7 @@
         for tail in (unless (= 1 axis) (pax axis))
         unless (ideep n) do (return nil) end
         finally (let ((form (formula-form (icell-formula n)))
-                      (name (intern
-                              (string-upcase
-                                (format nil "~a/~a" (peg 2 axis) name)))))
+                      (name (gensym (format nil "~a/~a" (peg 2 axis) name))))
                   (return (compile-form name form)))))
 
 (defun compile-stencil-dispatch (stencil battery name sfx jet arms)
@@ -448,7 +446,7 @@
          (ideal (stencil-ideal stencil))
          (jet (stencil-jet stencil))
          (battery (if (kernel-static kernel) (icell-head ideal) ideal))
-         (name (intern (string-upcase (format nil "dispatch/~a" label)))))
+         (name (gensym (format nil "dispatch/~a" label))))
     (setf (stencil-dispatch stencil)
           (compile-stencil-dispatch stencil battery name label jet nil))))
 

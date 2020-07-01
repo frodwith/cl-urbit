@@ -130,4 +130,6 @@
 (defun test-toplevel ()
   (with-input-from-string (in "(add 40 2)")
     (with-output-to-string (out)
-      (funcall (make-toplevel #P"/tmp/ivory.pill")))))
+      (let ((*standard-input* in)
+            (*standard-output* out))
+        (funcall (make-toplevel #P"/tmp/ivory.pill"))))))
