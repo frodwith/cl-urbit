@@ -92,11 +92,12 @@
      ,@forms))
 
 (defun make-toplevel (ivory-path)
-  (let* ((world (with-prints (load-k141 t)))
+  (let* ((world (load-k141 t))
          (rep (in-world world
-                (with-fresh-memos
-                  (with-lite-boot ivory-path
-                    (wish +rep-hoon+))))))
+                (with-prints
+                  (with-fresh-memos
+                    (with-lite-boot ivory-path
+                      (wish +rep-hoon+)))))))
     (lambda ()
       (print-wall
           (let ((input (read-cord *standard-input*)))
