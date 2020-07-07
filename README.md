@@ -21,8 +21,10 @@ and I expect a lot of other things don't work yet.
   * Install SBCL (http://sbcl.org or use your package manager)
   * Install Quicklisp (https://www.quicklisp.org/beta/index.html#installation)
   * Add this repo to Quicklisp's local projects
+
         cd ~/quicklisp/local-projects
         git clone http://github.com/frodwith/cl-urbit.git
+
   * Get an ivory pill (https://github.com/urbit/urbit/tree/master/bin)
   * Build a hoon executable
 
