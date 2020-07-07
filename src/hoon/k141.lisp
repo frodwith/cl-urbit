@@ -5,7 +5,7 @@
         #:urbit/nock #:urbit/equality #:urbit/serial #:urbit/world
         #:urbit/data/slimatom #:urbit/data/slimcell)
   (:import-from #:alexandria #:when-let #:when-let* #:if-let)
-  (:export #:load-k141))
+  (:export #:load-k141 #:flop))
 
 (in-package #:urbit/hoon/k141)
 
@@ -483,7 +483,7 @@
                   (ecase tag
                     (:success (slim-cons 0 val))
                     (:block (slim-cons 1 (tail val)))
-                    (:error (slim-cons 2 val)))))
+                    (:error (slim-cons 2 (flop val))))))
               (jet-core
                 %mule 3
                 (lambda (kernel parent-stencil ideal hooks)

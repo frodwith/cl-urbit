@@ -85,7 +85,7 @@
 (defun stack-trace-printer (wash mook out)
   (lambda (tax)
     (handler-case
-      (loop for n = (funcall mook tax) then (tail n)
+      (loop for n = (funcall mook (flop tax)) then (tail n)
             while (deep n)
             for i = (head n)
             do (print-wall (funcall wash i) out))
@@ -150,8 +150,9 @@
                 (slog slogger))
               (when-let (subject
                           (with-trace
-                            (loop for vase = init
-                                  then (funcall slap vase cord)
+                            (loop for vase = (with-fresh-memos init)
+                                  then (with-fresh-memos
+                                         (funcall slap vase cord))
                                   for filename in args
                                   for path = (parse-namestring filename)
                                   for cord = (cord-from-file path)
