@@ -29,7 +29,7 @@ and I expect a lot of other things don't work yet.
   * Build a hoon executable
 
         sbcl
-        (asdf:load-system :cl-urbit)
+        (ql:quickload :cl-urbit)
         (urbit/hoon/ivory:save-hoon-and-die #P"/tmp/hoon" #P"/tmp/ivory.pill")
 
 # Hoon REPL Usage
