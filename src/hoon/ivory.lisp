@@ -120,9 +120,10 @@
 
 (defun help (name)
   (opts:describe
-         :prefix "standalone hoon interpreter"
+         :prefix "standalone hoon interpreter. =~ arguments and pretty-print."
           :usage-of name
-          :args "[one.hoon two.hoon tre.hoon ...]"))
+          :args "[one.hoon two.hoon tre.hoon ...]")
+  (sb-ext:exit))
 
 (defun make-ivory-toplevel (&key name world init sell slap mook wash)
   (lambda ()
