@@ -287,6 +287,20 @@
 ; and they don't step on each others' values.
 (define-compiler-cache nest-cache +large-cache+)
 (defun nest-driver (kernel parent-stencil ideal hooks)
+  ; would like to access the arm version rather than the formula version
+  ; in these fallbacks. Maybe a proto-stencil object to be passed to the
+  ; drivers that could hold onto the dispatch function, and make the
+  ; signatures for a lot of these functions (resolve-hook, etc) nicer.
+  ; then profiling would be more accurate, and we can implement different
+  ; declarations for arms vs. formulas
+  ; more aggressive optimizations and longer time spent for fast arms
+  ; turn the optimizer down and go for compilation speed and space in formulas
+  ; might even make sense to use an interpreter as a base tier
+  ; like every formula starts interpreted, till its run 100 times, then
+  ; we compile it with the optimizer turned down till it runs 10k times,
+  ; then we turn the optimizer up.
+  ; and fast arms always have the optimizer turned all the way up.
+  ; that could cut down on our startup time.
   (let ((battery-fn (icell-function ideal)))
     (when-let (veth (resolve-hook %vet kernel parent-stencil hooks :skip 3))
       (trap

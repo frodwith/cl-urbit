@@ -1,7 +1,7 @@
 (defpackage #:urbit/hints
   (:use #:cl #:urbit/data #:urbit/math #:urbit/ideal #:urbit/world
         #:urbit/jets #:urbit/syntax #:urbit/common #:urbit/convert
-        #:urbit/mug #:urbit/equality)
+        #:urbit/mug #:urbit/equality #:urbit/data/slimcell)
   (:export #:compose-hinters #:+handle-slog+ #:handle-memo #:handle-stack
            #:handle-fast #:fast-hinter #:bad-fast #:unregistered-parent
            #:unregistered-name #:unregistered-axis #:unregistered-core
@@ -136,7 +136,8 @@
   (declare (ignore subject))
   (handler-case
     (dedata (@pri ^tank) clue
-      (signal 'slog :priority pri :tank tank))
+      (with-simple-restart (continue "Continue execution.")
+        (signal 'slog :priority pri :tank tank)))
     (exit () nil)))
 
 (defparameter +handle-slog+ (cons :before #'slog-handler))
@@ -186,7 +187,9 @@
   (cons :catch
         (lambda (subject clue exit)
           (declare (ignore subject))
-          (push (cons tag clue) (exit-stack exit)))))
+          (setf (exit-stack exit)
+                (slim-cons (slim-cons tag clue)
+                           (exit-stack exit))))))
 
 (defparameter +handle-hunk+ (make-stack-handler %hunk))
 (defparameter +handle-hand+ (make-stack-handler %hand))

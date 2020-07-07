@@ -16,7 +16,7 @@
   ((name :initarg :name :type symbol)))
 
 (define-condition exit (data-error) 
-  ((stack :initform nil :accessor exit-stack :type list)))
+  ((stack :initform 0 :accessor exit-stack)))
 
 (defun exit-with (stack-item)
   (let ((e (make-condition 'exit)))

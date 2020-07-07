@@ -21,6 +21,10 @@
         do (vector-push-extend (char-code c) a)
         finally (return (octets->uint a (fill-pointer a)))))
 
+(defun cord-from-file (path)
+  (with-open-file (in path)
+    (read-cord in)))
+
 (defvar *life-source*)
 (defvar *wish-source*)
 (defvar *ivory-kernel*)
@@ -36,18 +40,6 @@
   (with-fresh-memos
     (nock [*ivory-kernel* cord] *wish-source*)))
 
-(defparameter +rep-hoon+
-  (string->cord
-    (with-output-to-string (s)
-      (loop for (line . more) on '("=/  context=vase  !>(.)"
-                                   "|=  source=@t"
-                                   "%+  wash  [0 80]"
-                                   "%-  sell"
-                                   "%+  slap  context"
-                                   "%-  ream  source")
-            if more do (write-line line s)
-            else do (write-string line s)))))
-
 (defmacro with-lite-boot (pill-path &body forms)
   `(let ((arv (cue-pill ,pill-path)))
      (format t "lite: arvo formula ~x~%" (mug arv))
@@ -56,21 +48,6 @@
             (*ivory-kernel* (lite arv)))
        (format t "lite: core ~x~%" (mug *ivory-kernel*))
        ,@forms)))
-
-;(defun print-noun (n out tail)
-;  (if (deep n)
-;      (print-cell n out tail)
-;      (print-atom n out)))
-;
-;(defun print-atom (a out)
-;  (prin1 (cl-integer a) out))
-;
-;(defun print-cell (c out tail)
-;  (unless tail (princ #\[ out))
-;  (print-noun (head c) out nil)
-;  (princ #\space out)
-;  (print-noun (tail c) out nil) 
-;  (unless tail (princ #\] out)))
 
 (defun print-tape (tape &optional out)
   (loop for n = tape then (tail n)
@@ -85,52 +62,133 @@
         do (print-tape tape out)
         do (terpri)))
 
-(defmacro with-prints (&body forms)
-  `(handler-bind
-     ((unregistered-parent #'log-unregistered)
-      (slog #'log-slog))
-     ,@forms))
+(defun boot-unregistered (c)
+  (write "Tried to register a core with an unregistered parent during ")
+  (write-line "ivory boot. Refusing to continue...")
+  (sb-ext:exit :code 1))
 
-(defun make-toplevel (ivory-path)
-  (let* ((world (load-k141 t))
-         (rep (in-world world
-                (with-prints
-                  (with-fresh-memos
-                    (with-lite-boot ivory-path
-                      (wish +rep-hoon+)))))))
-    (lambda ()
-      (print-wall
-          (let ((input (read-cord *standard-input*)))
-            (in-world world
-              (with-prints
-                (with-fresh-memos
-                  (slam rep input)))))
-;                (sb-sprof:with-profiling (:report :flat :loop nil)
-;                  (slam rep input)))))
-          *standard-output*))))
+(defun boot-slog (slog)
+  (let ((tank (slog-tank slog)))
+    (handler-case
+      (dedata (@@tag tape) tank 
+        (case tag
+          (%leaf (print-tape tape *standard-output*))
+          (t (error 'exit))))
+      (exit ()
+        (format t "ivory boot slog: ~x" (jam (find-ideal tank)))))
+    (continue)))
+
+
+
+(defun stack-trace-printer (wash mook out)
+  (lambda (tax)
+    (handler-case
+      (loop for n = (funcall mook tax) then (tail n)
+            while (deep n)
+            for i = (head n)
+            do (print-wall (funcall wash i) out))
+      (exit (e) (warn "mook failed: ~x" (jam (find-ideal tax)))))))
+
+(defun slog-washer (wash tracer out)
+  (lambda (slog)
+    (let ((tank (slog-tank slog)))
+      ; TODO: do something with slog-priority
+      (handler-case (print-wall (funcall wash tank) out)
+        (exit (e) 
+          (warn "ivory wash failed: ~x" (jam (find-ideal tank)))
+          (funcall tracer (error-stack e))))
+      (continue))))
 
 (defun log-unregistered (w)
   (format t "unregistered: ~a at axis ~a~%"
           (cord->string (unregistered-name w))
-          (unregistered-axis w)))
+          (unregistered-axis w))
+  (continue))
 
-(defun log-slog (w)
-  (let ((tank (slog-tank w)))
-    (handler-case
-      (dedata (@@tag tape) tank 
-        (case tag
-          (%leaf (write-line (tape->string tape)))
-          (t (error 'exit))))
-      (exit () (format t "weird slog ~a~%" tank)))))
+(opts:define-opts
+  (:name :help
+   :description "print this message and exit"
+   :short #\h
+   :long "help")
+  (:name :repl
+   :description "run a REPL against the assembled subject"
+   :short #\r
+   :long "repl"))
 
-(defun save-hoon-and-die (exe-path pill-path)
+(defun help ()
+  (opts:describe
+         :prefix "standalone hoon interpreter"
+          :usage-of name
+          :args "[one.hoon two.hoon tre.hoon ...]"))
+
+(defun make-ivory-toplevel (&key name world init sell slap mook wash)
+  (lambda ()
+    (multiple-value-bind (options args) (opts:get-opts)
+      (when (options :help)
+        (help))
+      (in-world world
+        (let* ((out *standard-output*)
+               (tracer (stack-trace-printer wash mook out))
+               (slogger (slog-washer wash tracer out)))
+          (macrolet ((with-trace (&body forms)
+                       `(handler-case ,@forms
+                          (exit (e)
+                            (warn "exit")
+                            (funcall tracer (error-stack e))
+                            nil)))
+                     (try-print (vase)
+                       `(with-trace
+                          (with-fresh-memos
+                            (wash (sell ,vase))))))
+            (handler-bind
+              ((unregistered-parent #'log-unregistered)
+                (slog slogger))
+              (when-let (subject
+                          (with-trace
+                            (loop for vase = (init) then (slap vase cord)
+                                  for filename in args
+                                  for path = (parse-namestring filename)
+                                  for cord = (cord-from-file path)
+                                  finally (return vase))))
+                (if (or (null args) (options :repl))
+                  (loop for line = (read-line *standard-input* nil)
+                        for cord = (string->cord line)
+                        do (try-print (slap subject cord)))
+                  (try-print subject))))))))))
+
+(defun ivory-toplevel-from-pill (name pill-path)
+  (in-world (load-k141 t)
+    (with-fresh-memos
+      (handler-case
+        (handler-bind
+          ((unregistered-parent #'boot-unregistered)
+           (slog #'boot-slog))
+          (with-lite-boot pill-path
+            (make-ivory-toplevel
+              :name name
+              :world *world*
+              :init (wish (string->cord "!>(.)"))
+              :sell (let ((slam (make-slam (wish %sell))))
+                      (lambda (vase)
+                        (funcall slam vase)))
+              :slap (let ((slap (make-slam (wish %slap)))
+                          (ream (make-slam (wish %ream))))
+                      (lambda (vase cord)
+                        (funcall slap (funcall ream cord))))
+              :mook (let ((slam (make-slam (wish %mook))))
+                      (lambda (tax)
+                        (tail (funcall slam (slim-cons 2 tax)))))
+              :wash (let ((slam (make-slam (wish %wash)))
+                          (win (slim-cons 0 80)))
+                      (lambda (tank)
+                        (funcall slam (slim-cons win tank)))))))
+        (exit (e)
+          (format t "lite boot crash: ~x~%"
+                  (jam (find-ideal (error-stack e))))
+          (sb-ext:exit 1))))))
+
+(defun save-hoon-and-die (exe-path ivory-path)
   (sb-ext:save-lisp-and-die exe-path
     :executable t
-    :toplevel (make-toplevel pill-path)))
-
-(defun test-toplevel ()
-  (with-input-from-string (in "(add 40 2)")
-    (with-output-to-string (out)
-      (let ((*standard-input* in)
-            (*standard-output* out))
-        (funcall (make-toplevel #P"/tmp/ivory.pill"))))))
+    :compression t
+    :toplevel (ivory-toplevel-from-pill (file-namestring exe-path) ivory-path)))

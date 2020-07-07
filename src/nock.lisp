@@ -371,23 +371,38 @@
 
 (enable-syntax)
 
+; make a function that caches the speed of gate for mutants.
+; call the resulting function with a sample to slam the gate.
+; use if repeatedly calling a gate with different samples.
 (defun make-slam (gate)
   (let ((gate-speed (get-speed gate))
         (battery (get-battery gate)))
     (if (typep gate-speed 'void)
         (error 'cell-required :given battery)
         (let ((context (tail (tail gate)))
-              (nock (icell-function battery)))
-          (flet ((pay (sample) (slim-cons sample context))
-                 (slam (payload spd)
-                   (let ((subject (core-cons battery payload spd nil)))
-                     (or (call-jet subject 1) (funcall nock subject)))))
-            (if (zig-changes-speed #*10 gate-speed)
-                (lambda (sample)
-                  (let ((payload (pay sample)))
-                    (slam payload (measure-battery battery payload))))
-                (lambda (sample)
-                  (slam (pay sample) gate-speed))))))))
+              (nock (icell-function battery))
+              (sample-changes-speed (zig-changes-speed #*10 gate-speed)))
+          (labels ((pay (sample) (slim-cons sample context))
+                   (slam (payload spd)
+                     (let ((subject (core-cons battery payload spd nil)))
+                       (or (call-jet subject 1) (funcall nock subject))))
+                   (quick (sample)
+                     (slam (pay sample) gate-speed))
+                   (measure (sample)
+                     (let ((payload (pay sample)))
+                       (slam payload (measure-battery battery payload))))
+                   (recheck (sample)
+                      (unless (speed-valid gate-speed)
+                        (setq gate-speed (get-speed gate))
+                        (setq sample-changes-speed
+                              (zig-changes-speed #*10 gate-speed)))
+                      (if sample-changes-speed
+                          (measure sample)
+                          (quick sample))))
+            (if (typep gate-spd '(or fast stop))
+                ; fast and stop stay valid forever
+                (if sample-changes-speed #'measure #'quick)
+                #'recheck))))))
 
 (defun slam (gate sample)
   (funcall (make-slam gate) sample))

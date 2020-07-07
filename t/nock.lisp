@@ -207,8 +207,8 @@
                           11 [%lose 1 1]
                           0 0]))
               (exit (e) (exit-stack e)))))
-      (is (equal '((%hunk . 5) (%hand . 4) (%mean . 3) (%spot . 2) (%lose . 1))
-                 stack)))))
+      (is (same [[%hunk 5] [%hand 4] [%mean 3] [%spot 2] [%lose 1] 0]
+                stack)))))
 
 ; !=
 ; =<  fib
