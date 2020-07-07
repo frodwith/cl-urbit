@@ -1,8 +1,10 @@
 (defpackage #:urbit/hoon/ivory
   (:use #:cl #:urbit/serial #:urbit/syntax #:urbit/nock #:urbit/common
-        #:urbit/convert #:urbit/hints #:urbit/data #:urbit/mug 
+        #:urbit/convert #:urbit/hints #:urbit/data #:urbit/mug #:urbit/world
         #:urbit/hoon/k141 #:urbit/data/slimatom #:urbit/data/slimcell)
-  (:import-from #:cl-intbytes #:octets->uint))
+  (:import-from #:cl-intbytes #:octets->uint)
+  (:import-from #:alexandria #:when-let)
+  (:export #:save-hoon-and-die))
 
 (in-package #:urbit/hoon/ivory)
 
@@ -63,22 +65,22 @@
         do (terpri)))
 
 (defun boot-unregistered (c)
+  (declare (ignore c))
   (write "Tried to register a core with an unregistered parent during ")
   (write-line "ivory boot. Refusing to continue...")
-  (sb-ext:exit :code 1))
+  (sb-ext:exit :abort t))
 
 (defun boot-slog (slog)
   (let ((tank (slog-tank slog)))
     (handler-case
       (dedata (@@tag tape) tank 
         (case tag
-          (%leaf (print-tape tape *standard-output*))
+          (%leaf (print-tape tape *standard-output*)
+                 (terpri))
           (t (error 'exit))))
       (exit ()
         (format t "ivory boot slog: ~x" (jam (find-ideal tank)))))
     (continue)))
-
-
 
 (defun stack-trace-printer (wash mook out)
   (lambda (tax)
@@ -87,7 +89,8 @@
             while (deep n)
             for i = (head n)
             do (print-wall (funcall wash i) out))
-      (exit (e) (warn "mook failed: ~x" (jam (find-ideal tax)))))))
+      (exit (e)
+        (warn "mook failed: ~x" (jam (find-ideal (exit-stack e))))))))
 
 (defun slog-washer (wash tracer out)
   (lambda (slog)
@@ -96,7 +99,7 @@
       (handler-case (print-wall (funcall wash tank) out)
         (exit (e) 
           (warn "ivory wash failed: ~x" (jam (find-ideal tank)))
-          (funcall tracer (error-stack e))))
+          (funcall tracer (exit-stack e))))
       (continue))))
 
 (defun log-unregistered (w)
@@ -115,7 +118,7 @@
    :short #\r
    :long "repl"))
 
-(defun help ()
+(defun help (name)
   (opts:describe
          :prefix "standalone hoon interpreter"
           :usage-of name
@@ -124,8 +127,8 @@
 (defun make-ivory-toplevel (&key name world init sell slap mook wash)
   (lambda ()
     (multiple-value-bind (options args) (opts:get-opts)
-      (when (options :help)
-        (help))
+      (when (getf options :help)
+        (help name))
       (in-world world
         (let* ((out *standard-output*)
                (tracer (stack-trace-printer wash mook out))
@@ -134,26 +137,34 @@
                        `(handler-case ,@forms
                           (exit (e)
                             (warn "exit")
-                            (funcall tracer (error-stack e))
+                            (funcall tracer (exit-stack e))
                             nil)))
                      (try-print (vase)
                        `(with-trace
                           (with-fresh-memos
-                            (wash (sell ,vase))))))
+                            (print-wall
+                              (funcall wash (funcall sell ,vase)))))))
+
             (handler-bind
               ((unregistered-parent #'log-unregistered)
                 (slog slogger))
               (when-let (subject
                           (with-trace
-                            (loop for vase = (init) then (slap vase cord)
+                            (loop for vase = init
+                                  then (funcall slap vase cord)
                                   for filename in args
                                   for path = (parse-namestring filename)
                                   for cord = (cord-from-file path)
                                   finally (return vase))))
-                (if (or (null args) (options :repl))
-                  (loop for line = (read-line *standard-input* nil)
+                (if (or (null args) (getf options :repl))
+                  (loop for line = (progn
+                                     (princ "> ")
+                                     (force-output)
+                                     (read-line *standard-input* nil))
+                        while line
                         for cord = (string->cord line)
-                        do (try-print (slap subject cord)))
+                        do (try-print (funcall slap subject cord))
+                        finally (sb-ext:exit))
                   (try-print subject))))))))))
 
 (defun ivory-toplevel-from-pill (name pill-path)
@@ -174,7 +185,7 @@
               :slap (let ((slap (make-slam (wish %slap)))
                           (ream (make-slam (wish %ream))))
                       (lambda (vase cord)
-                        (funcall slap (funcall ream cord))))
+                        (funcall slap (slim-cons vase (funcall ream cord)))))
               :mook (let ((slam (make-slam (wish %mook))))
                       (lambda (tax)
                         (tail (funcall slam (slim-cons 2 tax)))))
@@ -184,11 +195,15 @@
                         (funcall slam (slim-cons win tank)))))))
         (exit (e)
           (format t "lite boot crash: ~x~%"
-                  (jam (find-ideal (error-stack e))))
-          (sb-ext:exit 1))))))
+                  (jam (find-ideal (exit-stack e))))
+          (sb-ext:exit :abort t))))))
 
 (defun save-hoon-and-die (exe-path ivory-path)
   (sb-ext:save-lisp-and-die exe-path
     :executable t
     :compression t
     :toplevel (ivory-toplevel-from-pill (file-namestring exe-path) ivory-path)))
+
+(defun test-toplevel (ivory-path)
+  (let ((sb-ext:*posix-argv* '("test" "--repl")))
+    (funcall (ivory-toplevel-from-pill "test" ivory-path))))

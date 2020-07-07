@@ -3,7 +3,7 @@
         #:urbit/ideal #:urbit/world #:urbit/data #:urbit/common #:urbit/syntax
         #:urbit/data/core #:urbit/data/slimcell #:urbit/data/slimatom)
   (:import-from #:alexandria #:when-let #:when-let* #:if-let)
-  (:export #:bottle #:in-world #:need #:need-sample
+  (:export #:bottle #:in-world #:need #:need-sample #:*world*
            #:icell-function #:cell-function
            #:nock #:slam #:make-slam #:soft #:resolve-hook #:call-hook
            #:compile-dynamic-hint #:compile-static-hint
@@ -399,7 +399,7 @@
                       (if sample-changes-speed
                           (measure sample)
                           (quick sample))))
-            (if (typep gate-spd '(or fast stop))
+            (if (typep gate-speed '(or fast stop))
                 ; fast and stop stay valid forever
                 (if sample-changes-speed #'measure #'quick)
                 #'recheck))))))
