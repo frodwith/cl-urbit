@@ -13,22 +13,23 @@ of usable artifacts, including:
 
 Currently a toy demo of the hoon REPL is available. Many jets are not
 yet implemented, but we can boot an ivory pill, compile simple programs,
-and (mostly) pretty-print the results. Printing cores crashes,
-and I expect a lot of other things don't work yet.
+and pretty-print the results.
 
 # Hoon REPL Installation
 
-  * Install SBCL (http://sbcl.org or use your package manager)
-  * Install Quicklisp (https://www.quicklisp.org/beta/index.html#installation)
-  * Add this repo to Quicklisp's local projects
+  1. Install [SBCL](http://sbcl.org).
+  2. Install [Quicklisp](https://www.quicklisp.org/beta/index.html#installation).
+  3. Add this repo to Quicklisp's local projects.
 
         cd ~/quicklisp/local-projects
         git clone http://github.com/frodwith/cl-urbit.git
 
-  * Get an ivory pill (https://github.com/urbit/urbit/tree/master/bin)
-  * Build a hoon executable
+  4. Get an [ivory pill](https://github.com/urbit/urbit/tree/master/bin).
 
-        sbcl
+        curl -Lo /tmp/ivory.pill https://github.com/urbit/urbit/raw/master/bin/ivory.pill
+
+  5. With [Quicklisp loaded](https://www.quicklisp.org/beta/index.html#loading) in SBCL:
+
         (ql:quickload :cl-urbit)
         (urbit/hoon/ivory:save-hoon-and-die #P"/tmp/hoon" #P"/tmp/ivory.pill")
 
