@@ -36,6 +36,8 @@ and pretty-print the results.
   (urbit/hoon/ivory:save-hoon-and-die #P"/tmp/hoon" #P"/tmp/ivory.pill")
   ```
 
+This will print a few things and leave a hoon executable at `/tmp/hoon`.
+
 # Hoon REPL Usage
 
 Launching with no arguments or the --repl option gives you a REPL with
