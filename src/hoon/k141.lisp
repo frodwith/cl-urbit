@@ -44,53 +44,73 @@
     `(gfn ,(or cord-name (symbol-cord name)) ,names
        (,name ,@names))))
 
-(defmacro nlist-end (list value)
-  `(if (zerop (cl-integer ,list))
-       (return ,value)
-       (error 'exit)))
+(defmacro sig-or-die (noun)
+  `(unless (zerop (cl-integer ,noun))
+     (error 'exit)))
 
-(defun nlist->vector (list)
-  (loop with vec = (make-array 10 :adjustable t :fill-pointer 0)
-        for n = list then (tail n)
-        while (deep n)
-        do (vector-push-extend (head n) vec)
-        finally (nlist-end n vec)))
+(defmacro nlist-for (cur while i list &body forms)
+  `(loop for ,cur = ,list then (tail ,cur)
+         while ,while
+         for ,i = (head ,cur)
+         do (progn ,@forms)))
+
+; there are basically two ways to test for the end of a list in hoon,
+; and both are idiomatic: test cell depth or test equality to 0. These
+; are equivalent for the list type, but of course nock is untyped.
+; When you send an improper list like [1 2 3] to a depth-checking loop,
+; it treats the trailing 3 as the list terminator.  A zero-checking loop
+; will instead crash. Jets have to care in order to avoid mismatches, so
+; we provide two list-iteration macros:
+
+(defmacro for-?^ ((var list) &body forms)
+  (let ((s (gensym)))
+    `(nlist-for ,s (deep ,s) ,var ,list ,@forms)))
+
+(defmacro test-?~ (var)
+  `(or (deep ,var)
+       (progn
+         (sig-or-die ,var)
+         nil)))
+
+(defmacro for-?~ ((var list) &body forms)
+  (let ((s (gensym)))
+    `(nlist-for ,s (test-?~ ,s) ,var ,list ,@forms)))
+
+(defmacro stack-vector (init-size)
+  `(make-array ,init-size :adjustable t :fill-pointer 0))
 
 ; jets that don't really belong anywhere else in the runtime just live
 ; here for now - later it might make sense to group them into modules
-
-(defun can (bloq list)
-  (declare (uint bloq))
-  (loop for n = list then (tail n)
-        while (deep n)
-        for pair = (head n)
-        for bloqs = (cl-integer (head pair))
-        for data = (end bloq bloqs (cl-integer (tail pair)))
-        for r = data then (logior (ash data size) r)
-        summing bloqs into size
-        finally (nlist-end n r)))
 
 (defun cat (a b c)
   (declare (uint a b c))
   (logior b (lsh a (met a b) c)))
 
+(defun can (bloq list)
+  (declare (uint bloq))
+  (let ((r 0) (size 0))
+    (for-?~ (pair list)
+      (dedata (@@bloqs @@data) pair
+        (setq r (logior r (lsh bloq size (end bloq bloqs data))))
+        (setq size (+ size bloqs))))
+    r))
+
 (defun rap (bloq list)
   (declare (uint bloq))
-  (loop for n = list then (tail n)
-        while (deep n)
-        for i = (cl-integer (head n))
-        for r = i then (cat bloq r i)
-        finally (nlist-end n r)))
+  (let ((r 0))
+    (for-?~ (i list)
+      (setq r (cat bloq r i)))
+    r))
 
 (defun rep (bloq list)
   (declare (uint bloq))
-  (loop with size = (ash 1 bloq)
-        for n = list then (tail n)
-        while (deep n)
-        for c upfrom 0 by size
-        for i = (ldb (byte size 0) (cl-integer (head n)))
-        for r = i then (logior r (ash i c))
-        finally (nlist-end n r)))
+  (let ((size (ash 1 bloq))
+        (c 0)
+        (r 0))
+    (for-?~ (i list)
+      (setq r (logior r (ash (ldb (byte size 0) (cl-integer i)) c)))
+      (setq c (+ c size)))
+    r))
 
 (defun cut (bloq from-end bloq-count atom)
   (declare (uint bloq from-end bloq-count atom))
@@ -144,6 +164,15 @@
                 for part = (ldb (byte size pos) a)
                 finally (return r)))))
 
+; when you need a random access to a list (like to iterate over it backwards)
+; strict means it will crash if the terminator isn't 0
+(defmacro nlist->vector (list &key (strict t) (size 10))
+  `(let ((vec (stack-vector ,size)))
+     (,(if strict 'for-?~ 'for-?^)
+       (i ,list)
+       (vector-push-extend i vec))
+     vec))
+
 (defun weld (a b)
   (loop with v = (nlist->vector a)
         for r = b then (slim-cons (aref v i) r)
@@ -159,17 +188,16 @@
         (murmurhash:murmurhash key :seed syd))))
 
 (defun flop (list)
-  (loop for n = list then (tail n)
-        for r = 0 then (slim-cons i r)
-        while (deep n)
-        for i = (head n)
-        finally (nlist-end n r)))
+  (let ((r 0))
+    (for-?~ (i list)
+      (setq r (slim-cons i r)))
+    r))
 
 (defun lent (list)
-  (loop for i upfrom 0
-        for n = list then (tail n)
-        while (deep n)
-        finally (nlist-end n i)))
+  (let ((len 0))
+    (for-?~ (i list)
+      (incf len))
+    len))
 
 (defun reap (times item)
   (declare (uint times))
