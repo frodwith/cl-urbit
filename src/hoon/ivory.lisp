@@ -153,19 +153,21 @@
                           (with-trace
                             (loop for vase = (with-fresh-memos init)
                                   then (with-fresh-memos
-                                         (funcall slap vase cord))
+                                         (funcall slap vase path cord))
                                   for filename in args
-                                  for path = (parse-namestring filename)
-                                  for cord = (cord-from-file path)
+                                  for file = (parse-namestring filename)
+                                  for cord = (cord-from-file file)
+                                  for path = (slim-cons (string->cord filename) 0)
                                   finally (return vase))))
                 (if (or (null args) (getf options :repl))
-                  (loop for line = (progn
+                  (loop with path = (slim-cons %repl 0)
+                        for line = (progn
                                      (princ "> ")
                                      (force-output)
                                      (read-line *standard-input* nil))
                         while line
                         for cord = (string->cord line)
-                        do (try-print (funcall slap subject cord))
+                        do (try-print (funcall slap subject path cord))
                         finally (sb-ext:exit))
                   (try-print subject))))))))))
 
@@ -185,9 +187,13 @@
                       (lambda (vase)
                         (funcall slam vase)))
               :slap (let ((slap (make-slam (wish %slap)))
-                          (ream (make-slam (wish %ream))))
-                      (lambda (vase cord)
-                        (funcall slap (slim-cons vase (funcall ream cord)))))
+                          (rain (make-slam (wish %rain))))
+                      (lambda (vase path cord)
+                        (funcall
+                          slap
+                          (slim-cons
+                            vase
+                            (funcall rain (slim-cons path cord))))))
               :mook (let ((slam (make-slam (wish %mook))))
                       (lambda (tax)
                         (tail (funcall slam (slim-cons 2 tax)))))
