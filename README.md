@@ -20,18 +20,21 @@ and pretty-print the results.
   1. Install [SBCL](http://sbcl.org).
   2. Install [Quicklisp](https://www.quicklisp.org/beta/index.html#installation).
   3. Add this repo to Quicklisp's local projects.
-
-        cd ~/quicklisp/local-projects
-        git clone http://github.com/frodwith/cl-urbit.git
+  ```
+  cd ~/quicklisp/local-projects
+  git clone http://github.com/frodwith/cl-urbit.git
+  ```
 
   4. Get an [ivory pill](https://github.com/urbit/urbit/tree/master/bin).
-
-        curl -Lo /tmp/ivory.pill https://github.com/urbit/urbit/raw/master/bin/ivory.pill
+  ```
+  curl -Lo /tmp/ivory.pill https://github.com/urbit/urbit/raw/master/bin/ivory.pill
+  ```
 
   5. With [Quicklisp loaded](https://www.quicklisp.org/beta/index.html#loading) in SBCL:
-
-        (ql:quickload :cl-urbit)
-        (urbit/hoon/ivory:save-hoon-and-die #P"/tmp/hoon" #P"/tmp/ivory.pill")
+  ```
+  (ql:quickload :cl-urbit)
+  (urbit/hoon/ivory:save-hoon-and-die #P"/tmp/hoon" #P"/tmp/ivory.pill")
+  ```
 
 # Hoon REPL Usage
 
