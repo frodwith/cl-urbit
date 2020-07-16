@@ -167,8 +167,7 @@
                                      (read-line *standard-input* nil))
                         while line
                         for cord = (string->cord line)
-                        do (try-print (funcall slap subject path cord))
-                        finally (sb-ext:exit))
+                        do (try-print (funcall slap subject path cord)))
                   (try-print subject))))))))))
 
 (defun ivory-toplevel-from-pill (name pill-path)
@@ -213,5 +212,12 @@
     :toplevel (ivory-toplevel-from-pill (file-namestring exe-path) ivory-path)))
 
 (defun test-toplevel (ivory-path)
-  (let ((sb-ext:*posix-argv* '("test" "--repl")))
-    (funcall (ivory-toplevel-from-pill "test" ivory-path))))
+  (let ((sb-ext:*posix-argv* '("test" "--repl"))
+        (top (ivory-toplevel-from-pill "test" ivory-path)))
+    (funcall top)))
+    ;(sb-sprof:with-profiling (:report :flat
+    ;                          :loop t
+    ;                          :max-samples 10000
+    ;                          :show-progress t)
+    ;  (with-input-from-string (*standard-input* "(add 40 2)")
+    ;    ))))
