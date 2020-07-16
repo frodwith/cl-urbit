@@ -225,13 +225,16 @@
     (ideal-atom nil)))
 
 (defun ideal-atom=mugatom (i a)
-  (or (eql i a) ; takes care of actual fixnums (no cached mug)
-      (and (not (cached-ideal a))
-           (= (iatom-mug i) (cached-mug a))
-           (= (iatom-int i) (cl-integer a))
-           (progn
-             (setf (cached-ideal a) i)
-             t))))
+  (or (eql i a)
+      (etypecase i
+        (fixnum (= i (cl-integer a)))
+        (iatom
+          (if-let (ai (cached-ideal a))
+            (eq i ai)
+            (and (= (iatom-mug i) (cached-mug a))
+                 (= (iatom-int i) (cl-integer a))
+                 (progn (setf (cached-ideal a) i)
+                        t)))))))
 
 (defun icell-copy (i c)
   (declare (icell i))
