@@ -14,15 +14,6 @@
 
 ; helpers
 
-(defun compile-form (name form)
-  (compile
-    name
-    `(lambda (s)
-       (declare (ignorable s) ; ignore unused subject (i.e. [1 1])
-                ; delete unreachable note (code after crash) (SBCL ONLY)
-                (sb-ext:muffle-conditions sb-ext:compiler-note))
-       ,form)))
-
 (defun icell-formula (c)
   (macrolet ((with-f (&body forms)
                `(let ((f (make-formula (compile-cell-raw c))))
@@ -39,20 +30,64 @@
                            (core-speed (make-fat :speed m :formula f))
                            (battery (make-fat :battery m :formula f))))))))))
 
-(defconstant +interpreter-threshold+ 100)
+(define-symbol-macro
+  formula-declarations
+  '((ignorable s)
+    (sb-ext:muffle-conditions sb-ext:compiler-note)))
+
+(defun heavy-form (formula)
+  `(lambda (s)
+     (declare ,@formula-declarations
+              (optimize (speed 3)
+                        (space 1)
+                        (compilation-speed 0)
+                        (debug 0)
+                        (safety 0)))
+     ,(formula-form formula)))
+
+
+(defconstant +light-threshold+ 100)
+(defconstant +heavy-threshold+ 1000)
+(declaim (fixnum +light-threshold+ +heavy-threshold+))
+
+(defstruct light-memory
+  (heavy nil :type (or null function))
+  (runs 0 :type fixnum)
+  (formula nil :read-only t))
+
+(defun light-form (formula)
+  `(lambda (s)
+     (declare ,@formula-declarations
+              (optimize (compilation-speed 3)
+                        (space 3)
+                        (debug 0)
+                        (safety 0)
+                        (speed 0)))
+     (let* ((mem (load-time-value (make-light-memory :formula ',formula)))
+            (heavy (light-memory-heavy mem)))
+       (cond (heavy (funcall heavy s))
+             ((= (light-memory-runs mem) +heavy-threshold+)
+              (let ((formula (light-memory-formula mem)))
+                (setq heavy (compile nil (heavy-form formula)))
+                (setf (light-memory-heavy mem) heavy)
+                (setf (formula-func formula) heavy)
+                (funcall heavy s)))
+             (t
+              (incf (light-memory-runs mem))
+              ,(formula-form formula))))))
 
 (defun formula-function (formula)
   (or (formula-func formula)
       (setf (formula-func formula)
             (let ((runs 0)
-                  (compiled nil)
+                  (light nil)
                   (form (formula-form formula)))
               (lambda (subject)
-                (cond (compiled (funcall compiled subject))
-                      ((= runs +interpreter-threshold+)
-                       (setq compiled (compile-form nil form))
-                       (setf (formula-func formula) compiled)
-                       (funcall compiled subject))
+                (cond (light (funcall light subject))
+                      ((= runs +light-threshold+)
+                       (setq light (compile nil (light-form formula)))
+                       (setf (formula-func formula) light)
+                       (funcall light subject))
                       (t (let ((sb-ext:*evaluator-mode* :interpret)
                                (s subject))
                            (declare (special s))
@@ -443,9 +478,10 @@
   (loop for n = battery then (if tail (icell-tail n) (icell-head n))
         for tail in (unless (= 1 axis) (pax axis))
         unless (ideep n) do (return nil) end
-        finally (let ((form (formula-form (icell-formula n)))
-                      (name (gensym (format nil "~a/~a" (peg 2 axis) name))))
-                  (return (compile-form name form)))))
+        finally (let ((mangle (gensym
+                                (string-upcase
+                                  (format nil "~a/~a" (peg 2 axis) name)))))
+                  (return (symbol-function (compile mangle (heavy-form (icell-formula n))))))))
 
 (defun compile-stencil-dispatch (stencil battery name sfx jet arms)
   (let ((dis `(case axis
