@@ -3,7 +3,7 @@
         #:urbit/data #:urbit/ideal #:urbit/world #:urbit/serial)
   (:import-from #:alexandria #:if-let)
   (:import-from #:urbit/data #:exit)
-  (:export #:kernel-label #:kernel-static
+  (:export #:kernel-label #:kernel-static #:kernel-battery
            #:jet-root #:jet-core #:jet-deaf-gate
            #:deaf #:trap #:gate #:deaf-gate-driver
            #:get-speed #:get-battery #:measure #:measure-battery
@@ -33,6 +33,14 @@
 
 (defun kernel-static (kernel)
   (not (typep kernel 'dynamic-kernel)))
+
+(defun kernel-battery (kernel ideal)
+  (if (kernel-static kernel)
+      (icell-head ideal)
+      ideal))
+
+(defun stencil-battery (stencil)
+  (kernel-battery (stencil-kernel stencil) (stencil-ideal stencil)))
 
 (defun make-child (name axis parent driver)
   (if (and (= 1 axis) (kernel-static parent))

@@ -16,11 +16,25 @@
          (tank (cons %leaf tape)))
     `(exit-with (cons %mean (copy-tree ',tank)))))
 
-(defmacro gfn (name pattern &body forms)
+(defun fuzzy-gate-driver (sample-fn)
+  (lambda (kernel parent-stencil ideal hooks)
+    (declare (ignore parent-stencil hooks))
+    (trap (fuzzy kernel ideal 1 (gate sample-fn)))))
+
+(defun jet-fuzzy-gate (name sample-fn)
+  (jet-core name 3 (fuzzy-gate-driver sample-fn)))
+
+(defmacro gfn-impl (build name pattern &body forms)
   (let ((sam (gensym)))
-    `(jet-deaf-gate ,name
+    `(,build ,name
        (lambda (,sam)
          (dedata ,pattern ,sam ,@forms)))))
+
+(defmacro gfn (name pattern &body forms)
+  `(gfn-impl jet-deaf-gate ,name ,pattern ,@forms))
+
+(defmacro gfn-fuzz (name pattern &body forms)
+  `(gfn-impl jet-fuzzy-gate ,name ,pattern ,@forms) )
 
 (defmacro gcmp (name cmp)
   `(gfn ,name (@@a @@b) (loob (,cmp a b))))
@@ -33,15 +47,17 @@
     (string->cord (string-downcase (symbol-name s)))))
 
 ; math gates take atom arguments and return atoms
-(defmacro math-gate (argc name &optional cord-name)
+(defmacro math-gate (argc name &optional cord-name fuzzy)
   (let* ((names (loop for i below argc collect (format nil "A~a" i)))
          (pats (mapcar (lambda (n) (intern (format nil "@@~a" n))) names)))
-    `(gfn ,(or cord-name (symbol-cord name)) ,pats
+    `(,(if fuzzy 'gfn-fuzz 'gfn)
+       ,(or cord-name (symbol-cord name)) ,pats
        (slim-malt (,name ,@(mapcar #'intern names))))))
 
-(defmacro raw-gate (argc name &optional cord-name)
+(defmacro raw-gate (argc name &optional cord-name fuzzy)
   (let ((names (loop for i below argc collect (gensym))))
-    `(gfn ,(or cord-name (symbol-cord name)) ,names
+    `(,(if fuzzy 'gfn-fuzz 'gfn)
+       ,(or cord-name (symbol-cord name)) ,names
        (,name ,@names))))
 
 (defmacro sig-or-die (noun)

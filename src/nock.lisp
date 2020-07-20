@@ -4,7 +4,7 @@
         #:urbit/data/core #:urbit/data/slimcell #:urbit/data/slimatom)
   (:import-from #:alexandria #:when-let #:when-let* #:if-let)
   (:export #:bottle #:in-world #:need #:need-sample #:*world*
-           #:icell-function #:cell-function
+           #:icell-function #:cell-function #:fuzzy
            #:nock #:slam #:make-slam #:soft #:resolve-hook #:call-hook
            #:compile-dynamic-hint #:compile-static-hint
            #:hint-tag #:hint-next #:hint-clue
@@ -506,12 +506,32 @@
                 `(or (funcall jet axis) ,dis)
                 dis))))))
 
+; wrap an arm driver with code that runs the outer layer of nock and compares
+; for sameness with the driver
+; on success, prints a "."
+; breaks into debugger on failure
+; (for driver testing only!)
+(defun fuzzy (kernel ideal axis driver)
+  (let* ((battery (kernel-battery kernel ideal))
+         (name (kernel-label kernel))
+         (arm (compile-stencil-arm battery name axis))
+         (testing t))
+    (lambda (core)
+      (when-let (pro (funcall driver core))
+        (when testing
+          (setq testing nil)
+          (unwind-protect
+            (if (same pro (funcall arm core))
+                (princ #\.)
+                (break))
+            (setq testing t)))
+        pro))))
+
 (defun first-stencil-dispatch (stencil)
   (let* ((kernel (stencil-kernel stencil))
          (label (kernel-label kernel))
-         (ideal (stencil-ideal stencil))
          (jet (stencil-jet stencil))
-         (battery (if (kernel-static kernel) (icell-head ideal) ideal))
+         (battery (kernel-battery kernel (stencil-ideal stencil)))
          (name (gensym (format nil "dispatch/~a" label))))
     (setf (stencil-dispatch stencil)
           (compile-stencil-dispatch stencil battery name label jet nil))))
