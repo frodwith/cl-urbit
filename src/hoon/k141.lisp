@@ -1,6 +1,6 @@
 (defpackage #:urbit/hoon/k141
   (:use #:cl #:ironclad #:cl-intbytes
-        #:urbit/jets #:urbit/common #:urbit/syntax #:urbit/mug
+        #:urbit/jets #:urbit/common #:urbit/syntax #:urbit/mug #:urbit/cache
         #:urbit/convert #:urbit/math #:urbit/data #:urbit/hints
         #:urbit/nock #:urbit/equality #:urbit/serial #:urbit/world
         #:urbit/data/slimatom #:urbit/data/slimcell)
@@ -239,13 +239,12 @@
 (defun versioned-compiler-cache (table ut-battery ut-context size)
   (if-let (top (gethash ut-battery table))
     (or (gethash ut-context top)
-        (setf (gethash ut-context top) (make-compiler-cache size)))
+        (setf (gethash ut-context top) (make-cache size 'same)))
     (let* ((top (make-hash-table :test 'eq :weakness :key)))
       (setf (gethash ut-battery table) top)
-      (setf (gethash ut-context top) (make-compiler-cache size)))))
+      (setf (gethash ut-context top) (make-cache size 'same)))))
 
-; each cached compiler function gets its own versioned table,
-; capped at a fixed number of entries, keyed on noun sameness
+; each cached compiler function gets its own urbit/cache
 (defmacro define-compiler-cache (name size)
   (let ((table (intern (format nil "*~a-table*" name))))
     `(progn
@@ -253,59 +252,15 @@
        (defun ,name (ut-battery ut-context)
          (versioned-compiler-cache ,table ut-battery ut-context ,size)))))
 
-; each cache is keyed by a noun key (get relevants pieces of subject)
-; empty goes down to zero from the initial value, after which each put
-; into the table is preceded by an eviction (clock algorithm)
-(sb-ext:define-hash-table-test same mug)
-(defstruct (compiler-cache (:constructor make-compiler-cache (empty)))
-  (empty 0 :type (integer 0)) 
-  (table (make-hash-table :test 'same) :type hash-table :read-only t)
-  (clock nil :type list))
-
-; we cycle around all the entries in the table, marking warm things cold
-; until we find a cold thing, and evict it
-(defun compiler-cache-evict (cache)
-  (let ((table (compiler-cache-table cache)))
-    (loop named outer 
-          do (loop for ((key . node) . more) on (compiler-cache-clock cache)
-                   do (if (car node)
-                          (setf (car node) nil)
-                          (progn
-                            (setf (compiler-cache-clock cache) more)
-                            (remhash key table)
-                            (return-from outer))))
-          do (setf (compiler-cache-clock cache) 
-                   (loop for k being the hash-keys of table
-                         using (hash-value v)
-                         collect (cons k v))))))
-
-(defun compiler-cache-lookup (cache key compute)
-  (let ((table (compiler-cache-table cache)))
-    (if-let (node (gethash key table))
-      (progn ; the act of looking up a key causes it to be marked warm
-        (setf (car node) t)
-        (cdr node))
-      (let ((value (funcall compute))
-            (slots (compiler-cache-empty cache)))
-        (if (zerop slots)
-            (compiler-cache-evict cache)
-            (setf (compiler-cache-empty cache) (1- slots)))
-        (setf (gethash key table) (cons t value))
-        value))))
-
-(defun compute-gate (gate)
-  (lambda ()
-    (nock gate (head gate))))
-
 (defun unpack-ut (ut-core)
   (let* ((upay (tail ut-core))
          (pen (get-ideal-cell (tail (tail upay)))))
     (values (head upay) pen (get-battery ut-core))))
 
 (defun look-in (core battery-fn ut-battery ut-context cache-fn noun-key)
-  (compiler-cache-lookup (funcall cache-fn ut-battery ut-context)
-    noun-key
-    (lambda () (funcall battery-fn core))))
+  (cache-lookup (funcall cache-fn ut-battery ut-context)
+                noun-key
+                (funcall battery-fn core)))
 
 (defparameter +large-cache+ 1024)
 (defparameter +small-cache+ 256)

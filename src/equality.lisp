@@ -267,3 +267,5 @@
               (when (ideep ai)
                 (copy-speed a b))
               t)))))
+
+(sb-ext:define-hash-table-test same urbit/mug:mug)

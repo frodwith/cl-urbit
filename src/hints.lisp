@@ -1,5 +1,5 @@
 (defpackage #:urbit/hints
-  (:use #:cl #:urbit/data #:urbit/math #:urbit/ideal #:urbit/world
+  (:use #:cl #:urbit/data #:urbit/math #:urbit/ideal #:urbit/world #:urbit/cache
         #:urbit/jets #:urbit/syntax #:urbit/common #:urbit/convert
         #:urbit/mug #:urbit/equality #:urbit/data/slimcell)
   (:export #:compose-hinters #:+handle-slog+ #:handle-memo #:handle-stack
@@ -148,10 +148,10 @@
     +handle-slog+))
 
 ; %memo
-; use WITH-FRESH-MEMOS to dynamically bind a fresh hash table (per road, etc)
-; TODO: use some kind of cache eviction to avoid OOMing (cacle?)
+; use WITH-FRESH-MEMOS to dynamically bind a fresh cache (per road, etc)
 
-(defvar *memo-table*)
+(defconstant +memo-size+ 8192)
+(defvar *memo-cache*)
 
 (defun memo= (a b)
   (and (eq (car a) (car b))
@@ -164,17 +164,17 @@
 (sb-ext:define-hash-table-test memo= memo-hash)
 
 (defmacro with-fresh-memos (&body forms)
-  `(let ((*memo-table* (make-hash-table :test 'memo=)))
+  `(let ((*memo-cache* (make-cache +memo-size+ 'memo=)))
      ,@forms))
 
 (defun memo-before (formula)
   (lambda (subject clue)
     (declare (ignore clue))
     (let ((key (cons formula subject)))
-      (values (gethash key *memo-table*) key))))
+      (values (cache-get *memo-cache* key) key))))
 
 (defun memo-after (key product)
-  (setf (gethash key *memo-table*) product))
+  (cache-put *memo-cache* key product))
 
 (defun handle-memo (next)
   (cons :around (cons (memo-before next) #'memo-after)))

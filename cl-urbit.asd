@@ -32,6 +32,7 @@
                  (:file "jets")
                  (:file "equality")
                  (:file "nock")
+                 (:file "cache")
                  (:file "hints")
                  (:file "hoon/k141")
                  (:file "hoon/ivory")
