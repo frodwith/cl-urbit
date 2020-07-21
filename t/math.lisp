@@ -44,29 +44,3 @@
   (is (= 10 (rsh 3 3 #xa000000)))
   (is (= 10 (rsh 3 3 #xa111111))))
 
-(test mas-test
-  (is (= 1 (mas 2)))
-  (is (= 1 (mas 3)))
-  (is (= 2 (mas 4)))
-  (is (= 3 (mas 5)))
-  (is (= 2 (mas 6)))
-  (is (= 3 (mas 7)))
-  (is (= 4 (mas 8))))
-
-(test tax-test
-  (is-false (tax 2))
-  (is-true (tax 3))
-  (is-false (tax 4))
-  (is-false (tax 5))
-  (is-true (tax 6))
-  (is-true (tax 7))
-  (is-false (tax 8)))
-
-(test pax-test
-  (is (equal '(nil) (pax 2)))
-  (is (equal '(t) (pax 3)))
-  (is (equal '(nil nil) (pax 4)))
-  (is (equal '(nil t) (pax 5)))
-  (is (equal '(t nil) (pax 6)))
-  (is (equal '(t t) (pax 7)))
-  (is (equal '(nil nil nil) (pax 8))))

@@ -1,8 +1,8 @@
 (defpackage #:urbit/data
-  (:use #:cl #:urbit/math)
+  (:use #:cl #:urbit/math #:urbit/axis)
   (:export #:data-error #:unimplemented #:atom-required #:cell-required
            #:exit #:exit-with #:exit-stack #:nullify-exit
-           #:deep #:head #:tail #:cl-integer #:dfrag
+           #:deep #:head #:tail #:cl-integer #:fragment #:d0
            #:cached-mug #:cached-ideal #:cached-battery #:cached-speed))
 
 (in-package #:urbit/data)
@@ -78,10 +78,15 @@
    (setf (head object) value)
    value))
 
-(defun dfrag (iax data)
-  (case iax
+(defun fragment (axis data)
+  (declare (decomposable axis))
+  (for-axis (tail axis)
+    (setq data (if tail (tail data) (head data))))
+  data)
+
+(defun d0 (axis data)
+  (declare (uint axis))
+  (case axis
     (0 (error 'exit))
     (1 data)
-    (t (loop for d = data then (if tail (tail d) (head d))
-             for tail in (pax iax)
-             finally (return d)))))
+    (t (fragment axis data))))

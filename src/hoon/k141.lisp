@@ -1,7 +1,7 @@
 (defpackage #:urbit/hoon/k141
   (:use #:cl #:ironclad #:cl-intbytes
         #:urbit/jets #:urbit/common #:urbit/syntax #:urbit/mug #:urbit/cache
-        #:urbit/convert #:urbit/math #:urbit/data #:urbit/hints
+        #:urbit/convert #:urbit/math #:urbit/axis #:urbit/data #:urbit/hints
         #:urbit/nock #:urbit/equality #:urbit/serial #:urbit/world
         #:urbit/data/slimatom #:urbit/data/slimcell)
   (:import-from #:alexandria #:when-let #:when-let* #:if-let)
@@ -420,8 +420,14 @@
           (cond ((= a b) 0)
                 ((> b a) (exit-mean-leaf "subtract-underflow"))
                 (t (m (sub a b)))))
-        (math-gate 1 cap)
-        (math-gate 1 mas)
+        (gfn %cap (@@a)
+          (case a
+            ((0 1) (error 'exit))
+            (t (cap a))))
+        (gfn %mas (@@a)
+          (case a
+            ((0 1) (error 'exit))
+            (t (mas a))))
         (gfn %peg (@@a @@b)
           (if (zerop a)
               (error 'exit)

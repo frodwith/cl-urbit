@@ -1,6 +1,6 @@
 (defpackage #:urbit/hints
-  (:use #:cl #:urbit/data #:urbit/math #:urbit/ideal #:urbit/world #:urbit/cache
-        #:urbit/jets #:urbit/syntax #:urbit/common #:urbit/convert
+  (:use #:cl #:urbit/data #:urbit/math #:urbit/axis #:urbit/ideal #:urbit/world
+        #:urbit/cache #:urbit/jets #:urbit/syntax #:urbit/common #:urbit/convert
         #:urbit/mug #:urbit/equality #:urbit/data/slimcell)
   (:export #:compose-hinters #:+handle-slog+ #:handle-memo #:handle-stack
            #:handle-fast #:fast-hinter #:bad-fast #:unregistered-parent

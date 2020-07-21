@@ -57,6 +57,6 @@
                                :element-type '(unsigned-byte 8))
         for n = tape then (tail n)
         while (deep n)
-        for c = (low-bits 8 (head n))
+        for c = (end 0 8 (head n))
         do (vector-push-extend c oct)
         finally (return (octets->uint oct (length oct)))))

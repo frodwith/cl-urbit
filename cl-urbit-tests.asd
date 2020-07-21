@@ -8,6 +8,7 @@
                 ((:file "tests")
                  (:file "syntax")
                  (:file "math")
+                 (:file "axis")
                  (:file "convert")
                  (:file "zig")
                  (:file "mug")

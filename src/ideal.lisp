@@ -1,5 +1,6 @@
 (defpackage #:urbit/ideal
-  (:use #:cl #:urbit/data #:urbit/mug #:urbit/zig #:urbit/math #:urbit/common)
+  (:use #:cl #:urbit/math #:urbit/axis #:urbit/zig
+        #:urbit/data #:urbit/mug #:urbit/common)
   (:import-from #:alexandria #:if-let #:when-let)
   (:export #:kernel #:kernel-name #:kernel-driver #:kernel-children
            #:root-kernel #:root-kernel-constant
@@ -20,7 +21,7 @@
            #:ideal #:ideal-atom #:iatom #:make-iatom #:iatom-int #:iatom-mug
            #:icell #:icons #:icell-head #:icell-tail #:icell-mug #:icell-meta
            #:fat #:make-fat #:fat-formula
-           #:icell-battery #:icell-speed #:iint #:imug #:ideep
+           #:icell-battery #:icell-speed #:iint #:imug #:ideep #:icell-fragment-safe
            #:ideal-atom=mugatom #:icell=mugcell #:icell-copy))
 
 (in-package #:urbit/ideal)
@@ -261,3 +262,15 @@
               #'icell-tail #'tail
               #'ideal-atom=mugatom #'icell-copy #'fast)
         (icell-copy i c)))))
+
+(defun icell-fragment-safe (axis icell)
+  (declare (pint axis) (icell icell))
+  (if (= 1 axis)
+      icell
+      (block
+        nil
+        (let ((n icell))
+          (for-axis (tail axis)
+            (unless (ideep icell) (return nil))
+            (setq n (if tail (icell-tail n) (icell-head n))))
+          n))))

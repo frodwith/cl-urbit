@@ -1,5 +1,5 @@
 (defpackage #:urbit/nock
-  (:use #:cl #:urbit/math #:urbit/zig #:urbit/jets #:urbit/equality
+  (:use #:cl #:urbit/math #:urbit/axis #:urbit/zig #:urbit/jets #:urbit/equality
         #:urbit/ideal #:urbit/world #:urbit/data #:urbit/common #:urbit/syntax
         #:urbit/data/core #:urbit/data/slimcell #:urbit/data/slimatom)
   (:import-from #:alexandria #:when-let #:when-let* #:if-let)
@@ -265,8 +265,7 @@
 (defmacro @0 (ax)
   (case ax
     (0 +crash+)
-    (1 's)
-    (t (axis-parts ax 's 'head 'tail))))
+    (t (compile-axis ax 's 'head 'tail))))
 
 (defmacro @1 (a)
   `(quote ,a))
@@ -320,30 +319,29 @@
         (core-cons head tail spd nil)
         (slim-cons head tail))))
 
-(defun pvax (pax)
-  (map 'bit-vector (lambda (bool) (if bool 1 0)) pax))
-
-; TODO: this loop might be clearer with a zig, making pvax unneccessary
-(defun edit-on (pax)
-  (destructuring-bind (tail . remain) pax
-    (if (null remain)
-        (if tail
-            '(econs #*1 o (head o) n)
-            '(econs #*0 o n (tail o)))
-        (let* ((side (if tail 'tail 'head))
-               (more `(let ((o (,side o)))
-                        ,(edit-on remain)))
-               (parts (if tail
-                          `((head o) ,more)
-                          `(,more (tail o)))))
-          `(econs ,(pvax pax) o ,@parts)))))
+(defun edit-on (zig)
+  (let ((end (1- (length zig))))
+    (labels ((rec (i)
+               (let ((tail (not (zerop (bit zig i)))))
+                 (if (= i end)
+                     (if tail
+                         '(econs #*1 o (head o) n)
+                         '(econs #*0 o n (tail o)))
+                     (let* ((side (if tail 'tail 'head))
+                            (more `(let ((o (,side o)))
+                                     ,(rec (1+ i))))
+                            (parts (if tail
+                                       `((head o) ,more)
+                                       `(,more (tail o)))))
+                       `(econs ,(subseq zig i) o ,@parts))))))
+      (rec 0))))
 
 (defmacro @10 ((ax small) big)
   (case ax
     (0 +crash+)
     (1 `(progn ,big ,small))
     (t `(let ((o ,big) (n ,small))
-          ,(edit-on (pax ax))))))
+          ,(edit-on (axis->zig ax))))))
 
 ; hint macros
 
@@ -475,13 +473,14 @@
             (error 'need :sample sample)))))
 
 (defun compile-stencil-arm (battery name axis)
-  (loop for n = battery then (if tail (icell-tail n) (icell-head n))
-        for tail in (unless (= 1 axis) (pax axis))
-        unless (ideep n) do (return nil) end
-        finally (let ((mangle (gensym
-                                (string-upcase
-                                  (format nil "~a/~a" (peg 2 axis) name)))))
-                  (return (symbol-function (compile mangle (heavy-form (icell-formula n))))))))
+  (when-let (formula (icell-fragment-safe axis battery))
+    (and (ideep formula)
+         (symbol-function
+           (compile
+             (gensym
+               (string-upcase
+                 (format nil "~a/~a" (peg 2 axis) name)))
+             (heavy-form (icell-formula formula)))))))
 
 (defun compile-stencil-dispatch (stencil battery name sfx jet arms)
   (let ((dis `(case axis

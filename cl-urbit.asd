@@ -10,6 +10,7 @@
                 :serial t
                 :components
                 ((:file "math")
+                 (:file "axis")
                  (:file "zig")
                  (:file "data")
                  (:file "common")
