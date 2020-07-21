@@ -95,7 +95,9 @@
 (defun slog-washer (wash tracer out)
   (lambda (slog)
     (let ((tank (slog-tank slog)))
-      ; TODO: do something with slog-priority
+      (let ((p (slog-priority slog)))
+        (loop repeat p do (princ #\>))
+        (unless (zerop p) (princ #\space)))
       (handler-case (print-wall (funcall wash tank) out)
         (exit (e) 
           (warn "ivory wash failed: ~x" (jam (find-ideal tank)))
