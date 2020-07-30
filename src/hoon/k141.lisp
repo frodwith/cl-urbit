@@ -115,7 +115,7 @@
   (declare (uint bloq))
   (let ((r 0))
     (for-?~ (i list)
-      (setq r (cat bloq r i)))
+      (setq r (cat bloq r (cl-integer i))))
     r))
 
 (defun rep (bloq list)
@@ -189,11 +189,14 @@
        (vector-push-extend i vec))
      vec))
 
+(defun vector-onto-nlist (vector list)
+  (loop for n = list then (slim-cons a n)
+        for i from (1- (length vector)) downto 0
+        for a = (aref vector i)
+        finally (return n)))
+
 (defun weld (a b)
-  (loop with v = (nlist->vector a)
-        for r = b then (slim-cons (aref v i) r)
-        for i from (1- (length v)) downto 0
-        finally (return r)))
+  (vector-onto-nlist (nlist->vector a) b))
 
 (defun muk (syd len key)
   (if (or (> (met 5 syd) 1)
@@ -383,6 +386,55 @@
 (defun rest-driver (kernel parent-stencil ideal hooks)
   (vet-sut-sam kernel parent-stencil ideal hooks #'rest-cache))
 
+; layer six jet functions
+
+; adapted from
+; https://rosettacode.org/wiki/Longest_common_subsequence#Common_Lisp
+(defun loss (list-1 list-2)
+  (let* ((array1 (nlist->vector list-1))
+         (array2 (nlist->vector list-2))
+         (l1 (length array1))
+         (l2 (length array2))
+         (results (make-array (list l1 l2) :initial-element nil)))
+    (declare (dynamic-extent results))
+    (labels ((lcs (start1 start2)
+               ;; if either sequence is empty
+               (if (or (eql start1 l1) (eql start2 l2))
+                   '(0 . 0)
+                   ;; otherwise, return any memoized value
+                   (or (aref results start1 start2)
+                       (setf (aref results start1 start2)
+                             (if (same (aref array1 start1) (aref array2 start2))
+                                 ;; if they start with the same element,
+                                 ;; move forward in both sequences
+                                 (destructuring-bind (seq . len)
+                                   (lcs (1+ start1) (1+ start2))
+                                   (cons
+                                     (slim-cons (aref array1 start1) seq)
+                                     (1+ len)))
+                                 ;; otherwise, move ahead in each separately,
+                                 ;; and return the better result.
+                                 (let ((a (lcs (1+ start1) start2))
+                                       (b (lcs start1 (1+ start2))))
+                                   (if (> (cdr a) (cdr b))
+                                       a
+                                       b))))))))
+      (car (lcs 0 0)))))
+
+(defun leer (cord)
+  (declare (uint cord))
+  (loop with len = (integer-length cord)
+        with out = (stack-vector 10)
+        for i = 0 then (+ 8 j)
+        for j = (loop for pos from i below len by 8
+                      for c = (ldb (byte 8 pos) cord)
+                      when (= 10 c) return pos
+                      finally (return pos))
+        for line = (ldb (byte (- j i) i) cord)
+        do (vector-push-extend line out)
+        until (>= j len)
+        finally (return (vector-onto-nlist out 0))))
+
 ; the actual jet tree
 
 (defparameter +jets+
@@ -520,7 +572,20 @@
                     %nest 3 nil
                     (jet-core
                       %nest-in 3 nil
-                      (jet-core %nest-dext 1 #'nest-driver))))))))))))
+                      (jet-core %nest-dext 1 #'nest-driver))))
+                (jet-core
+                  %hex 1 nil
+                  (jet-core
+                    %loss 31
+                    (deaf-gate-driver
+                      (lambda (sample)
+                        (dedata (hel hev) sample
+                          (loss hel hev)))))
+                  (jet-core
+                    %leer 31
+                    (deaf-gate-driver
+                      (lambda (sample)
+                        (leer (cl-integer sample))))))))))))))
 
 (defun k141-hinter (tag clue next)
   (when clue

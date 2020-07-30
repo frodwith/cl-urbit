@@ -5,7 +5,7 @@
   :homepage "https://github.com/frodwith/cl-urbit"
   :version "0.1"
   :depends-on (:alexandria :named-readtables :trivial-bit-streams 
-               :ironclad :cl-murmurhash :cl-intbytes :unix-opts)
+               :cffi :ironclad :cl-murmurhash :cl-intbytes :unix-opts)
   :components ((:module "src"
                 :serial t
                 :components
@@ -35,6 +35,7 @@
                  (:file "nock")
                  (:file "cache")
                  (:file "hints")
+                 (:file "crypto")
                  (:file "hoon/k141")
                  (:file "hoon/ivory")
                  )))
