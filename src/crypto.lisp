@@ -112,6 +112,17 @@
                      aptr a-point-ptr bptr b-point-ptr out))
         (read-out out 32)))))
 
+(defcfun "urcrypt_ed_puck" :void
+  (seed :pointer)
+  (out :pointer))
+
+(defun ed-puck (seed)
+  (declare ((octets 32) seed))
+  (with-foreign-octets ((seed-ptr 32 seed))
+    (with-foreign-pointer (out 32)
+      (urcrypt-ed-puck seed-ptr out)
+      (read-out out 32))))
+
 (defcfun "urcrypt_ed_sign" :void
   (message :pointer)
   (length size)
