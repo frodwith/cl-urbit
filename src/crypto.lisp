@@ -94,6 +94,24 @@
                      aptr a-point-ptr bptr out))
         (read-out out 32)))))
 
+(defcfun "urcrypt_ed_add_double_scalarmult" :int
+  (a :pointer)
+  (a-point :pointer)
+  (b :pointer)
+  (b-point :pointer)
+  (out :pointer))
+
+(defun ed-add-double-scalarmult (a a-point b b-point)
+  (declare ((octets 32) a a-point b b-point))
+  (with-foreign-octets ((aptr 32 a)
+                        (a-point-ptr 32 a-point)
+                        (bptr 32 b)
+                        (b-point-ptr 32 b-point))
+    (with-foreign-pointer (out 32)
+      (when (zerop (urcrypt-ed-add-double-scalarmult
+                     aptr a-point-ptr bptr b-point-ptr out))
+        (read-out out 32)))))
+
 (defcfun "urcrypt_ed_sign" :void
   (message :pointer)
   (length size)
