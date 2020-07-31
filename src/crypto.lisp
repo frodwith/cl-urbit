@@ -1,40 +1,20 @@
 (defpackage #:urbit/crypto
   (:use #:cl #:cl-intbytes #:cffi)
   (:import-from #:urbit/math #:met #:uint)
-  (:export #:scalarmult #:ed-sign))
+  (:export #:ed-point-add #:ed-scalarmult #:ed-sign))
 
 (in-package #:urbit/crypto)
 
-(define-foreign-library
-  liburcrypt
-  (t (:default "liburcrypt")))
-
-(use-foreign-library liburcrypt)
-
-(defcfun "urcrypt_ed_scalarmult" :int
-  (a :pointer)
-  (b :pointer)
-  (c :pointer))
-
-; not necessarily true, see grovel?
-(defctype size :unsigned-int)
-
-(defcfun "urcrypt_ed_sign" :void
-  (message :pointer)
-  (length size)
-  (seed :pointer)
-  (out :pointer))
-
 (deftype octets (n) `(unsigned-byte ,(ash n 3)))
 
-(defun write-bytes-to-ptr (ptr bytes int)
+(defun write-ptr (ptr bytes int)
   (declare (uint int bytes))
   (loop for i from 0 below bytes
         for pos upfrom 0 by 8
         for byt = (ldb (byte 8 pos) int)
         do (setf (mem-ref ptr :uint8 i) byt)))
 
-(defun read-bytes-from-ptr (ptr bytes)
+(defun read-ptr (ptr bytes)
   (declare (uint bytes))
   (loop for r = 0 then (dpb byt (byte 8 pos) r)
         for i from 0 below bytes
@@ -42,23 +22,63 @@
         for byt = (mem-ref ptr :uint8 i)
         finally (return r)))
 
-(defun scalarmult (a b)
+(defmacro read-out (ptr bytes)
+  (assert (constantp bytes)) ; note the duplication of bytes
+  `(the (octets ,bytes) (read-ptr ,ptr ,bytes)))
+
+(defmacro with-foreign-octets (bindings &body forms)
+  (multiple-value-bind (out-bindings writes)
+    (loop for (name size int) in bindings
+          collect `(,name :uint8 ,size) into out-bindings
+          collect `(write-ptr ,name ,size ,int) into writes
+          finally (return (values out-bindings writes)))
+    `(with-foreign-objects ,out-bindings
+       ,@writes
+       ,@forms)))
+
+(define-foreign-library
+  liburcrypt
+  (t (:default "liburcrypt")))
+
+(use-foreign-library liburcrypt)
+
+; not necessarily true, see grovel?
+(defctype size :unsigned-int)
+
+(defcfun "urcrypt_ed_point_add" :int
+  (a :pointer)
+  (b :pointer)
+  (out :pointer))
+
+(defun ed-point-add (a b)
   (declare ((octets 32) a b))
-  (with-foreign-pointer (aptr 32)
-    (with-foreign-pointer (bptr 32)
-      (with-foreign-pointer (cptr 32)
-        (write-bytes-to-ptr aptr 32 a)
-        (write-bytes-to-ptr bptr 32 b)
-        (when (zerop (urcrypt-ed-scalarmult aptr bptr cptr))
-          (the (octets 32) (read-bytes-from-ptr cptr 32)))))))
+  (with-foreign-octets ((aptr 32 a) (bptr 32 b))
+    (with-foreign-pointer (out 32)
+      (when (zerop (urcrypt-ed-point-add aptr bptr out))
+        (read-out out 32)))))
+
+(defcfun "urcrypt_ed_scalarmult" :int
+  (a :pointer)
+  (b :pointer)
+  (out :pointer))
+
+(defun ed-scalarmult (a b)
+  (declare ((octets 32) a b))
+  (with-foreign-octets ((aptr 32 a) (bptr 32 b))
+    (with-foreign-pointer (out 32)
+      (when (zerop (urcrypt-ed-scalarmult aptr bptr out))
+        (read-out out 32)))))
+
+(defcfun "urcrypt_ed_sign" :void
+  (message :pointer)
+  (length size)
+  (seed :pointer)
+  (out :pointer))
 
 (defun ed-sign (msg seed)
   (declare (uint msg) ((octets 32) seed))
   (let ((len (met 3 msg)))
-    (with-foreign-pointer (msg-ptr len)
-      (with-foreign-pointer (seed-ptr 32)
-        (with-foreign-pointer (out-ptr 64)
-          (write-bytes-to-ptr msg-ptr len msg)
-          (write-bytes-to-ptr seed-ptr 32 seed)
-          (urcrypt-ed-sign msg-ptr len seed-ptr out-ptr)
-          (the (octets 64) (read-bytes-from-ptr out-ptr 64)))))))
+    (with-foreign-octets ((msg-ptr len msg) (seed-ptr 32 seed))
+      (with-foreign-pointer (out 64)
+        (urcrypt-ed-sign msg-ptr len seed-ptr out)
+        (read-out out 64)))))
