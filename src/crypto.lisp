@@ -80,6 +80,20 @@
       (urcrypt-ed-scalarmult-base in out)
       (read-out out 32))))
 
+(defcfun "urcrypt_ed_add_scalarmult_scalarmult_base" :int
+  (a :pointer)
+  (a-point :pointer)
+  (b :pointer)
+  (out :pointer))
+
+(defun ed-add-scalarmult-scalarmult-base (a a-point b)
+  (declare ((octets 32) a a-point b))
+  (with-foreign-octets ((aptr 32 a) (a-point-ptr 32 a-point) (bptr 32 b))
+    (with-foreign-pointer (out 32)
+      (when (zerop (urcrypt-ed-add-scalarmult-scalarmult-base
+                     aptr a-point-ptr bptr out))
+        (read-out out 32)))))
+
 (defcfun "urcrypt_ed_sign" :void
   (message :pointer)
   (length size)
