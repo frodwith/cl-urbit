@@ -123,6 +123,18 @@
       (urcrypt-ed-puck seed-ptr out)
       (read-out out 32))))
 
+(defcfun "urcrypt_ed_shar" :void
+  (public :pointer)
+  (seed :pointer)
+  (out :pointer))
+
+(defun ed-shar (public seed)
+  (declare ((octets 32) public seed))
+  (with-foreign-octets ((public-ptr 32 public) (seed-ptr 32 seed))
+    (with-foreign-pointer (out 32)
+      (urcrypt-ed-shar public-ptr seed-ptr out)
+        (read-out out 32))))
+
 (defcfun "urcrypt_ed_sign" :void
   (message :pointer)
   (length size)
