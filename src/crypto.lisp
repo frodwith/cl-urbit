@@ -148,3 +148,19 @@
       (with-foreign-pointer (out 64)
         (urcrypt-ed-sign msg-ptr len seed-ptr out)
         (read-out out 64)))))
+
+(defcfun "urcrypt_ed_veri" :boolean
+  (message :pointer)
+  (length size)
+  (public :pointer)
+  (signature :pointer))
+
+(defun ed-veri (msg public signature)
+  (declare (uint msg)
+           ((octets 32) public)
+           ((octets 64) signature))
+  (let ((len (met 3 msg)))
+    (with-foreign-octets ((msg-ptr len msg)
+                          (pub-ptr 32 public)
+                          (sig-ptr 64 signature))
+      (urcrypt-ed-veri msg-ptr len pub-ptr sig-ptr))))
