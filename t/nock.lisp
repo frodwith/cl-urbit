@@ -1,6 +1,6 @@
 (defpackage #:urbit/tests/nock
   (:use #:cl #:fiveam #:urbit/tests #:urbit/syntax #:urbit/nock #:urbit/hints
-        #:urbit/common #:urbit/jets #:urbit/equality #:urbit/data
+        #:urbit/common #:urbit/nock/jets #:urbit/equality #:urbit/data
         #:urbit/data/slimatom))
 
 (in-package #:urbit/tests/nock)
