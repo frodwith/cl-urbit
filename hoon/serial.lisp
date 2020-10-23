@@ -2,7 +2,7 @@
   (:use #:cl #:cl-intbytes #:trivial-bit-streams
         #:urbit/nock/math #:urbit/nock/data #:urbit/nock/ideal
         #:urbit/nock/data/slimcell #:urbit/nock/data/slimatom)
-  (:export #:jam #:cue #:jam-to-write #:cue-from-read
+  (:export #:jam #:cue #:jam-to-write #:jam-to-bytes #:cue-from-read
            #:cue-slim-from-int #:cue-pill))
 
 (in-package #:urbit/hoon/serial)
@@ -143,14 +143,19 @@
   (let ((len (met 3 a)))
     (read-from-octets len (int->octets a len))))
 
-(defun jam (ideal)
+(defun jam-to-bytes (ideal)
   (let ((oct (make-array 100 :adjustable t :fill-pointer 0)))
     (jam-to-write
       ideal
       (lambda (buf end)
         (loop for i below end
               do (vector-push-extend (aref buf i) oct))))
-    (octets->uint oct (fill-pointer oct))))
+    (values oct (fill-pointer oct))))
+
+(defun jam (ideal)
+  (multiple-value-bind (oct len)
+    (jam-to-bytes ideal)
+    (octets->uint oct len)))
 
 (defun cue (int atom-fn cell-fn)
   (cue-from-read (read-from-int int) atom-fn cell-fn))

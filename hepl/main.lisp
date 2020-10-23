@@ -175,6 +175,26 @@
                         do (try-print (funcall slap subject path cord)))
                   (try-print subject))))))))))
 
+; readable hoon dotted notation
+(defun print-ux-bytes (bytes len)
+  (if (zerop len)
+      (format t "0x0")
+      (flet ((chunk (hi lo)
+               (logior (ash (aref bytes hi) 8) (aref bytes lo))))
+        ; write first byte
+        (format t "0x~(~x~)"
+                (let ((hi (1- len)))
+                  (if (oddp len)
+                      (progn
+                        (setq len hi)
+                        (aref bytes hi))
+                      (let ((lo (1- hi)))
+                        (setq len lo)
+                        (chunk hi lo)))))
+        ; length has been evened
+        (loop for i from (1- len) above 0 by 2
+              do (format t ".~(~4,'0x~)" (chunk i (1- i)))))))
+
 (defun ivory-toplevel-from-pill (name pill-path)
   (in-world (load-k141 urbit/hepl/jets:+tree+)
     (with-fresh-memos
@@ -206,20 +226,24 @@
                       (lambda (tank)
                         (funcall slam (slim-cons win tank)))))))
         (exit (e)
-          (format t "lite boot crash: ~x~%"
-                  (jam (find-ideal (exit-stack e))))
+          (format t "lite boot crash: printing jammed trace as @ux:~%")
+          (multiple-value-bind (oct len)
+            (jam-to-bytes (find-ideal (exit-stack e)))
+            (print-ux-bytes oct len))
+          (terpri)
           (sb-ext:exit :abort t))))))
 
 (defvar *ivory-toplevel*)
 
 (register-image-dump-hook
   (lambda ()
-    (setf *ivory-toplevel*
-          (ivory-toplevel-from-pill
-            "hepl"
-            (merge-pathnames 
-              (uiop/pathname:parse-unix-namestring "../ivory.pill")
-              #.*compile-file-pathname*)))))
+    (unless (boundp '*ivory-toplevel*)
+      (setf *ivory-toplevel*
+            (ivory-toplevel-from-pill
+              "hepl"
+              (merge-pathnames
+                (uiop/pathname:parse-unix-namestring "../ivory.pill")
+                #.*compile-file-pathname*))))))
 
 (defun entry ()
   (funcall *ivory-toplevel*))

@@ -6,7 +6,7 @@
         #:urbit/hoon/tape #:urbit/hoon/cache #:urbit/hoon/syntax
         #:urbit/hoon/serial #:urbit/hoon/hints)
   (:import-from #:alexandria #:when-let #:when-let* #:if-let)
-  (:export #:defunary #:defbinary #:defgate #:load-k141
+  (:export #:defunary #:defbinary #:defgate #:load-k141 #:debug-core
            #:hoon-jet-tree #:layer #:container #:leaf #:~/ 
            #:+add #:+dec #:+div #:+dvr #:+gte #:+gth #:+lte #:+lth
            #:+max #:+min #:+mod #:+mul #:+sub #:+cap #:+mas #:+peg
@@ -177,7 +177,7 @@
 (defmacro defcmp (name fn)
   `(defund ,name (@@a @@b) (loob (funcall ,fn a b))))
 
-(defcmp gte+< #'<=)
+(defcmp gte+< #'>=)
 (defgate +gte #'gte+<)
 
 (defcmp gth+< #'>)
@@ -668,3 +668,12 @@
               :hinter (if fast-hints-enabled
                           (compose-hinters #'fast-hinter #'k141-hinter)
                           #'k141-hinter)))
+
+; instruments a kernel-driver to fuzz all its arms
+(defun debug-core (kernel-driver)
+  (lambda (kernel parent-stencil ideal hooks)
+    (let ((axis-driver
+            (funcall kernel-driver kernel parent-stencil ideal hooks)))
+      (lambda (axis)
+        (let ((arm-driver (funcall axis-driver axis)))
+          (fuzzy kernel ideal axis arm-driver))))))
