@@ -1,5 +1,5 @@
 (defpackage #:urbit/tests/math
-  (:use #:cl #:fiveam #:urbit/tests #:urbit/math))
+  (:use #:cl #:fiveam #:urbit/tests #:urbit/nock/math))
 
 (in-package #:urbit/tests/math)
 

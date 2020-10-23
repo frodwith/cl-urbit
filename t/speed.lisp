@@ -1,6 +1,6 @@
 (defpackage #:urbit/tests/speed
-  (:use #:cl #:fiveam #:urbit/ideal #:urbit/world
-        #:urbit/syntax #:urbit/tests #:urbit/nock/jets #:urbit/zig))
+  (:use #:cl #:fiveam #:urbit/tests #:urbit/nock/ideal #:urbit/nock/world
+        #:urbit/hoon/syntax #:urbit/nock/jets #:urbit/nock/zig))
 
 (in-package #:urbit/tests/speed)
 

@@ -235,24 +235,24 @@
 ; into just such a pack.
 
 (defun install-jet-pack (pack)
-  (loop for more = pack then (cdr more)
-        while (consp more)
+  (loop for more = pack then (tail more)
+        while (deep more)
         with parents = (make-array 100 :adjustable t :fill-pointer 0)
         for s = (macrolet ((! (e) `(get-ideal ,e))
                            (@ (e) `(get-ideal-atom ,e))
                            (^ (e) `(get-ideal-cell ,e)))
-                  (decons (@@stem bulb) (car more)
+                  (dedata (@@stem bulb) (head more)
                     (ecase stem
-                      (0 (decons (@name core hooks) bulb
-                           (decons (^ @) core
+                      (0 (dedata (@name core hooks) bulb
+                           (dedata (^ @) core
                              (install-root-stencil
                                (@ name) (^ core) (! hooks)))))
-                      (1 (decons (@name ^battery @axis @@parent hooks) bulb
+                      (1 (dedata (@name ^battery @axis @@parent hooks) bulb
                            (install-child-stencil
                              (@ name) (^ battery) (@ axis)
                              (aref parents parent) (! hooks)))))))
         do (vector-push-extend s parents)
-        finally (unless (zerop more) (error 'exit))))
+        finally (unless (zerop (cl-integer more)) (error 'exit))))
 
 ; destructively set the final nil of a list to a 0 (lisp list -> noun list)
 (defun zero-terminate (list)

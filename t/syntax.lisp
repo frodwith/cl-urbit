@@ -1,5 +1,5 @@
 (defpackage #:urbit/tests/syntax
-  (:use #:cl #:fiveam #:urbit/tests #:urbit/syntax #:named-readtables))
+  (:use #:cl #:fiveam #:urbit/tests #:urbit/hoon/syntax #:named-readtables))
 
 (in-package #:urbit/tests/syntax)
 

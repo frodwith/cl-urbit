@@ -10,27 +10,7 @@
       (uiop:subpathname *load-pathname* "README.md"))
   :depends-on ("cl-urbit/hepl"
                "cl-urbit/lars")
-  :in-order-to ((test-op (test-op "cl-urbit/test"))))
-
-(defsystem "cl-urbit/test"
-  :depends-on ("cl-urbit" "fiveam")
-  :components ((:module "t"
-                        :serial t
-                        :components
-                        ((:file "tests")
-                         (:file "syntax")
-                         (:file "math")
-                         (:file "axis")
-                         (:file "convert")
-                         (:file "zig")
-                         (:file "mug")
-                         (:file "data")
-                         (:file "common")
-                         (:file "ideal")
-                         (:file "speed")
-                         (:file "nock"))))
-  :perform (test-op (o s)
-                    (uiop:symbol-call '#:urbit/tests '#:test-urbit)))
+  :in-order-to ((test-op (test-op "cl-urbit/base"))))
 
 (defsystem "cl-urbit/base"
   :description "nock/hoon runtime"
@@ -39,6 +19,7 @@
                "trivial-bit-streams"
                "cl-murmurhash"
                "cl-intbytes")
+  :in-order-to ((test-op (test-op "cl-urbit/base/test")))
   :components
   ((:module "nock"
             :serial t
@@ -75,6 +56,26 @@
              (:file "tape")
              (:file "serial")
              (:file "k141")))))
+
+(defsystem "cl-urbit/base/test"
+  :depends-on ("cl-urbit/base" "fiveam")
+  :components ((:module "t"
+                :serial t
+                :components
+                ((:file "tests")
+                 (:file "syntax")
+                 (:file "math")
+                 (:file "axis")
+                 (:file "convert")
+                 (:file "zig")
+                 (:file "mug")
+                 (:file "data")
+                 (:file "common")
+                 (:file "ideal")
+                 (:file "speed")
+                 (:file "nock"))))
+  :perform (test-op (o s)
+             (uiop:symbol-call '#:urbit/tests '#:test-urbit)))
 
 (defsystem "cl-urbit/urcrypt"
   :description "bindings to liburcrypt"

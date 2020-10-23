@@ -1,6 +1,6 @@
 (defpackage #:urbit/tests/ideal
-  (:use #:cl #:fiveam #:urbit/tests #:urbit/syntax #:urbit/data
-        #:urbit/ideal #:urbit/world))
+  (:use #:cl #:fiveam #:urbit/tests #:urbit/hoon/syntax #:urbit/nock/data
+        #:urbit/nock/ideal #:urbit/nock/world))
 
 (in-package #:urbit/tests/ideal)
 

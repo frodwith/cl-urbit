@@ -1,7 +1,8 @@
 (defpackage #:urbit/tests/data
-  (:use #:cl #:fiveam #:urbit/tests #:urbit/syntax #:urbit/world
-        #:urbit/data #:urbit/equality #:urbit/ideal
-        #:urbit/data/slimcell #:urbit/data/slimatom))
+  (:use #:cl #:fiveam #:urbit/tests #:urbit/hoon/syntax
+        #:urbit/nock/world #:urbit/nock/data
+        #:urbit/nock/equality #:urbit/nock/ideal
+        #:urbit/nock/data/slimcell #:urbit/nock/data/slimatom))
 
 (in-package #:urbit/tests/data)
 

@@ -1,6 +1,6 @@
 (defpackage #:urbit/tests/common
   (:use #:cl #:fiveam
-        #:urbit/tests #:urbit/syntax #:urbit/common #:urbit/data))
+        #:urbit/tests #:urbit/hoon/syntax #:urbit/nock/common #:urbit/nock/data))
 
 (in-package #:urbit/tests/common)
 

@@ -1,5 +1,5 @@
 (defpackage #:urbit/tests/axis
-  (:use #:cl #:fiveam #:urbit/tests #:urbit/axis))
+  (:use #:cl #:fiveam #:urbit/tests #:urbit/nock/axis))
 
 (in-package #:urbit/tests/axis)
 

@@ -1,7 +1,8 @@
 (defpackage #:urbit/tests/nock
-  (:use #:cl #:fiveam #:urbit/tests #:urbit/syntax #:urbit/nock #:urbit/hints
-        #:urbit/common #:urbit/nock/jets #:urbit/equality #:urbit/data
-        #:urbit/data/slimatom))
+  (:use #:cl #:fiveam #:urbit/tests #:urbit/hoon/syntax #:urbit/nock/nock
+        #:urbit/hoon/serial #:urbit/hoon/hints #:urbit/nock/common
+        #:urbit/nock/jets #:urbit/hoon/k141 #:urbit/nock/equality
+        #:urbit/nock/data #:urbit/nock/data/slimatom))
 
 (in-package #:urbit/tests/nock)
 
@@ -145,11 +146,14 @@
       (error 'exit)
       (1- i))))
 
+(defunary mock-dec+< #'mock-dec)
+(defgate +mock-dec #'mock-dec+<)
+
 (defparameter +ackerman-jets+
   (list
     (jet-root
       %kack %kack nil
-      (jet-deaf-gate %dec #'mock-dec))))
+      (~/ dec #'+mock-dec))))
 
 (defun ack (n m)
   (nock [n m] (copy-tree [9 2 10 [6 0 1] +ackerman-source+])))
@@ -169,9 +173,9 @@
     (is (= 7 (in-world (load-world :jet-tree +ackerman-jets+
                                    :hinter #'fast-hinter)
                (let ((a (ack 2 2)))
-                 (setf pack (save-jet-pack))
-                 a
-                 ))))
+                 ; jam/cue to wash metadata
+                 (setf pack (jam (save-jet-pack)))
+                 a))))
     (is (= +decs-per-call+ *mock-dec-calls*))
     ; call in a new world with no jets - no increase
     (is (= 7 (bottle (ack 2 2))))
@@ -180,7 +184,8 @@
     (is (= 7 (in-world (load-world :jet-tree +ackerman-jets+) (ack 2 2))))
     (is (= +decs-per-call+ *mock-dec-calls*))
     ; supply the saved jet pack, the jets fire
-    (is (= 7 (in-world (load-world :jet-tree +ackerman-jets+ :jet-pack pack)
+    (is (= 7 (in-world (load-world :jet-tree +ackerman-jets+
+                                   :jet-pack (cue-slim-from-int pack))
                (ack 2 2))))
     (is (= (* 2 +decs-per-call+) *mock-dec-calls*))))
 
@@ -257,34 +262,38 @@
 (defparameter +memo-source+
   [7 [7 [1 42] 7 [8 [1 0 3] 11 [%fast 1 %kern [1 0] 0] 0 1] 7 [8 [1 [7 [8 [1 0 0] [1 6 [5 [0 13] 1 0] [0 12] 9 2 10 [6 [4 0 12] 8 [9 5 0 7] 9 2 10 [6 0 29] 0 2] 0 1] 0 1] 11 [%fast 1 %add [0 7] 0] 0 1] 7 [8 [1 0] [1 6 [5 [1 0] 0 6] [0 0] 8 [1 0] 8 [1 8 [4 0 6] 6 [5 [0 2] 0 62] [0 14] 9 2 10 [6 0 2] 0 3] 9 2 0 1] 0 1] 11 [%fast 1 %dec [0 7] 0] 0 1] 11 [%fast 1 %one [0 3] 0] 0 1] 8 [1 7 [8 [1 0] [1 11 [%memo 1 0] 6 [5 [1 0] 0 6] [1 0] 6 [5 [1 1] 0 6] [1 1] 8 [8 [9 5 0 15] 9 2 10 [6 0 14] 0 2] 8 [8 [9 5 0 31] 9 2 10 [6 0 6] 0 2] 8 [9 4 0 63] 9 2 10 [6 [7 [0 3] 9 2 10 [6 0 6] 0 7] 7 [0 3] 9 2 10 [6 0 2] 0 7] 0 2] 0 1] 11 [%fast 1 %fib [0 7] 0] 0 1] 11 [%fast 1 %two [0 3] 0] 0 1] 9 2 0 1])
 
-(defun memo-dec (sample)
-  (dedata (@@i) sample
-    (if (zerop i)
-        (error 'exit)
-        (slim-malt (1- i)))))
+(defun memo-dec (a)
+  (if (zerop a)
+      (error 'exit)
+      (1- a)))
 
-(defun memo-add (sample)
-  (dedata (@@a @@b) sample
-    (slim-malt (+ a b))))
+(defunary memo-dec+< #'memo-dec)
+(defgate +memo-dec #'memo-dec+<)
+
+(defun memo-add (a b)
+  (+ a b))
+
+(defbinary memo-add+< #'memo-add)
+(defgate +memo-add #'memo-add+<)
 
 (defvar *memo-count*)
 
-(defun memo-fib (sample)
+(defun memo-fib+< (sample)
   (declare (ignore sample))
   (incf *memo-count*)
   nil)
+
+(defgate +memo-fib #'memo-fib+<)
 
 (defparameter +memo-jets+
   (list
     (jet-root
       %kern 42 nil
-      (jet-core
-        %one 1 nil
-        (jet-deaf-gate %dec #'memo-dec)
-        (jet-deaf-gate %add #'memo-add)
-        (jet-core
-          %two 1 nil
-          (jet-deaf-gate %fib #'memo-fib))))))
+      (layer one
+        (~/ dec #'+memo-dec)
+        (~/ add #'+memo-add)
+        (layer two
+          (~/ fib #'+memo-fib))))))
 
 (test memo
   (in-world (load-world :hinter (compose-hinters #'memo-hinter #'fast-hinter)
@@ -298,7 +307,7 @@
 (test fast-parent
   (macrolet ((pfp (parent &body forms)
                `(multiple-value-bind (valid axis)
-                  (urbit/hints::parse-fast-parent ,parent)
+                  (urbit/hoon/hints::parse-fast-parent ,parent)
                   ,@forms)))
     (pfp [11 %slog 1 0]
       (is-true valid)
@@ -320,7 +329,7 @@
       (is (= 7 axis)))))
 
 (test fast-name
-  (macrolet ((p (&rest args) `(urbit/hints::parse-fast-name ,@args)))
+  (macrolet ((p (&rest args) `(urbit/hoon/hints::parse-fast-name ,@args)))
     (is (= %foo (p %foo)))
     (is (= %barbazquux (p %barbazquux)))
     (is (= %foo42 (p [%foo 42])))

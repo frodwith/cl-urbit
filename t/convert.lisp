@@ -1,6 +1,7 @@
 (defpackage #:urbit/tests/convert
   (:use #:cl #:fiveam #:urbit/tests
-        #:urbit/convert #:urbit/syntax #:urbit/equality))
+        #:urbit/nock/cord #:urbit/hoon/tape
+        #:urbit/hoon/syntax #:urbit/nock/equality))
 
 (in-package #:urbit/tests/convert)
 

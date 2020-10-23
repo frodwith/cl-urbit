@@ -47,11 +47,11 @@
 
 (defmacro with-lite-boot (pill-path &body forms)
   `(let ((arv (cue-pill ,pill-path)))
-     (format t "lite: arvo formula ~x~%" (mug arv))
+     (format t "lite: arvo formula ~(~x~)~%" (mug arv))
      (let* ((*life-source* (copy-tree [7 [2 [0 3] 0 2] 0 7]))
             (*wish-source* (copy-tree [9 2 10 [6 0 3] 9 22 0 2]))
             (*ivory-kernel* (lite arv)))
-       (format t "lite: core ~x~%" (mug *ivory-kernel*))
+       (format t "lite: core ~(~x~)~%" (mug *ivory-kernel*))
        ,@forms)))
 
 (defun print-tape (tape &optional out)
@@ -130,7 +130,7 @@
           :args "[one.hoon two.hoon tre.hoon ...]")
   (sb-ext:exit))
 
-(defun make-ivory-toplevel (&key name world init sell slap mook wash)
+(defun make-hepl-toplevel (&key name world init sell slap mook wash)
   (lambda ()
     (multiple-value-bind (options args) (opts:get-opts)
       (when (getf options :help)
@@ -195,7 +195,7 @@
         (loop for i from (1- len) above 0 by 2
               do (format t ".~(~4,'0x~)" (chunk i (1- i)))))))
 
-(defun ivory-toplevel-from-pill (name pill-path)
+(defun hepl-toplevel-from-pill (name pill-path)
   (in-world (load-k141 urbit/hepl/jets:+tree+)
     (with-fresh-memos
       (handler-case
@@ -203,7 +203,7 @@
           ((unregistered-parent #'boot-unregistered)
            (slog #'boot-slog))
           (with-lite-boot pill-path
-            (make-ivory-toplevel
+            (make-hepl-toplevel
               :name name
               :world *world*
               :init (wish (string->cord "!>(.)"))
@@ -233,30 +233,27 @@
           (terpri)
           (sb-ext:exit :abort t))))))
 
-(defvar *ivory-toplevel*)
-
-(register-image-dump-hook
-  (lambda ()
-    (unless (boundp '*ivory-toplevel*)
-      (setf *ivory-toplevel*
-            (ivory-toplevel-from-pill
-              "hepl"
-              (merge-pathnames
-                (uiop/pathname:parse-unix-namestring "../ivory.pill")
-                #.*compile-file-pathname*))))))
+(defvar *hepl-toplevel*)
+(defun save-toplevel ()
+  ; looks for "ivory.pill" in toplevel cl-urbit directory
+  (setf *hepl-toplevel*
+        (hepl-toplevel-from-pill
+          "hepl"
+          (merge-pathnames
+            (uiop/pathname:parse-unix-namestring "../ivory.pill")
+            #.*compile-file-pathname*))))
 
 (defun entry ()
-  (funcall *ivory-toplevel*))
+  (funcall *hepl-toplevel*))
 
-(defun save-hoon-and-die (exe-path ivory-path)
-  (sb-ext:save-lisp-and-die exe-path
-    :executable t
-    :compression t
-    :toplevel (ivory-toplevel-from-pill (file-namestring exe-path) ivory-path)))
+(defparameter *dump-hooked* nil)
+(unless *dump-hooked*
+  (setq *dump-hooked* t)
+  (register-image-dump-hook #'save-toplevel))
 
 (defun test-toplevel (ivory-path)
   (let ((sb-ext:*posix-argv* '("test" "--repl"))
-        (top (ivory-toplevel-from-pill "test" ivory-path)))
+        (top (hepl-toplevel-from-pill "test" ivory-path)))
     (funcall top)))
     ;(sb-sprof:with-profiling (:report :flat
     ;                          :loop t

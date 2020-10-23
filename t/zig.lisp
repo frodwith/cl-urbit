@@ -1,5 +1,5 @@
 (defpackage #:urbit/tests/zig
-  (:use #:cl #:fiveam #:urbit/tests #:urbit/zig))
+  (:use #:cl #:fiveam #:urbit/tests #:urbit/nock/zig))
 
 (in-package #:urbit/tests/zig)
 

@@ -1,5 +1,5 @@
 (defpackage #:urbit/tests/mug
-  (:use #:cl #:fiveam #:urbit/tests #:urbit/syntax #:urbit/mug))
+  (:use #:cl #:fiveam #:urbit/tests #:urbit/hoon/syntax #:urbit/nock/mug))
 
 (in-package #:urbit/tests/mug)
 
