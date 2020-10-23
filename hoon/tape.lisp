@@ -41,4 +41,4 @@
         while (deep n)
         for c = (end 0 8 (head n))
         do (vector-push-extend c oct)
-        finally (return (the cord (octets->uint oct (length oct))))))
+        finally (return (the cord (values (octets->uint oct (length oct)))))))
