@@ -1,11 +1,29 @@
-(defpackage #:urbit/crypto
-  (:use #:cl #:cl-intbytes #:cffi)
-  (:import-from #:urbit/math #:met #:uint)
-  (:export #:ed-point-add #:ed-scalarmult #:ed-sign))
+(defpackage #:urbit/urcrypt
+  (:use #:cl #:cffi)
+  (:export #:ed-point-add #:ed-scalarmult #:ed-scalarmult-base
+           #:ed-add-scalarmult-scalarmult-base #:ed-add-double-scalarmult
+           #:ed-puck #:ed-shar #:ed-sign #:ed-veri
+           #:aes-ecba-en #:aes-ecba-de #:aes-cbca-en #:aes-cbca-de
+           #:aes-ecbb-en #:aes-ecbb-de #:aes-cbcb-en #:aes-cbcb-de
+           #:aes-ecbc-en #:aes-ecbc-de #:aes-cbcc-en #:aes-cbcc-de))
 
-(in-package #:urbit/crypto)
+(in-package #:urbit/urcrypt)
 
-(deftype octets (n) `(unsigned-byte ,(ash n 3)))
+(define-foreign-library
+  liburcrypt
+  (t (:default "liburcrypt")))
+
+(use-foreign-library liburcrypt)
+
+(deftype octets (n)
+  `(unsigned-byte ,(ash n 3)))
+
+(deftype uint ()
+  '(integer 0))
+
+(defun byte-length (i)
+  (declare (uint i))
+  (the uint (values (ceiling (integer-length i) 8))))
 
 (defun write-ptr (ptr bytes int)
   (declare (uint int bytes))
@@ -35,15 +53,6 @@
     `(with-foreign-objects ,out-bindings
        ,@writes
        ,@forms)))
-
-(define-foreign-library
-  liburcrypt
-  (t (:default "liburcrypt")))
-
-(use-foreign-library liburcrypt)
-
-; not necessarily true, see grovel?
-(defctype size :unsigned-int)
 
 (defcfun "urcrypt_ed_point_add" :int
   (a :pointer)
@@ -137,13 +146,13 @@
 
 (defcfun "urcrypt_ed_sign" :void
   (message :pointer)
-  (length size)
+  (length size-t)
   (seed :pointer)
   (out :pointer))
 
 (defun ed-sign (msg seed)
   (declare (uint msg) ((octets 32) seed))
-  (let ((len (met 3 msg)))
+  (let ((len (byte-length msg)))
     (with-foreign-octets ((msg-ptr len msg) (seed-ptr 32 seed))
       (with-foreign-pointer (out 64)
         (urcrypt-ed-sign msg-ptr len seed-ptr out)
@@ -151,7 +160,7 @@
 
 (defcfun "urcrypt_ed_veri" :boolean
   (message :pointer)
-  (length size)
+  (length size-t)
   (public :pointer)
   (signature :pointer))
 
@@ -159,8 +168,77 @@
   (declare (uint msg)
            ((octets 32) public)
            ((octets 64) signature))
-  (let ((len (met 3 msg)))
+  (let ((len (byte-length msg)))
     (with-foreign-octets ((msg-ptr len msg)
                           (pub-ptr 32 public)
                           (sig-ptr 64 signature))
       (urcrypt-ed-veri msg-ptr len pub-ptr sig-ptr))))
+
+(defmacro defecb (wrapper-name key-size c-name lisp-name)
+  (assert (constantp key-size))
+  `(progn
+     (defcfun (,c-name ,lisp-name) :int
+       (key :pointer)
+       (block :pointer)
+       (out :pointer))
+     (defun ,wrapper-name (key block)
+       (declare ((octets ,key-size) key)
+                ((octets 16) block))
+       (with-foreign-octets ((key-ptr ,key-size key)
+                             (blk-ptr 16 block))
+         (with-foreign-pointer (out 16)
+           (when (zerop (,lisp-name key-ptr blk-ptr out))
+             (read-out out 16)))))))
+
+(defecb aes-ecba-en 16 "urcrypt_aes_ecba_en" urcrypt-aes-ecba-en)
+(defecb aes-ecba-de 16 "urcrypt_aes_ecba_de" urcrypt-aes-ecba-de)
+
+(defecb aes-ecbb-en 24 "urcrypt_aes_ecbb_en" urcrypt-aes-ecbb-en)
+(defecb aes-ecbb-de 24 "urcrypt_aes_ecbb_de" urcrypt-aes-ecbb-de)
+
+(defecb aes-ecbc-en 32 "urcrypt_aes_ecbc_en" urcrypt-aes-ecbc-en)
+(defecb aes-ecbc-de 32 "urcrypt_aes_ecbc_de" urcrypt-aes-ecbc-de)
+
+; we use these with realloc in defcbc
+(defcfun "malloc" :pointer (size size-t))
+(defcfun "free" :void (ptr :pointer))
+
+(defmacro defcbc (wrapper-name key-size c-name lisp-name)
+  (assert (constantp key-size))
+  `(progn
+     (defcfun (,c-name ,lisp-name) :int
+       (message :pointer)
+       (length :pointer)
+       (key :pointer)
+       (ivec :pointer)
+       (realloc :pointer))
+     (defun ,wrapper-name (message key ivec)
+       (declare (uint message)
+                ((octets ,key-size) key)
+                ((octets 16) ivec))
+       (with-foreign-octets ((key-ptr ,key-size key)
+                             (ivec-ptr 16 ivec))
+         (with-foreign-objects ((size-ptr 'size-t)
+                                (buf-ptr :pointer))
+           (let* ((len (byte-length message))
+                  (buf (malloc len)))
+             (write-ptr buf len message)
+             (setf (mem-ref size-ptr 'size-t) len)  
+             (setf (mem-ref buf-ptr :pointer) buf)
+             (if (zerop (,lisp-name buf-ptr size-ptr key-ptr ivec-ptr
+                                    (foreign-symbol-pointer "realloc")))
+                 (let* ((out-size (mem-ref size-ptr 'size-t))
+                        (out-ptr (mem-ref buf-ptr :pointer))
+                        (out (read-ptr out-ptr out-size)))
+                   (free out-ptr)
+                   out)
+                 (progn (free buf) nil))))))))
+
+(defcbc aes-cbca-en 16 "urcrypt_aes_cbca_en" urcrypt-aes-cbca-en)
+(defcbc aes-cbca-de 16 "urcrypt_aes_cbca_de" urcrypt-aes-cbca-de)
+
+(defcbc aes-cbcb-en 24 "urcrypt_aes_cbcb_en" urcrypt-aes-cbcb-en)
+(defcbc aes-cbcb-de 24 "urcrypt_aes_cbcb_de" urcrypt-aes-cbcb-de)
+
+(defcbc aes-cbcc-en 32 "urcrypt_aes_cbcc_en" urcrypt-aes-cbcc-en)
+(defcbc aes-cbcc-de 32 "urcrypt_aes_cbcc_de" urcrypt-aes-cbcc-de)

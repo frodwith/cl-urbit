@@ -1,1 +1,3 @@
 *.fasl
+bin/
+ivory.pill

@@ -79,13 +79,21 @@
 
 (defsystem "cl-urbit/urcrypt"
   :description "bindings to liburcrypt"
-  :depends-on ("cl-urbit/base" "cffi")
-  :components
-  ((module "urcrypt"
-           :serial t
-           :components
-           ((:file "raw")
-            (:file "noun")))))
+  :defsystem-depends-on ("cffi-grovel")
+  :depends-on ("cffi")
+  :in-order-to ((test-op (test-op "cl-urbit/urcrypt/test")))
+  :components ((:module "urcrypt"
+                :serial t
+                :components
+                ((:file "urcrypt")
+                 (:cffi-grovel-file "grovel")))))
+
+(defsystem "cl-urbit/urcrypt/test"
+  :description "test the liburcrypt bindings"
+  :depends-on ("fiveam" "cl-urbit/urcrypt")
+  :components ((:file "t/urcrypt"))
+  :perform (test-op (o s)
+             (uiop:symbol-call '#:urbit/urcrypt/test '#:test-urcrypt)))
 
 (defsystem "cl-urbit/hepl"
   :description "hoon REPL"
@@ -93,8 +101,10 @@
   :build-operation program-op
   :build-pathname "bin/hepl"
   :entry-point "urbit/hepl/main:entry"
+  :serial t
   :components
-  ((module "hepl"
+  ((:static-file "ivory.pill")
+   (module "hepl"
            :serial t
            :components
            ((:file "jets")
@@ -102,7 +112,7 @@
 
 (defsystem "cl-urbit/lars"
   :description "urbit worker process"
-  :depends-on ("cl-urbit/urcrypt")
+  :depends-on ("cl-urbit/base" "cl-urbit/urcrypt")
   :class program-system
   :build-pathname "lars"
   :entry-point "urbit/lars/main::entry"
