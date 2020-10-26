@@ -1,4 +1,4 @@
-.PHONY: all
+.PHONY: all bin/hepl
 
 all: bin/hepl
 

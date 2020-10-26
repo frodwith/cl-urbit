@@ -101,14 +101,13 @@
   :build-operation program-op
   :build-pathname "bin/hepl"
   :entry-point "urbit/hepl/main:entry"
-  :serial t
   :components
-  ((:static-file "ivory.pill")
-   (module "hepl"
+  ((module "hepl"
            :serial t
            :components
            ((:file "jets")
-            (:file "main")))))
+            (:file "main")))
+   (:static-file "ivory.pill")))
 
 (defsystem "cl-urbit/lars"
   :description "urbit worker process"
