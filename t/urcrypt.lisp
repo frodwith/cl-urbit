@@ -65,3 +65,20 @@
   (is-cbc #'aes-cbca-en #'aes-cbca-de #x5eb4689e8c22cbe20340ac72770fa712)
   (is-cbc #'aes-cbcb-en #'aes-cbcb-de #x9f63fee8ebcded42bffef8e9e03fc9a3)
   (is-cbc #'aes-cbcc-en #'aes-cbcc-de #xa74fd8ec91dcbf3904d679b33c7a4b81))
+
+(defun is-siv (en de encrypted)
+  (let ((text #xdeadbeefcadefeeddeafbeefdeadcadedeedfadedeaf)
+        (ass #(0 42 #xdeadbeefcadefeeddeafbeefdeadcadedeedfadedeaf 42 0 0))
+        (key 42))
+    (multiple-value-bind (iv len enc) (funcall en text ass key)
+      (declare (ignore len))
+      (is (= encrypted enc))
+      (is (= text (funcall de enc ass key iv))))))
+
+(test aes-siv
+  (is-siv #'aes-siva-en #'aes-siva-de
+          #x6b8a0805104a7ce07c8f93e972ec18247ede1a8c218e)
+  (is-siv #'aes-sivb-en #'aes-sivb-de
+          #x3327efa318f77da69bfada8793c125c50790c0d352b3)
+  (is-siv #'aes-sivc-en #'aes-sivc-de
+          #x6c483c2b881ef22b5d42a1d29f05e01c719605b42ad9))

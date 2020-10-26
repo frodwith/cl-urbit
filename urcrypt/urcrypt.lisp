@@ -1,12 +1,3 @@
-(defpackage #:urbit/urcrypt
-  (:use #:cl #:cffi)
-  (:export #:ed-point-add #:ed-scalarmult #:ed-scalarmult-base
-           #:ed-add-scalarmult-scalarmult-base #:ed-add-double-scalarmult
-           #:ed-puck #:ed-shar #:ed-sign #:ed-veri
-           #:aes-ecba-en #:aes-ecba-de #:aes-cbca-en #:aes-cbca-de
-           #:aes-ecbb-en #:aes-ecbb-de #:aes-cbcb-en #:aes-cbcb-de
-           #:aes-ecbc-en #:aes-ecbc-de #:aes-cbcc-en #:aes-cbcc-de))
-
 (in-package #:urbit/urcrypt)
 
 (define-foreign-library
@@ -18,8 +9,7 @@
 (deftype octets (n)
   `(unsigned-byte ,(ash n 3)))
 
-(deftype uint ()
-  '(integer 0))
+(deftype uint () 'unsigned-byte)
 
 (defun byte-length (i)
   (declare (uint i))
@@ -242,3 +232,100 @@
 
 (defcbc aes-cbcc-en 32 "urcrypt_aes_cbcc_en" urcrypt-aes-cbcc-en)
 (defcbc aes-cbcc-de 32 "urcrypt_aes_cbcc_de" urcrypt-aes-cbcc-de)
+
+(defun measure-associations (as)
+  (loop with alen = (length as)
+        with lens = (make-array alen)
+        for i below alen
+        for a = (aref as i)
+        for b = (byte-length a)
+        do (setf (aref lens i) b)
+        sum b into total
+        finally (return (values alen total lens))))
+
+(defun fill-associations (as len lengths data-block dest-ptr)
+  (loop for i below len
+        for blk-ptr = data-block then (inc-pointer blk-ptr dlen)
+        for dlen = (aref lengths i)
+        for a = (aref as i)
+        for el-ptr = (mem-aptr dest-ptr '(:struct aes-siv-data) i)
+        do (write-ptr blk-ptr dlen a)
+        do (with-foreign-slots
+             ((dlength bytes) el-ptr (:struct aes-siv-data))
+             (setq dlength dlen)
+             (setq bytes blk-ptr))))
+
+(defmacro with-foreign-associations (associations (ptr len) &body forms)
+  (let ((asym (gensym))
+        (tot (gensym))
+        (lens (gensym))
+        (blk (gensym)))
+    `(let ((,asym ,associations))
+       (multiple-value-bind (,len ,tot ,lens) (measure-associations ,asym)
+         (with-foreign-objects ((,ptr '(:struct aes-siv-data) ,len)
+                                (,blk :uint8 ,tot))
+           (fill-associations ,asym ,len ,lens ,blk ,ptr)
+           ,@forms)))))
+
+(defmacro with-siv (message associations key key-size
+                    (message-ptr message-length
+                                 data-ptr data-length
+                                 key-ptr)
+                    &body forms)
+  (declare (symbol message-ptr message-length data-ptr data-length key-ptr))
+  (declare (fixnum key-size))
+  (assert (constantp key-size))
+  (let ((msym (gensym))
+        (asym (gensym))
+        (ksym (gensym)))
+    `(let ((,msym ,message)
+           (,asym ,associations)
+           (,ksym ,key))
+       (declare (uint ,msym)
+                ((vector uint) ,asym)
+                ((octets ,key-size) key))
+       (let ((,message-length (byte-length ,msym)))
+         (with-foreign-associations ,asym (,data-ptr ,data-length)
+           (with-foreign-octets ((,message-ptr ,message-length ,msym)
+                                 (,key-ptr ,key-size ,ksym))
+             ,@forms))))))
+
+(defmacro defcsiv (c-name lisp-name)
+  `(defcfun (,c-name ,lisp-name) :int
+     (message :pointer)
+     (length size-t)
+     (data :pointer)
+     (data-length size-t)
+     (key :pointer)
+     (iv :pointer)
+     (out :pointer)))
+
+(defmacro defsiv-en (wrapper-name key-size c-name lisp-name)
+  `(progn
+     (defcsiv ,c-name ,lisp-name)
+     (defun ,wrapper-name (message associations key)
+       (with-siv message associations key ,key-size (mptr mlen dptr dlen kptr)
+         (with-foreign-objects ((iv :uint8 16)
+                                (out :uint8 mlen))
+           (when (zerop (,lisp-name mptr mlen dptr dlen kptr iv out))
+             (values (read-ptr iv 16) mlen (read-ptr out mlen))))))))
+
+(defmacro defsiv-de (wrapper-name key-size c-name lisp-name)
+  `(progn
+     (defcsiv ,c-name ,lisp-name)
+     (defun ,wrapper-name (message associations key iv)
+       (declare (uint iv))
+       (with-siv message associations key ,key-size (mptr mlen dptr dlen kptr)
+         (with-foreign-octets ((iv-ptr 16 iv))
+           (with-foreign-object (out :uint8 mlen)
+             (when (zerop (,lisp-name mptr mlen dptr dlen kptr iv-ptr out))
+               (read-ptr out mlen))))))))
+
+(defsiv-en aes-siva-en 32 "urcrypt_aes_siva_en" urcrypt-aes-siva-en)
+(defsiv-de aes-siva-de 32 "urcrypt_aes_siva_de" urcrypt-aes-siva-de)
+
+(defsiv-en aes-sivb-en 48 "urcrypt_aes_sivb_en" urcrypt-aes-sivb-en)
+(defsiv-de aes-sivb-de 48 "urcrypt_aes_sivb_de" urcrypt-aes-sivb-de)
+
+(defsiv-en aes-sivc-en 64 "urcrypt_aes_sivc_en" urcrypt-aes-sivc-en)
+(defsiv-de aes-sivc-de 64 "urcrypt_aes_sivc_de" urcrypt-aes-sivc-de)

@@ -85,8 +85,9 @@
   :components ((:module "urcrypt"
                 :serial t
                 :components
-                ((:file "urcrypt")
-                 (:cffi-grovel-file "grovel")))))
+                ((:file "package")
+                 (:cffi-grovel-file "grovel")
+                 (:file "urcrypt")))))
 
 (defsystem "cl-urbit/urcrypt/test"
   :description "test the liburcrypt bindings"
