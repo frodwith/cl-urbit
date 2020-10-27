@@ -9,5 +9,6 @@
            #:aes-ecbb-de #:aes-cbcb-de #:aes-sivb-de
            #:aes-ecbc-en #:aes-cbcc-en #:aes-sivc-en
            #:aes-ecbc-de #:aes-cbcc-de #:aes-sivc-de
-           #:ripemd-160 #:sha-1 #:shay #:shal #:shas
-           #:argon2 #:blake2))
+           #:sha-1 #:shay #:shal #:shas
+           #:ripemd-160 #:argon2 #:blake2
+           #:with-secp-context #:secp-make #:secp-sign #:secp-reco))

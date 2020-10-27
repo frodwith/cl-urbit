@@ -131,3 +131,19 @@
 
 (test blake2
   (is (= #x73500a252b436d8407e2a3b84bdde1c5 (blake2 42 1 #xdeadbeef 4 16))))
+
+(test secp
+  (is (= #xf0168a6da839696f4ad792dd9baf6d5cbeb1a47e7746cf9e81a5f64b3ca34e84
+         (secp-make 42 42)))
+  (with-secp-context (ctx)
+    (multiple-value-bind (v r s) (secp-sign ctx 41 42)
+      (is (= 0 v))
+      (is (= #xaffea04ec20600e0e2e61ab44f303fa3c273b28d155b8b31f6d23d4dc8d0aefc
+             r))
+      (is (= #x518c1d2e9dabbc45f6ba8756f07586b5970db8ebca9a074be543b74a311f609f
+             s))
+      (multiple-value-bind (x y) (secp-reco ctx 41 v r s)
+        (is (= #xfe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af
+               x))
+        (is (= #x7b158f244cd0de2134ac7c1d371cffbfae4db40801a2572e531c573cda9b5b4
+               y))))))

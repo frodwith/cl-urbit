@@ -472,3 +472,78 @@
                      key-length key-ptr
                      output-length out))
         (read-ptr out output-length)))))
+
+(defcfun "urcrypt_secp_prealloc_size" size-t)
+
+(defcfun "urcrypt_secp_init" :void
+  (context :pointer)
+  (entropy :pointer))
+
+(defcfun "urcrypt_secp_destroy" :void
+  (context :pointer))
+
+; works with dynamic variables, too.
+(defmacro with-secp-context ((name) &body forms)
+  (let ((ent (gensym)))
+    `(with-foreign-pointer (,name (urcrypt-secp-prealloc-size))
+       (with-foreign-pointer (,ent 32)
+         (write-ptr ,ent 32 (secure-random:number (ash 1 256)))
+         (urcrypt-secp-init ,name ,ent)
+         (unwind-protect (progn ,@forms)
+           (urcrypt-secp-destroy ,name))))))
+
+(defcfun "urcrypt_secp_make" :int
+  (hash :pointer)
+  (key :pointer)
+  (out :pointer))
+
+(defun secp-make (hash key)
+  (declare ((octets 32) hash key))
+  (with-foreign-octets ((hash-ptr 32 hash)
+                        (key-ptr 32 key))
+    (with-foreign-pointer (out 32)
+      (when (zerop (urcrypt-secp-make hash-ptr key-ptr out))
+        (read-out out 32)))))
+
+(defcfun "urcrypt_secp_sign" :int
+  (context :pointer)
+  (hash :pointer)
+  (key :pointer)
+  (out-v :pointer)
+  (out-r :pointer)
+  (out-s :pointer))
+
+(defun secp-sign (context hash key)
+  (declare ((octets 32) hash key))
+  (with-foreign-octets ((hash-ptr 32 hash)
+                        (key-ptr 32 key))
+    (with-foreign-objects ((v :uint8)
+                           (r :uint8 32)
+                           (s :uint8 32))
+      (when (zerop (urcrypt-secp-sign context hash-ptr key-ptr v r s))
+        (values (read-out v 1)
+                (read-out r 32)
+                (read-out s 32))))))
+
+(defcfun "urcrypt_secp_reco" :int
+  (context :pointer)
+  (hash :pointer)
+  (key-v :uint8)
+  (key-r :pointer)
+  (key-s :pointer)
+  (out-x :pointer)
+  (out-y :pointer))
+
+(defun secp-reco (context hash key-v key-r key-s)
+  (declare ((octets 32) key-r key-s)
+           ((integer 0 3) key-v))
+  (with-foreign-octets ((hash-ptr 32 hash)
+                        (r-ptr 32 key-r)
+                        (s-ptr 32 key-s))
+    (with-foreign-objects ((x-ptr :uint8 32)
+                           (y-ptr :uint8 32))
+      (when (zerop (urcrypt-secp-reco context hash-ptr
+                                      key-v r-ptr s-ptr
+                                      x-ptr y-ptr))
+        (values (read-out x-ptr 32)
+                (read-out y-ptr 32))))))

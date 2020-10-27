@@ -80,7 +80,7 @@
 (defsystem "cl-urbit/urcrypt"
   :description "bindings to liburcrypt"
   :defsystem-depends-on ("cffi-grovel")
-  :depends-on ("cffi")
+  :depends-on ("cffi" "secure-random")
   :in-order-to ((test-op (test-op "cl-urbit/urcrypt/test")))
   :components ((:module "urcrypt"
                 :serial t
