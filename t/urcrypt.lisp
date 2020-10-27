@@ -147,3 +147,8 @@
                x))
         (is (= #x7b158f244cd0de2134ac7c1d371cffbfae4db40801a2572e531c573cda9b5b4
                y))))))
+
+(test scrypt
+  (is (= #xfb4bf177fc0c80bf243279940e15954e
+         (scrypt-pbkdf-sha256 40 1 41 1 42 16)))
+  (is (= #xef8596b4c87addd6685d6efc1a1c271 (scrypt 40 1 41 1 16 1 1 16))))

@@ -11,4 +11,5 @@
            #:aes-ecbc-de #:aes-cbcc-de #:aes-sivc-de
            #:sha-1 #:shay #:shal #:shas
            #:ripemd-160 #:argon2 #:blake2
-           #:with-secp-context #:secp-make #:secp-sign #:secp-reco))
+           #:with-secp-context #:secp-make #:secp-sign #:secp-reco
+           #:scrypt #:scrypt-pbkdf-sha256))

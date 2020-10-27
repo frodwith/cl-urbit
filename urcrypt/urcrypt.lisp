@@ -547,3 +547,47 @@
                                       x-ptr y-ptr))
         (values (read-out x-ptr 32)
                 (read-out y-ptr 32))))))
+
+(defcfun "urcrypt_scrypt_pbkdf_sha256" :void
+  (passwd :pointer)
+  (passwdlen size-t)
+  (salt :pointer)
+  (saltlen size-t)
+  (count :uint64)
+  (outlen size-t)
+  (out :pointer))
+
+(defun scrypt-pbkdf-sha256 (password password-length salt salt-length
+                                     count output-length)
+  (declare (uint password password-length salt salt-length)
+           ((unsigned-byte 64) count)
+           ((integer 0 137438953440) output-length))
+  (with-foreign-octets ((pwd-ptr password-length password)
+                        (salt-ptr salt-length salt))
+    (with-foreign-pointer (out output-length)
+      (urcrypt-scrypt-pbkdf-sha256 pwd-ptr password-length
+                                   salt-ptr salt-length
+                                   count output-length out)
+      (read-ptr out output-length))))
+
+(defcfun "urcrypt_scrypt" :int
+  (passwd :pointer)
+  (passwdlen size-t)
+  (salt :pointer)
+  (saltlen size-t)
+  (n :uint64)
+  (r :uint32)
+  (p :uint32)
+  (outlen size-t)
+  (out :pointer))
+
+(defun scrypt (password password-length salt salt-length n r p output-length)
+  (declare (uint password password-length salt salt-length output-length)
+           ((unsigned-byte 64) n)
+           ((unsigned-byte 32) r p))
+  (with-foreign-octets ((pwd-ptr password-length password)
+                        (salt-ptr salt-length salt))
+    (with-foreign-pointer (out output-length)
+      (when (zerop (urcrypt-scrypt pwd-ptr password-length salt-ptr salt-length
+                                   n r p output-length out))
+        (read-ptr out output-length)))))
