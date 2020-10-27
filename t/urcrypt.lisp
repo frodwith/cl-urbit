@@ -5,7 +5,7 @@
 (in-package #:urbit/urcrypt/test)
 
 (def-suite urcrypt-tests
-           :description "all of cl-urbit's tests")
+           :description "smoke tests for liburcrypt ffi bindings")
 
 (defun test-urcrypt ()
   (run! 'urcrypt-tests))
@@ -82,3 +82,21 @@
           #x3327efa318f77da69bfada8793c125c50790c0d352b3)
   (is-siv #'aes-sivc-en #'aes-sivc-de
           #x6c483c2b881ef22b5d42a1d29f05e01c719605b42ad9))
+
+(test ripemd-160
+  (is (= 1413132018540087757400171133956762286659735740531 (ripemd-160 42))))
+
+(test sha-1
+  (is (= 1275070591239822890430087490021002412718171930465 (sha-1 42))))
+
+(test shay
+  (is (= #xc14f495f09c1e1bb7ecc1b704c0966c0267580e25eb69842377fb1ebc0884868
+         (shay 42))))
+
+(test shal
+  (is (= #x2a593488d26a73ec0ceb89bcc78a74a6ecf3842e7ff71fefd9307d9087f1c7823ee48d4723476a71283a5a633b8e082522e12401690b8682705b9c2d4cd4678
+         (shal 42))))
+
+(test shas
+  (is (= #x3b639b7ca7cdb9e9ea07814c4967589bde044df8e97a74b5485a34c411e9a494
+         (shas 42 42))))

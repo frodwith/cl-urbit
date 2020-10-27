@@ -140,10 +140,19 @@
   (seed :pointer)
   (out :pointer))
 
+(defmacro with-measured-octets (expr (ptr-name length-name) &body forms)
+  (declare (symbol ptr-name length-name))
+  (let ((esym (gensym)))
+    `(let ((,esym ,expr))
+       (declare (uint ,esym))
+       (let ((,length-name (byte-length ,esym)))
+         (with-foreign-octets ((,ptr-name ,length-name ,esym))
+           ,@forms)))))
+
 (defun ed-sign (msg seed)
   (declare (uint msg) ((octets 32) seed))
-  (let ((len (byte-length msg)))
-    (with-foreign-octets ((msg-ptr len msg) (seed-ptr 32 seed))
+  (with-measured-octets msg (msg-ptr len)
+    (with-foreign-octets ((seed-ptr 32 seed))
       (with-foreign-pointer (out 64)
         (urcrypt-ed-sign msg-ptr len seed-ptr out)
         (read-out out 64)))))
@@ -158,9 +167,8 @@
   (declare (uint msg)
            ((octets 32) public)
            ((octets 64) signature))
-  (let ((len (byte-length msg)))
-    (with-foreign-octets ((msg-ptr len msg)
-                          (pub-ptr 32 public)
+  (with-measured-octets msg (msg-ptr len)
+    (with-foreign-octets ((pub-ptr 32 public)
                           (sig-ptr 64 signature))
       (urcrypt-ed-veri msg-ptr len pub-ptr sig-ptr))))
 
@@ -284,10 +292,9 @@
        (declare (uint ,msym)
                 ((vector uint) ,asym)
                 ((octets ,key-size) key))
-       (let ((,message-length (byte-length ,msym)))
+       (with-measured-octets ,msym (,message-ptr ,message-length)
          (with-foreign-associations ,asym (,data-ptr ,data-length)
-           (with-foreign-octets ((,message-ptr ,message-length ,msym)
-                                 (,key-ptr ,key-size ,ksym))
+           (with-foreign-octets ((,key-ptr ,key-size ,ksym))
              ,@forms))))))
 
 (defmacro defcsiv (c-name lisp-name)
@@ -317,7 +324,7 @@
        (declare (uint iv))
        (with-siv message associations key ,key-size (mptr mlen dptr dlen kptr)
          (with-foreign-octets ((iv-ptr 16 iv))
-           (with-foreign-object (out :uint8 mlen)
+           (with-foreign-pointer (out mlen)
              (when (zerop (,lisp-name mptr mlen dptr dlen kptr iv-ptr out))
                (read-ptr out mlen))))))))
 
@@ -329,3 +336,46 @@
 
 (defsiv-en aes-sivc-en 64 "urcrypt_aes_sivc_en" urcrypt-aes-sivc-en)
 (defsiv-de aes-sivc-de 64 "urcrypt_aes_sivc_de" urcrypt-aes-sivc-de)
+
+(defcfun "urcrypt_ripemd160" :int
+  (message :pointer)
+  (length size-t)
+  (out :pointer))
+
+(defun ripemd-160 (message)
+  (declare (uint message))
+  (with-measured-octets message (ptr len)
+    (with-foreign-pointer (out 20)
+      (when (zerop (urcrypt-ripemd160 ptr len out))
+        (read-out out 20)))))
+
+(defmacro defsha (name size c-name lisp-name)
+  `(progn
+     (defcfun (,c-name ,lisp-name) :void
+       (message :pointer)
+       (length size-t)
+       (out :pointer))
+     (defun ,name (message)
+       (declare (uint message))
+       (with-measured-octets message (ptr len)
+         (with-foreign-pointer (out ,size)
+           (,lisp-name ptr len out)
+           (read-out out ,size))))))
+
+(defsha sha-1 20 "urcrypt_sha1" urcrypt-sha1)
+(defsha shay 32 "urcrypt_shay" urcrypt-shay)
+(defsha shal 64 "urcrypt_shal" urcrypt-shal)
+
+(defcfun "urcrypt_shas" :void
+  (salt :pointer)
+  (salt-length size-t)
+  (message :pointer)
+  (message-length size-t)
+  (out :pointer))
+
+(defun shas (salt message)
+  (with-measured-octets salt (salt-ptr salt-len)
+    (with-measured-octets message (msg-ptr msg-len)
+      (with-foreign-pointer (out 32)
+        (urcrypt-shas salt-ptr salt-len msg-ptr msg-len out)
+        (read-out out 32)))))

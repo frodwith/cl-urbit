@@ -8,4 +8,5 @@
            #:aes-ecbb-en #:aes-cbcb-en #:aes-sivb-en
            #:aes-ecbb-de #:aes-cbcb-de #:aes-sivb-de
            #:aes-ecbc-en #:aes-cbcc-en #:aes-sivc-en
-           #:aes-ecbc-de #:aes-cbcc-de #:aes-sivc-de))
+           #:aes-ecbc-de #:aes-cbcc-de #:aes-sivc-de
+           #:ripemd-160 #:sha-1 #:shay #:shal #:shas))
