@@ -63,8 +63,8 @@
   (is-ecb #'aes-ecbc-en #'aes-ecbc-de #x3e438be4ce97cfc2720f424e225d79b1))
 
 (defun is-cbc (en de encrypted)
-  (is (= encrypted (funcall en 42 42 42)))
-  (is (= 42 (funcall de encrypted 42 42))))
+  (is (= encrypted (funcall en 42 1 42 42)))
+  (is (= 42 (funcall de encrypted 16 42 42))))
 
 (test aes-cbc
   (is-cbc #'aes-cbca-en #'aes-cbca-de #x5eb4689e8c22cbe20340ac72770fa712)
@@ -73,12 +73,18 @@
 
 (defun is-siv (en de encrypted)
   (let ((text #xdeadbeefcadefeeddeafbeefdeadcadedeedfadedeaf)
-        (ass #(0 42 #xdeadbeefcadefeeddeafbeefdeadcadedeedfadedeaf 42 0 0))
+        (len 22)
+        (ass #((0 . 0)
+               (1 . 42)
+               (22 . #xdeadbeefcadefeeddeafbeefdeadcadedeedfadedeaf)
+               (1 . 42)
+               (0 . 0)
+               (0 . 0)))
         (key 42))
-    (multiple-value-bind (iv len enc) (funcall en text ass key)
-      (declare (ignore len))
+    (multiple-value-bind (iv rlen enc) (funcall en text len ass key)
+      (declare (ignore rlen))
       (is (= encrypted enc))
-      (is (= text (funcall de enc ass key iv))))))
+      (is (= text (funcall de enc len ass key iv))))))
 
 (test aes-siv
   (is-siv #'aes-siva-en #'aes-siva-de
@@ -89,22 +95,22 @@
           #x6c483c2b881ef22b5d42a1d29f05e01c719605b42ad9))
 
 (test ripemd-160
-  (is (= 1413132018540087757400171133956762286659735740531 (ripemd-160 42))))
+  (is (= 1413132018540087757400171133956762286659735740531 (ripemd-160 42 1))))
 
 (test sha-1
-  (is (= 1275070591239822890430087490021002412718171930465 (sha-1 42))))
+  (is (= 1275070591239822890430087490021002412718171930465 (sha-1 42 1))))
 
 (test shay
   (is (= #xc14f495f09c1e1bb7ecc1b704c0966c0267580e25eb69842377fb1ebc0884868
-         (shay 42))))
+         (shay 42 1))))
 
 (test shal
   (is (= #x2a593488d26a73ec0ceb89bcc78a74a6ecf3842e7ff71fefd9307d9087f1c7823ee48d4723476a71283a5a633b8e082522e12401690b8682705b9c2d4cd4678
-         (shal 42))))
+         (shal 42 1))))
 
 (test shas
   (is (= #x3b639b7ca7cdb9e9ea07814c4967589bde044df8e97a74b5485a34c411e9a494
-         (shas 42 42))))
+         (shas 42 1 42 1))))
 
 (test argon2
   (is (= #x11f29a514b82c5a550cddd0415c7027240a08670b9db2a19e1efd21fe7f388ab
@@ -115,9 +121,13 @@
                  :memory-cost 1024
                  :time-cost 1
                  :secret 0
+                 :secret-length 0
                  :associated 0
+                 :associated-length 0
                  :password #x70617373776f7264
-                 :salt #x736f6d6573616c74))))
+                 :password-length 8
+                 :salt #x736f6d6573616c74
+                 :salt-length 8))))
 
 (test blake2
-  (is (= #x73500a252b436d8407e2a3b84bdde1c5 (blake2 42 #xdeadbeef 16))))
+  (is (= #x73500a252b436d8407e2a3b84bdde1c5 (blake2 42 1 #xdeadbeef 4 16))))

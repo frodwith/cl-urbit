@@ -11,10 +11,6 @@
 
 (deftype uint () 'unsigned-byte)
 
-(defun byte-length (i)
-  (declare (uint i))
-  (the uint (values (ceiling (integer-length i) 8))))
-
 (defun write-ptr (ptr bytes int)
   (declare (uint int bytes))
   (loop for i from 0 below bytes
@@ -140,14 +136,8 @@
   (seed :pointer)
   (out :pointer))
 
-(defmacro with-measured-octets ((ptr-name length-name expr) &body forms)
-  (declare (symbol ptr-name length-name))
-  (let ((esym (gensym)))
-    `(let ((,esym ,expr))
-       (declare (uint ,esym))
-       (let ((,length-name (byte-length ,esym)))
-         (with-foreign-octets ((,ptr-name ,length-name ,esym))
-           ,@forms)))))
+; we never take raw unsized atoms, they're always accompanied by a length
+; if you just take the uints and measure them, it can ignore zero padding
 
 (defun ed-sign (message message-length seed)
   (declare (uint message message-length)
@@ -211,16 +201,15 @@
        (key :pointer)
        (ivec :pointer)
        (realloc :pointer))
-     (defun ,wrapper-name (message key ivec)
-       (declare (uint message)
+     (defun ,wrapper-name (message len key ivec)
+       (declare (uint message len)
                 ((octets ,key-size) key)
                 ((octets 16) ivec))
        (with-foreign-octets ((key-ptr ,key-size key)
                              (ivec-ptr 16 ivec))
          (with-foreign-objects ((size-ptr 'size-t)
                                 (buf-ptr :pointer))
-           (let* ((len (byte-length message))
-                  (buf (malloc len)))
+           (let ((buf (malloc len)))
              (write-ptr buf len message)
              (setf (mem-ref size-ptr 'size-t) len)
              (setf (mem-ref buf-ptr :pointer) buf)
@@ -243,60 +232,54 @@
 (defcbc aes-cbcc-de 32 "urcrypt_aes_cbcc_de" urcrypt-aes-cbcc-de)
 
 (defun measure-associations (as)
-  (loop with alen = (length as)
-        with lens = (make-array alen)
-        for i below alen
-        for a = (aref as i)
-        for b = (byte-length a)
-        do (setf (aref lens i) b)
-        sum b into total
-        finally (return (values alen total lens))))
+  (loop for (len . nil) across as
+        summing len))
 
-(defun fill-associations (as len lengths data-block dest-ptr)
+(defun fill-associations (as len data-block dest-ptr)
   (loop for i below len
         for blk-ptr = data-block then (inc-pointer blk-ptr dlen)
-        for dlen = (aref lengths i)
-        for a = (aref as i)
+        for (dlen . data) = (aref as i)
         for el-ptr = (mem-aptr dest-ptr '(:struct aes-siv-data) i)
-        do (write-ptr blk-ptr dlen a)
+        do (write-ptr blk-ptr dlen data)
         do (with-foreign-slots
              ((dlength bytes) el-ptr (:struct aes-siv-data))
              (setq dlength dlen)
              (setq bytes blk-ptr))))
 
-(defmacro with-foreign-associations (associations (ptr len) &body forms)
+(defmacro with-foreign-associations ((ptr len associations) &body forms)
+  (declare (symbol ptr len))
   (let ((asym (gensym))
         (tot (gensym))
-        (lens (gensym))
         (blk (gensym)))
-    `(let ((,asym ,associations))
-       (multiple-value-bind (,len ,tot ,lens) (measure-associations ,asym)
-         (with-foreign-objects ((,ptr '(:struct aes-siv-data) ,len)
-                                (,blk :uint8 ,tot))
-           (fill-associations ,asym ,len ,lens ,blk ,ptr)
-           ,@forms)))))
+    `(let* ((,asym ,associations)
+            (,len (length ,asym))
+            (,tot (measure-associations ,asym)))
+       (with-foreign-objects ((,ptr '(:struct aes-siv-data) ,len)
+                              (,blk :uint8 ,tot))
+         (fill-associations ,asym ,len ,blk ,ptr)
+         ,@forms))))
 
-(defmacro with-siv (message associations key key-size
-                    (message-ptr message-length
-                                 data-ptr data-length
-                                 key-ptr)
+(defmacro with-siv (message message-length associations key key-size
+                    (message-ptr data-ptr data-length key-ptr)
                     &body forms)
-  (declare (symbol message-ptr message-length data-ptr data-length key-ptr))
+  (declare (symbol message-ptr data-ptr data-length key-ptr))
   (declare (fixnum key-size))
   (assert (constantp key-size))
   (let ((msym (gensym))
+        (mlns (gensym))
         (asym (gensym))
         (ksym (gensym)))
     `(let ((,msym ,message)
+           (,mlns ,message-length)
            (,asym ,associations)
            (,ksym ,key))
        (declare (uint ,msym)
                 ((vector uint) ,asym)
                 ((octets ,key-size) key))
-       (with-measured-octets (,message-ptr ,message-length ,msym)
-         (with-foreign-associations ,asym (,data-ptr ,data-length)
-           (with-foreign-octets ((,key-ptr ,key-size ,ksym))
-             ,@forms))))))
+       (with-foreign-associations (,data-ptr ,data-length ,asym)
+         (with-foreign-octets ((,message-ptr ,mlns ,msym)
+                               (,key-ptr ,key-size ,ksym))
+           ,@forms)))))
 
 (defmacro defcsiv (c-name lisp-name)
   `(defcfun (,c-name ,lisp-name) :int
@@ -311,23 +294,28 @@
 (defmacro defsiv-en (wrapper-name key-size c-name lisp-name)
   `(progn
      (defcsiv ,c-name ,lisp-name)
-     (defun ,wrapper-name (message associations key)
-       (with-siv message associations key ,key-size (mptr mlen dptr dlen kptr)
+     (defun ,wrapper-name (message message-length associations key)
+       (with-siv message message-length associations key ,key-size
+                 (mptr dptr dlen kptr)
          (with-foreign-objects ((iv :uint8 16)
-                                (out :uint8 mlen))
-           (when (zerop (,lisp-name mptr mlen dptr dlen kptr iv out))
-             (values (read-ptr iv 16) mlen (read-ptr out mlen))))))))
+                                (out :uint8 message-length))
+           (when (zerop (,lisp-name mptr message-length dptr dlen kptr iv out))
+             (values (read-ptr iv 16)
+                     message-length
+                     (read-ptr out message-length))))))))
 
 (defmacro defsiv-de (wrapper-name key-size c-name lisp-name)
   `(progn
      (defcsiv ,c-name ,lisp-name)
-     (defun ,wrapper-name (message associations key iv)
+     (defun ,wrapper-name (message message-length associations key iv)
        (declare (uint iv))
-       (with-siv message associations key ,key-size (mptr mlen dptr dlen kptr)
+       (with-siv message message-length associations key ,key-size
+                 (mptr dptr dlen kptr)
          (with-foreign-octets ((iv-ptr 16 iv))
-           (with-foreign-pointer (out mlen)
-             (when (zerop (,lisp-name mptr mlen dptr dlen kptr iv-ptr out))
-               (read-ptr out mlen))))))))
+           (with-foreign-pointer (out message-length)
+             (when (zerop (,lisp-name mptr message-length
+                                      dptr dlen kptr iv-ptr out))
+               (read-ptr out message-length))))))))
 
 (defsiv-en aes-siva-en 32 "urcrypt_aes_siva_en" urcrypt-aes-siva-en)
 (defsiv-de aes-siva-de 32 "urcrypt_aes_siva_de" urcrypt-aes-siva-de)
@@ -343,11 +331,11 @@
   (length size-t)
   (out :pointer))
 
-(defun ripemd-160 (message)
-  (declare (uint message))
-  (with-measured-octets (ptr len message)
+(defun ripemd-160 (message message-length)
+  (declare (uint message message-length))
+  (with-foreign-octets ((ptr message-length message))
     (with-foreign-pointer (out 20)
-      (when (zerop (urcrypt-ripemd160 ptr len out))
+      (when (zerop (urcrypt-ripemd160 ptr message-length out))
         (read-out out 20)))))
 
 (defmacro defsha (name size c-name lisp-name)
@@ -356,11 +344,11 @@
        (message :pointer)
        (length size-t)
        (out :pointer))
-     (defun ,name (message)
-       (declare (uint message))
-       (with-measured-octets (ptr len message)
+     (defun ,name (message message-length)
+       (declare (uint message message-length))
+       (with-foreign-octets ((ptr message-length message))
          (with-foreign-pointer (out ,size)
-           (,lisp-name ptr len out)
+           (,lisp-name ptr message-length out)
            (read-out out ,size))))))
 
 (defsha sha-1 20 "urcrypt_sha1" urcrypt-sha1)
@@ -374,12 +362,13 @@
   (message-length size-t)
   (out :pointer))
 
-(defun shas (salt message)
-  (with-measured-octets (salt-ptr salt-len salt)
-    (with-measured-octets (msg-ptr msg-len message)
-      (with-foreign-pointer (out 32)
-        (urcrypt-shas salt-ptr salt-len msg-ptr msg-len out)
-        (read-out out 32)))))
+(defun shas (salt salt-length message message-length)
+  (declare (uint salt salt-length message message-length))
+  (with-foreign-octets ((salt-ptr salt-length salt)
+                        (msg-ptr message-length message))
+    (with-foreign-pointer (out 32)
+        (urcrypt-shas salt-ptr salt-length msg-ptr message-length out)
+        (read-out out 32))))
 
 (defcfun "urcrypt_argon2" :string
   (type :uint8)
@@ -432,30 +421,36 @@
 
 (defun argon2 (&key output-length type version
                threads memory-cost time-cost
-               secret associated password salt)
+               secret secret-length
+               associated associated-length
+               password password-length
+               salt salt-length)
   (declare (argon2-specifier type)
            ((unsigned-byte 32) version threads memory-cost time-cost)
-           (uint secret associated password salt))
+           (uint secret secret-length
+                 associated associated-length
+                 password password-length
+                 salt salt-length))
   (let ((ty (argon2-type type)))
     (if (null ty)
         (values nil "invalid argon2 type")
-        (with-measured-octets (secret-ptr secret-len secret)
-          (with-measured-octets (assoc-ptr assoc-len associated)
-            (with-measured-octets (passwd-ptr passwd-len password)
-              (with-measured-octets (salt-ptr salt-len salt)
-                (with-foreign-pointer (out output-length)
-                  (let ((err (urcrypt-argon2
-                               ty version threads memory-cost time-cost
-                               secret-len secret-ptr
-                               assoc-len assoc-ptr
-                               passwd-len passwd-ptr
-                               salt-len salt-ptr
-                               output-length out
-                               (callback argon2-alloc)
-                               (callback argon2-free))))
-                    (if (null err)
-                        (values (read-ptr out output-length))
-                        (values nil err)))))))))))
+        (with-foreign-octets ((secret-ptr secret-length secret)
+                              (assocated-ptr associated-length associated)
+                              (password-ptr password-length password)
+                              (salt-ptr salt-length salt))
+          (with-foreign-pointer (out output-length)
+            (let ((err (urcrypt-argon2
+                         ty version threads memory-cost time-cost
+                         secret-length secret-ptr
+                         associated-length assocated-ptr
+                         password-length password-ptr
+                         salt-length salt-ptr
+                         output-length out
+                         (callback argon2-alloc)
+                         (callback argon2-free))))
+              (if (null err)
+                  (values (read-ptr out output-length))
+                  (values nil err))))))))
 
 (defcfun "urcrypt_blake2" :int
   (message-length size-t)
@@ -465,14 +460,15 @@
   (out-length size-t)
   (out :pointer))
 
-(defun blake2 (message key output-length)
-  (declare (uint message output-length)
+(defun blake2 (message message-length key key-length output-length)
+  (declare (uint message message-length output-length)
+           ((integer 0 64) key-length)
            ((octets 64) key))
-  (with-measured-octets (msg-ptr msg-len message)
-    (with-measured-octets (key-ptr key-len key)
-      (with-foreign-pointer (out output-length)
-        (when (zerop (urcrypt-blake2
-                       msg-len msg-ptr
-                       key-len key-ptr
-                       output-length out))
-          (read-ptr out output-length))))))
+  (with-foreign-octets ((msg-ptr message-length message)
+                        (key-ptr key-length key))
+    (with-foreign-pointer (out output-length)
+      (when (zerop (urcrypt-blake2
+                     message-length msg-ptr
+                     key-length key-ptr
+                     output-length out))
+        (read-ptr out output-length)))))
