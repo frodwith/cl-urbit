@@ -149,13 +149,14 @@
          (with-foreign-octets ((,ptr-name ,length-name ,esym))
            ,@forms)))))
 
-(defun ed-sign (msg seed)
-  (declare (uint msg) ((octets 32) seed))
-  (with-measured-octets (msg-ptr len msg)
-    (with-foreign-octets ((seed-ptr 32 seed))
-      (with-foreign-pointer (out 64)
-        (urcrypt-ed-sign msg-ptr len seed-ptr out)
-        (read-out out 64)))))
+(defun ed-sign (message message-length seed)
+  (declare (uint message message-length)
+           ((octets 32) seed))
+  (with-foreign-octets ((msg-ptr message-length message)
+                        (seed-ptr 32 seed))
+    (with-foreign-pointer (out 64)
+      (urcrypt-ed-sign msg-ptr message-length seed-ptr out)
+      (read-out out 64))))
 
 (defcfun "urcrypt_ed_veri" :boolean
   (message :pointer)
@@ -163,14 +164,14 @@
   (public :pointer)
   (signature :pointer))
 
-(defun ed-veri (msg public signature)
-  (declare (uint msg)
+(defun ed-veri (message message-length public signature)
+  (declare (uint message message-length)
            ((octets 32) public)
            ((octets 64) signature))
-  (with-measured-octets (msg-ptr len msg)
-    (with-foreign-octets ((pub-ptr 32 public)
-                          (sig-ptr 64 signature))
-      (urcrypt-ed-veri msg-ptr len pub-ptr sig-ptr))))
+  (with-foreign-octets ((msg-ptr message-length message)
+                        (pub-ptr 32 public)
+                        (sig-ptr 64 signature))
+    (urcrypt-ed-veri msg-ptr message-length pub-ptr sig-ptr)))
 
 (defmacro defecb (wrapper-name key-size c-name lisp-name)
   (assert (constantp key-size))
@@ -221,7 +222,7 @@
            (let* ((len (byte-length message))
                   (buf (malloc len)))
              (write-ptr buf len message)
-             (setf (mem-ref size-ptr 'size-t) len)  
+             (setf (mem-ref size-ptr 'size-t) len)
              (setf (mem-ref buf-ptr :pointer) buf)
              (if (zerop (,lisp-name buf-ptr size-ptr key-ptr ivec-ptr
                                     (foreign-symbol-pointer "realloc")))
@@ -379,3 +380,99 @@
       (with-foreign-pointer (out 32)
         (urcrypt-shas salt-ptr salt-len msg-ptr msg-len out)
         (read-out out 32)))))
+
+(defcfun "urcrypt_argon2" :string
+  (type :uint8)
+  (version :uint32)
+  (threads :uint32)
+  (memory-cost :uint32)
+  (time-cost :uint32)
+  (secret-length size-t)
+  (secret :pointer)
+  (associated-length size-t)
+  (associated :pointer)
+  (password-length size-t)
+  (password :pointer)
+  (salt-length size-t)
+  (salt :pointer)
+  (out-length size-t)
+  (out :pointer)
+  (alloc :pointer)
+  (free :pointer))
+
+(deftype argon2-specifier ()
+  '(member :d :i :id :u))
+
+(deftype argon2-type ()
+  `(member ,urcrypt-argon2-d
+           ,urcrypt-argon2-i
+           ,urcrypt-argon2-id
+           ,urcrypt-argon2-u))
+
+(defun argon2-type (spec)
+  (declare (argon2-specifier spec))
+  (the (or null argon2-type)
+       (case spec
+         (:d urcrypt-argon2-d)
+         (:i urcrypt-argon2-i)
+         (:id urcrypt-argon2-id)
+         (:u urcrypt-argon2-u))))
+
+(defcallback argon2-alloc :int ((mem :pointer) (size size-t))
+  (let ((ptr (foreign-alloc :uint8 :count size)))
+    (if (null-pointer-p ptr)
+        0
+        (progn
+          (setf (mem-ref mem :pointer) ptr)
+          1))))
+
+(defcallback argon2-free :void ((mem :pointer) (size size-t))
+  (declare (ignore size))
+  (foreign-free mem))
+
+(defun argon2 (&key output-length type version
+               threads memory-cost time-cost
+               secret associated password salt)
+  (declare (argon2-specifier type)
+           ((unsigned-byte 32) version threads memory-cost time-cost)
+           (uint secret associated password salt))
+  (let ((ty (argon2-type type)))
+    (if (null ty)
+        (values nil "invalid argon2 type")
+        (with-measured-octets (secret-ptr secret-len secret)
+          (with-measured-octets (assoc-ptr assoc-len associated)
+            (with-measured-octets (passwd-ptr passwd-len password)
+              (with-measured-octets (salt-ptr salt-len salt)
+                (with-foreign-pointer (out output-length)
+                  (let ((err (urcrypt-argon2
+                               ty version threads memory-cost time-cost
+                               secret-len secret-ptr
+                               assoc-len assoc-ptr
+                               passwd-len passwd-ptr
+                               salt-len salt-ptr
+                               output-length out
+                               (callback argon2-alloc)
+                               (callback argon2-free))))
+                    (if (null err)
+                        (values (read-ptr out output-length))
+                        (values nil err)))))))))))
+
+(defcfun "urcrypt_blake2" :int
+  (message-length size-t)
+  (message :pointer)
+  (key-length size-t)
+  (key :pointer)
+  (out-length size-t)
+  (out :pointer))
+
+(defun blake2 (message key output-length)
+  (declare (uint message output-length)
+           ((octets 64) key))
+  (with-measured-octets (msg-ptr msg-len message)
+    (with-measured-octets (key-ptr key-len key)
+      (with-foreign-pointer (out output-length)
+        (when (zerop (urcrypt-blake2
+                       msg-len msg-ptr
+                       key-len key-ptr
+                       output-length out))
+          (read-ptr out output-length))))))

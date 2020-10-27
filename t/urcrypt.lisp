@@ -25,28 +25,33 @@
          (ed-scalarmult 42 42))))
 
 (test ed-scalarmult-base
-  (is (= #xc237066783c4352092fdf0de4df92cae7343f40939f32b3e195c834e99321ace 
+  (is (= #xc237066783c4352092fdf0de4df92cae7343f40939f32b3e195c834e99321ace
          (ed-scalarmult-base 42))))
 
 (test ed-add-scalarmult-scalarmult-base
-  (is (= #x8d31b8acda3058fff4b25839c8aceb3baa3df789e7708bc6a8fde104c44a600a 
+  (is (= #x8d31b8acda3058fff4b25839c8aceb3baa3df789e7708bc6a8fde104c44a600a
          (ed-add-scalarmult-scalarmult-base 42 42 42))))
 
 (test ed-add-double-scalarmult
-  (is (= #xdb75c7cfd8df573fa00327e9f27773800f0f5236b7bced3b0aea077183632cbe 
+  (is (= #xdb75c7cfd8df573fa00327e9f27773800f0f5236b7bced3b0aea077183632cbe
          (ed-add-double-scalarmult 42 42 42 42))))
 
 (test ed-puck
-  (is (= #x9f49539565ef87da425912ee017fec92ee11c8fd556a8a9a39f711f2e62fefe1 
+  (is (= #x9f49539565ef87da425912ee017fec92ee11c8fd556a8a9a39f711f2e62fefe1
          (ed-puck 42))))
 
 (test ed-shar
-  (is (= #xe65a0c467722065aca17aed392869f1b8c4edb308035f7001a8c843bf0e2de0 
+  (is (= #xe65a0c467722065aca17aed392869f1b8c4edb308035f7001a8c843bf0e2de0
          (ed-shar 42 42))))
 
 (test ed-sign
   (is (= #xb32e0ff43a269755faa984fffe9d9b916dd11c0ead263500d66420191149dfce83d6182017607d70c0303437e9a239e4f75038f4b1c8b3a29b65a078f5c90d8
-         (ed-sign 42 42))))
+         (ed-sign 42 1 42))))
+
+(test ed-veri
+  (is (ed-veri 42 1
+               #x9f49539565ef87da425912ee017fec92ee11c8fd556a8a9a39f711f2e62fefe1
+               #xb32e0ff43a269755faa984fffe9d9b916dd11c0ead263500d66420191149dfce83d6182017607d70c0303437e9a239e4f75038f4b1c8b3a29b65a078f5c90d8)))
 
 (defun is-ecb (en de encrypted)
   (is (= encrypted (funcall en 42 42)))
@@ -100,3 +105,19 @@
 (test shas
   (is (= #x3b639b7ca7cdb9e9ea07814c4967589bde044df8e97a74b5485a34c411e9a494
          (shas 42 42))))
+
+(test argon2
+  (is (= #x11f29a514b82c5a550cddd0415c7027240a08670b9db2a19e1efd21fe7f388ab
+         (argon2 :output-length 32
+                 :type :u
+                 :version #x13
+                 :threads 1
+                 :memory-cost 1024
+                 :time-cost 1
+                 :secret 0
+                 :associated 0
+                 :password #x70617373776f7264
+                 :salt #x736f6d6573616c74))))
+
+(test blake2
+  (is (= #x73500a252b436d8407e2a3b84bdde1c5 (blake2 42 #xdeadbeef 16))))
