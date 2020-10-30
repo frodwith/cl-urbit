@@ -6,7 +6,8 @@
         #:urbit/hoon/tape #:urbit/hoon/cache #:urbit/hoon/syntax
         #:urbit/hoon/serial #:urbit/hoon/hints)
   (:import-from #:alexandria #:when-let #:when-let* #:if-let)
-  (:export #:defunary #:defbinary #:defgate #:load-k141 #:debug-core
+  (:export #:@ #:defunary #:defbinary #:defgate #:defund
+           #:load-k141 #:debug-core
            #:hoon-jet-tree #:layer #:container #:leaf #:~/ 
            #:+add #:+dec #:+div #:+dvr #:+gte #:+gth #:+lte #:+lth
            #:+max #:+min #:+mod #:+mul #:+sub #:+cap #:+mas #:+peg
@@ -17,7 +18,7 @@
            #:+shal #:+shan #:+shay #:+trip #:+mink #:+mule
            #:+crop #:+fish #:+fond #:+fuse #:+mint
            #:+mull #:+peek #:+play #:+rest #:+nest
-           #:+loss #:+leer))
+           #:+loss #:+leer #:+lore))
 
 (in-package #:urbit/hoon/k141)
 
@@ -107,7 +108,7 @@
 
 ; defun wrapper with dedata
 (defmacro defund (name bindings &body forms)
-  (let ((arg (gensym)))
+  (let ((arg (gensym "sample")))
     `(defun ,name (,arg) (dedata ,bindings ,arg ,@forms))))
 
 ; just an alias
@@ -519,6 +520,10 @@
 (defund leer+< (@@cord)
   (leer cord))
 (defgate +leer #'leer+<)
+
+; lore and leer are subtly incompatible wrt to embedded null bytes,
+; but we haven't written a version of lore yet and it's going away.
+(defgate +lore #'leer+<)
 
 ; "partial memoization" caches for the hoon compiler
 

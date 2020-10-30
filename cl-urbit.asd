@@ -113,11 +113,9 @@
 (defsystem "cl-urbit/lars"
   :description "urbit worker process"
   :depends-on ("cl-urbit/base" "cl-urbit/urcrypt")
-  :class program-system
-  :build-pathname "lars"
+  :build-operation program-op
+  :build-pathname "bin/lars"
   :entry-point "urbit/lars/main::entry"
-  :prologue-code (uiop:symbol-call '#:urbit/hepl/main '#:prologue)
-  :epilogue-code (uiop:symbol-call '#:urbit/hepl/main '#:epilogue)
   :components
   ((module "lars"
            :serial t

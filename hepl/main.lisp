@@ -7,7 +7,7 @@
   (:import-from #:cl-intbytes #:octets->uint)
   (:import-from #:alexandria #:when-let)
   (:import-from #:uiop/image #:register-image-dump-hook)
-  (:export #:prologue #:epilogue #:entry))
+  (:export #:entry))
 
 (in-package #:urbit/hepl/main)
 

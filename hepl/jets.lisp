@@ -16,13 +16,13 @@
 (defbinary shal+< #'shal)
 (defgate +shal #'shal+<)
 
-(defun shan (ruz)
+(defun sha1 (ruz)
   (declare (uint ruz))
   (octets->uint
     (reverse (digest-sequence :sha1 (int->octets ruz (met 3 ruz))))
     20))
-(defunary shan+< #'shan)
-(defgate +shan #'shan+<)
+(defunary sha1+< #'sha1)
+(defgate +sha1 #'sha1+<)
 
 (defun shay (len ruz)
   (declare (uint len ruz))
@@ -80,7 +80,7 @@
         (~/ weld #'+weld)
         (layer tri
           (~/ shal #'+shal)
-          (~/ shan #'+shan)
+          (~/ sha1 #'+sha1)
           (~/ shay #'+shay)
           (layer qua
             (~/ trip #'+trip)
@@ -102,4 +102,4 @@
                     (leaf nest-dext 1 #'+nest)))
                 (layer hex
                   (leaf loss 31 #'+loss)
-                  (leaf leer 31 #'+leer))))))))))
+                  (leaf lore 31 #'+lore))))))))))
