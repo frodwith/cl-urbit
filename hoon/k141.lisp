@@ -9,6 +9,7 @@
   (:export #:@ #:defunary #:defbinary #:defgate #:defund
            #:load-k141 #:debug-core
            #:hoon-jet-tree #:layer #:container #:leaf #:~/ 
+           #:for-?~ #:for-?^ #:lent
            #:+add #:+dec #:+div #:+dvr #:+gte #:+gth #:+lte #:+lth
            #:+max #:+min #:+mod #:+mul #:+sub #:+cap #:+mas #:+peg
            #:+turn #:+bex #:+can #:+cat #:+cut #:+end #:+lsh #:+met
