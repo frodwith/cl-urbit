@@ -11,6 +11,7 @@
            #:nock #:slam #:make-slam #:soft #:resolve-hook #:call-hook
            #:compile-dynamic-hint #:compile-static-hint
            #:hint-tag #:hint-next #:hint-clue
+           #:with-bug-trap #:*bug-stack* #:exit-with
            #:before #:after #:around))
 
 (in-package #:urbit/nock/nock)
@@ -538,18 +539,37 @@
     (setf (stencil-dispatch stencil)
           (compile-stencil-dispatch stencil battery name label jet nil))))
 
+; after code crashes, the stack items from spot/mean etc. are left on
+; the bug stack. We don't use dynamic bindings for the hint execution
+; because we specifically do not want stack unwind protection, allowing
+; for bug stack inspection after an interrupt.
+(defvar *bug-stack*)
+
+; common usage when all you want is to trap for exits and get a stack trace
+; primary value is nil on error, and secondary value will be the bug stack.
+(defmacro with-bug-trap (&body forms)
+  `(let (*bug-stack*)
+     (handler-case (progn ,@forms)
+       (exit (e) (declare (ignore e)) (values nil *bug-stack*)))))
+
+(defmacro exit-with (item)
+  `(progn
+     (push ,item *bug-stack*)
+     (error 'exit)))
+
 (defmacro soft (gate &body forms)
-  `(handler-case
-     (values :success (let ((*djinn-stack* (cons ,gate *djinn-stack*)))
-                        ,@forms))
-     (exit (e) (values :error (exit-stack e)))
-     (need (n) (values :block (need-sample n)))
-     (skip (s) (let ((less (1- (skip-levels s))))
-                 (if (zerop less)
-                     (error (skip-wrapped s))
-                     (progn
-                       (setf (skip-levels s) less)
-                       (error s)))))))
+  `(let (*bug-stack*)
+     (handler-case
+       (values :success (let ((*djinn-stack* (cons ,gate *djinn-stack*)))
+                          ,@forms))
+       (exit (e) (declare (ignore e)) (values :error *bug-stack*))
+       (need (n) (values :block (need-sample n)))
+       (skip (s) (let ((less (1- (skip-levels s))))
+                   (if (zerop less)
+                       (error (skip-wrapped s))
+                       (progn
+                         (setf (skip-levels s) less)
+                         (error s))))))))
 
 (defun call-hook (hook-fn subject)
   (nullify-exit (funcall hook-fn subject)))

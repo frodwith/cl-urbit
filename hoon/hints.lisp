@@ -1,9 +1,9 @@
 (defpackage #:urbit/hoon/hints
   (:use #:cl #:urbit/nock/math #:urbit/nock/axis #:urbit/nock/cord
         #:urbit/nock/data #:urbit/nock/ideal #:urbit/nock/world
-        #:urbit/nock/jets #:urbit/nock/common #:urbit/nock/mug 
-        #:urbit/nock/equality #:urbit/nock/data/slimcell 
-        #:urbit/hoon/cache #:urbit/hoon/syntax )
+        #:urbit/nock/jets #:urbit/nock/common #:urbit/nock/mug
+        #:urbit/nock/nock #:urbit/nock/equality #:urbit/nock/data/slimcell
+        #:urbit/hoon/cache #:urbit/hoon/syntax)
   (:export #:compose-hinters #:+handle-slog+ #:handle-memo #:handle-stack
            #:handle-fast #:fast-hinter #:bad-fast #:unregistered-parent
            #:unregistered-name #:unregistered-axis #:unregistered-core
@@ -185,13 +185,19 @@
   (when (and clue (= tag %memo))
     (handle-memo next)))
 
+(defun stack-before (tag)
+  (lambda (subject clue)
+    (declare (ignore subject))
+    (let ((old *bug-stack*))
+      (push (cons tag clue) *bug-stack*)
+      (values nil old))))
+
+(defun stack-after (old pro)
+  (declare (ignore pro))
+  (setq *bug-stack* old))
+
 (defun make-stack-handler (tag)
-  (cons :catch
-        (lambda (subject clue exit)
-          (declare (ignore subject))
-          (setf (exit-stack exit)
-                (slim-cons (slim-cons tag clue)
-                           (exit-stack exit))))))
+  (cons :around (cons (stack-before tag) #'stack-after)))
 
 (defparameter +handle-hunk+ (make-stack-handler %hunk))
 (defparameter +handle-hand+ (make-stack-handler %hand))

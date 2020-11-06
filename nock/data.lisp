@@ -1,7 +1,7 @@
 (defpackage #:urbit/nock/data
   (:use #:cl #:urbit/nock/math #:urbit/nock/axis)
   (:export #:data-error #:unimplemented #:atom-required #:cell-required
-           #:exit #:exit-with #:exit-stack #:nullify-exit
+           #:exit #:nullify-exit
            #:deep #:head #:tail #:cl-integer #:fragment #:d0
            #:cached-mug #:cached-ideal #:cached-battery #:cached-speed))
 
@@ -15,13 +15,7 @@
 (define-condition unimplemented (data-error)
   ((name :initarg :name :type symbol)))
 
-(define-condition exit (data-error) 
-  ((stack :initform 0 :accessor exit-stack)))
-
-(defun exit-with (stack-item)
-  (let ((e (make-condition 'exit)))
-    (push stack-item (exit-stack e))
-    (error e)))
+(define-condition exit (data-error) ())
 
 (defmacro nullify-exit (&body forms)
   `(handler-case (progn ,@forms)

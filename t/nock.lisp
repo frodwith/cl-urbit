@@ -201,19 +201,19 @@
       (is (same [%leaf %h %e %l %l %o 0] (slog-tank c))))))
 
 (test stack
-  (handler-case
-    (let ((stack
-            (handler-case
-              (in-world (load-world :hinter #'stack-hinter)
-                (nock 42 [11 [%hunk 1 5]
-                          11 [%hand 1 4]
-                          11 [%mean 1 3]
-                          11 [%spot 1 2]
-                          11 [%lose 1 1]
-                          0 0]))
-              (exit (e) (exit-stack e)))))
-      (is (same [[%hunk 5] [%hand 4] [%mean 3] [%spot 2] [%lose 1] 0]
-                stack)))))
+  (multiple-value-bind (pro tax)
+    (with-bug-trap
+      (in-world (load-world :hinter #'stack-hinter)
+        (nock 42 [11 [%hunk 1 5]
+                  11 [%hand 1 4]
+                  11 [%mean 1 3]
+                  11 [%spot 1 2]
+                  11 [%lose 1 1]
+                  0 0])))
+    (is (null pro))
+    (loop for got in tax
+          for expected in (list [%lose 1] [%spot 2] [%mean 3] [%hand 4] [%hunk 5])
+          do (is (same expected got)))))
 
 ; !=
 ; =<  fib
@@ -374,9 +374,9 @@
                         (ecase key
                           (:success val)
                           (:block (error 'need :sample val))
-                          (:error (let ((e (make-condition 'exit)))
-                                    (setf (exit-stack e) val)
-                                    (error e))))))))))
+                          (:error
+                            (setf *bug-stack* val)
+                            (error 'exit)))))))))
     (rec gates)))
 
 (defun scry (path)

@@ -85,15 +85,29 @@
         (format t "ivory boot slog: ~x" (jam (find-ideal tank)))))
     (continue)))
 
+(defun nounify-trace (tax)
+  (loop for out = 0 then (slim-cons item out)
+        for item in tax
+        finally (return out)))
+
+(defun print-jammed-trace (tax)
+  (multiple-value-bind (oct len)
+    (jam-to-bytes (find-ideal (nounify-trace tax)))
+    (print-ux-bytes oct len))
+  (terpri))
+
 (defun stack-trace-printer (wash mook out)
   (lambda (tax)
-    (handler-case
-      (loop for n = (funcall mook (flop tax)) then (tail n)
-            while (deep n)
-            for i = (head n)
-            do (print-wall (funcall wash i) out))
-      (exit (e)
-        (warn "mook failed: ~x" (jam (find-ideal (exit-stack e))))))))
+    (multiple-value-bind (pro mtax)
+      (with-bug-trap
+        (loop for n = (funcall mook (nounify-trace tax)) then (tail n)
+              while (deep n)
+              for i = (head n)
+              do (print-wall (funcall wash i) out)))
+      (declare (ignore pro))
+      (when mtax
+        (warn "crash while printing stack trace")
+        (print-jammed-trace tax)))))
 
 (defun slog-washer (wash tracer out)
   (lambda (slog)
@@ -101,10 +115,12 @@
       (let ((p (slog-priority slog)))
         (loop repeat p do (princ #\>))
         (unless (zerop p) (princ #\space)))
-      (handler-case (print-wall (funcall wash tank) out)
-        (exit (e) 
-          (warn "ivory wash failed: ~x" (jam (find-ideal tank)))
-          (funcall tracer (exit-stack e))))
+      (multiple-value-bind (pro tax) (funcall wash tank)
+        (if pro
+            (print-wall pro out)
+            (progn
+              (warn "ivory wash failed: ~x" (jam (find-ideal tank)))
+              (funcall tracer tax))))
       (continue))))
 
 (defun log-unregistered (w)
@@ -140,11 +156,11 @@
                (tracer (stack-trace-printer wash mook out))
                (slogger (slog-washer wash tracer out)))
           (macrolet ((with-trace (&body forms)
-                       `(handler-case ,@forms
-                          (exit (e)
-                            (warn "exit")
-                            (funcall tracer (exit-stack e))
-                            nil)))
+                       (let ((pro (gensym)) (tax (gensym)))
+                         `(multiple-value-bind (,pro ,tax)
+                            (with-bug-trap ,@forms)
+                            (unless ,pro (funcall tracer ,tax))
+                            ,pro)))
                      (try-print (vase)
                        `(with-trace
                           (with-fresh-memos
@@ -172,7 +188,16 @@
                                      (read-line *standard-input* nil))
                         while line
                         for cord = (string->cord line)
-                        do (try-print (funcall slap subject path cord)))
+                        do (with-simple-restart
+                             (continue "Stop processing and skip this input.")
+                             (try-print
+                               ; this condition only exists in SBCL
+                               (handler-bind ((sb-sys:interactive-interrupt
+                                                (lambda (c)
+                                                  (declare (ignore c))
+                                                  (funcall tracer *bug-stack*)
+                                                  (continue))))
+                                 (funcall slap subject path cord)))))
                   (try-print subject))))))))))
 
 ; readable hoon dotted notation
@@ -198,40 +223,39 @@
 (defun hepl-toplevel-from-pill (name pill-path)
   (in-world (load-k141 urbit/hepl/jets:+tree+)
     (with-fresh-memos
-      (handler-case
-        (handler-bind
-          ((unregistered-parent #'boot-unregistered)
-           (slog #'boot-slog))
-          (with-lite-boot pill-path
-            (make-hepl-toplevel
-              :name name
-              :world *world*
-              :init (wish (string->cord "!>(.)"))
-              :sell (let ((slam (make-slam (wish %sell))))
-                      (lambda (vase)
-                        (funcall slam vase)))
-              :slap (let ((slap (make-slam (wish %slap)))
-                          (rain (make-slam (wish %rain))))
-                      (lambda (vase path cord)
-                        (funcall
-                          slap
-                          (slim-cons
-                            vase
-                            (funcall rain (slim-cons path cord))))))
-              :mook (let ((slam (make-slam (wish %mook))))
-                      (lambda (tax)
-                        (tail (funcall slam (slim-cons 2 tax)))))
-              :wash (let ((slam (make-slam (wish %wash)))
-                          (win (slim-cons 0 80)))
-                      (lambda (tank)
-                        (funcall slam (slim-cons win tank)))))))
-        (exit (e)
-          (format t "lite boot crash: printing jammed trace as @ux:~%")
-          (multiple-value-bind (oct len)
-            (jam-to-bytes (find-ideal (exit-stack e)))
-            (print-ux-bytes oct len))
-          (terpri)
-          (sb-ext:exit :abort t))))))
+      (multiple-value-bind (pro tax)
+        (with-bug-trap
+          (handler-bind
+            ((unregistered-parent #'boot-unregistered)
+             (slog #'boot-slog))
+            (with-lite-boot pill-path
+              (make-hepl-toplevel
+                :name name
+                :world *world*
+                :init (wish (string->cord "!>(.)"))
+                :sell (let ((slam (make-slam (wish %sell))))
+                        (lambda (vase)
+                          (funcall slam vase)))
+                :slap (let ((slap (make-slam (wish %slap)))
+                            (rain (make-slam (wish %rain))))
+                        (lambda (vase path cord)
+                          (funcall
+                            slap
+                            (slim-cons
+                              vase
+                              (funcall rain (slim-cons path cord))))))
+                :mook (let ((slam (make-slam (wish %mook))))
+                        (lambda (tax)
+                          (tail (funcall slam (slim-cons 2 tax)))))
+                :wash (let ((slam (make-slam (wish %wash)))
+                            (win (slim-cons 0 80)))
+                        (lambda (tank)
+                          (funcall slam (slim-cons win tank))))))))
+          (or pro
+              (progn
+                (format t "lite boot crash: printing jammed trace as @ux:~%")
+                (print-jammed-trace tax)
+                (sb-ext:exit :abort t)))))))
 
 (defvar *hepl-toplevel*)
 (defun save-toplevel ()
