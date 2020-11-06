@@ -231,8 +231,6 @@
                           `(@11d-before (,itag ,clue-form) ,next-form ',data))
                         (:after
                           `(@11d-after (,itag ,clue-form) ,next-form ',data))
-                        (:catch
-                          `(@11d-catch (,itag ,clue-form) ,next-form ',data))
                         (:around
                           (when (consp data)
                             (destructuring-bind (before . after) data
@@ -250,8 +248,6 @@
                         `(@11s-before ,itag ,next-form ',data))
                       (:after
                         `(@11s-after ,itag ,next-form ',data))
-                      (:catch
-                        `(@11s-catch ,itag ,next-form ',data))
                       (:around
                         (when (consp data)
                           (destructuring-bind (before . after) data
@@ -377,23 +373,6 @@
          (pro ,next))
      (funcall ,handler s clu pro)
      pro))
-
-(defmacro @11s-catch (tag next handler)
-  (declare (ignore tag))
-  `(handler-bind
-     ((exit (lambda (e)
-              (funcall ,handler s clu e)
-              nil)))
-     ,next))
-
-(defmacro @11d-catch ((tag clue) next handler)
-  (declare (ignore tag))
-  `(let ((clu ,clue))
-     (handler-bind
-       ((exit (lambda (e)
-                (funcall ,handler s clu e)
-                nil)))
-       ,next)))
 
 (defmacro @11s-around (tag next before after)
   (declare (ignore tag))
