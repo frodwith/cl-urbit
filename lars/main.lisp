@@ -13,6 +13,9 @@
 
 (define-condition writ-foul (error) ())
 
+(defun plea (noun)
+  (newt-write *standard-output* noun))
+
 (defmacro with-0mil-timeout (milliseconds form ((condition-symbol) error-form))
   (let ((mils (gensym))
         (secs (gensym)))
@@ -25,9 +28,6 @@
                  (,condition-symbol)
                  (declare (ignorable ,condition-symbol))
                  ,error-form)))))))
-
-(defun plea (noun)
-  (newt-write *standard-output* noun))
 
 (defun save-snapshot (eve kernel)
   (declare (ignore eve kernel))
@@ -57,7 +57,18 @@
             (declare (ignore e)) ; MOOK
             (plea [%peek %bail %exit 0]))))))
 
-(defun do-serf (eve kernel)
+; get interrupt / alarm with stack traces in hepl
+; bake an ivory pill into lars (for mook and future runtime support)
+; actually mook stack traces
+; *eve* *kernel* *newt-input* *newt-output*
+; and move things out of do-serf
+; for modularity and testing, etc.
+; for interactivity, etc. might be nice to expose a socket endpoint instead of
+; using stdin/stdout, then use netcat in an urbit-worker script
+; alternatively, open a slime port or something and connect to running stdio
+; process
+
+(defun do-serf (eve kernel mook)
   (symbol-macrolet ((kmug '(mug kernel)))
     (labels
       ((boot (events)
