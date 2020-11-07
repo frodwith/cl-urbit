@@ -1,10 +1,12 @@
 (defpackage #:urbit/tests/nock
-  (:use #:cl #:fiveam #:urbit/tests #:urbit/hoon/syntax #:urbit/nock/nock
+  (:use #:cl #:fiveam #:named-readtables
+        #:urbit/tests #:urbit/hoon/syntax #:urbit/nock/nock
         #:urbit/hoon/serial #:urbit/hoon/hints #:urbit/nock/common
         #:urbit/nock/jets #:urbit/hoon/k141 #:urbit/nock/equality
         #:urbit/nock/data #:urbit/nock/data/slimatom))
 
 (in-package #:urbit/tests/nock)
+(in-readtable hoon)
 
 (def-suite nock-tests
            :description "test nock"
@@ -27,8 +29,6 @@
            :in nock-tests)
 
 (in-suite basic-nock-tests)
-
-(enable-syntax)
 
 (test autocons
   (bottle
@@ -135,7 +135,7 @@
 ;    ?~  n  $(m (dec m), n 1)
 ;    $(m (dec m), n $(n (dec n)))
 ;  --
-(defparameter +ackerman-source+ [7 [7 [1 %kack] 8 [1 [7 [8 [1 0] [1 8 [1 0] 8 [1 8 [4 0 6] 6 [5 [0 2] 0 62] [0 14] 9 2 10 [6 0 2] 0 3] 9 2 0 1] 0 1] 11 [%fast 1 %dec [0 7] 0] 0 1] 7 [8 [1 0 0] [1 6 [5 [1 0] 0 12] [4 0 13] 6 [5 [1 0] 0 13] [9 2 10 [6 [8 [9 4 0 7] 9 2 10 [6 0 28] 0 2] 1 1] 0 1] 9 2 10 [6 [8 [9 4 0 7] 9 2 10 [6 0 28] 0 2] 9 2 10 [13 8 [9 4 0 7] 9 2 10 [6 0 29] 0 2] 0 1] 0 1] 0 1] 11 [%fast 1 %ack [0 7] 0] 0 1] 11 [%fast 1 %kack [1 0] 0] 0 1] 9 5 0 1])
+(define-symbol-macro +ackerman-source+ [7 [7 [1 %kack] 8 [1 [7 [8 [1 0] [1 8 [1 0] 8 [1 8 [4 0 6] 6 [5 [0 2] 0 62] [0 14] 9 2 10 [6 0 2] 0 3] 9 2 0 1] 0 1] 11 [%fast 1 %dec [0 7] 0] 0 1] 7 [8 [1 0 0] [1 6 [5 [1 0] 0 12] [4 0 13] 6 [5 [1 0] 0 13] [9 2 10 [6 [8 [9 4 0 7] 9 2 10 [6 0 28] 0 2] 1 1] 0 1] 9 2 10 [6 [8 [9 4 0 7] 9 2 10 [6 0 28] 0 2] 9 2 10 [13 8 [9 4 0 7] 9 2 10 [6 0 29] 0 2] 0 1] 0 1] 0 1] 11 [%fast 1 %ack [0 7] 0] 0 1] 11 [%fast 1 %kack [1 0] 0] 0 1] 9 5 0 1])
 
 (defvar *mock-dec-calls*)
 
@@ -149,14 +149,14 @@
 (defunary mock-dec+< #'mock-dec)
 (defgate +mock-dec #'mock-dec+<)
 
-(defparameter +ackerman-jets+
+(define-symbol-macro +ackerman-jets+
   (list
     (jet-root
       %kack %kack nil
       (~/ dec #'+mock-dec))))
 
 (defun ack (n m)
-  (nock [n m] (copy-tree [9 2 10 [6 0 1] +ackerman-source+])))
+  (nock [n m] [9 2 10 [6 0 1] +ackerman-source+]))
 
 (defparameter +decs-per-call+ 26)
 
@@ -259,7 +259,7 @@
 ;   $(n b)
 ; --  ==
 
-(defparameter +memo-source+
+(define-symbol-macro +memo-source+
   [7 [7 [1 42] 7 [8 [1 0 3] 11 [%fast 1 %kern [1 0] 0] 0 1] 7 [8 [1 [7 [8 [1 0 0] [1 6 [5 [0 13] 1 0] [0 12] 9 2 10 [6 [4 0 12] 8 [9 5 0 7] 9 2 10 [6 0 29] 0 2] 0 1] 0 1] 11 [%fast 1 %add [0 7] 0] 0 1] 7 [8 [1 0] [1 6 [5 [1 0] 0 6] [0 0] 8 [1 0] 8 [1 8 [4 0 6] 6 [5 [0 2] 0 62] [0 14] 9 2 10 [6 0 2] 0 3] 9 2 0 1] 0 1] 11 [%fast 1 %dec [0 7] 0] 0 1] 11 [%fast 1 %one [0 3] 0] 0 1] 8 [1 7 [8 [1 0] [1 11 [%memo 1 0] 6 [5 [1 0] 0 6] [1 0] 6 [5 [1 1] 0 6] [1 1] 8 [8 [9 5 0 15] 9 2 10 [6 0 14] 0 2] 8 [8 [9 5 0 31] 9 2 10 [6 0 6] 0 2] 8 [9 4 0 63] 9 2 10 [6 [7 [0 3] 9 2 10 [6 0 6] 0 7] 7 [0 3] 9 2 10 [6 0 2] 0 7] 0 2] 0 1] 11 [%fast 1 %fib [0 7] 0] 0 1] 11 [%fast 1 %two [0 3] 0] 0 1] 9 2 0 1])
 
 (defun memo-dec (a)
@@ -300,7 +300,7 @@
                         :jet-tree +memo-jets+)
     (with-fresh-memos
       (let ((*memo-count* 0))
-        (is (= 55 (nock 0 [9 2 10 [6 1 10] (copy-tree +memo-source+)])))
+        (is (= 55 (nock 0 [9 2 10 [6 1 10] +memo-source+])))
         ; 177 without memoization
         (is (= 19 *memo-count*))))))
 
@@ -362,7 +362,7 @@
 (defmacro exits (&body forms)
   `(signals exit ,@forms))
 
-(defparameter +wisher-source+ [12 [1 151 %atom 116 0] 0 1])
+(define-symbol-macro +wisher-source+ [12 [1 151 %atom 116 0] 0 1])
 
 (defmacro layers ((&rest gates) &body forms)
   (labels ((rec (gates)
@@ -380,36 +380,36 @@
     (rec gates)))
 
 (defun scry (path)
-  (nock path (copy-tree +wisher-source+)))
+  (nock path +wisher-source+))
 
 (defun soft-test-djinn ()
   ; [~ ~] on empty path,
   ; block on paths starting with /b,
   ; !! crash on /c,
   ; else ``42
-  (copy-tree [[6 [6 [3 0 13] [1 1] 1 0] [1 0 0] 6 [5 [0 26] 1 98] [1 0] 6 [5 [0 26] 1 99] [0 0] 1 0 0 42] 0 0]))
+  [[6 [6 [3 0 13] [1 1] 1 0] [1 0 0] 6 [5 [0 26] 1 98] [1 0] 6 [5 [0 26] 1 99] [0 0] 1 0 0 42] 0 0])
 
 (defun soft-cd ()
-  (copy-tree [99 100]))
+  [99 100])
 
 (defun soft-bc ()
-  (copy-tree [98 99 0]))
+  [98 99 0])
 
 (defun soft-abcd ()
-  (copy-tree [97 98 99 100]))
+  [97 98 99 100])
 
 (test soft-top
   (bottle
-    (exits (nock 0 (copy-tree [12 [1 0] 1 97 98 99 0])))))
+    (exits (nock 0 [12 [1 0] 1 97 98 99 0]))))
 
 (test soft-basic
   (bottle
-    (let ((always42 (copy-tree [[1 0 0 42] 0 0])))
+    (let ((always42 [[1 0 0 42] 0 0]))
       (succeeds 42 (soft always42 (scry 0))))))
 
 (test soft-crash
   (bottle
-    (let ((crash (copy-tree [[0 0] 0 0])))
+    (let ((crash [[0 0] 0 0]))
       (exits (soft crash (scry 0))))))
 
 (test soft-full
@@ -425,7 +425,7 @@
 
 (test soft-nested
   (bottle
-    (let ((pass-thru (copy-tree [[[1 0] [1 0] 12 [0 12] 0 13] [0 0] 0]))
+    (let ((pass-thru [[[1 0] [1 0] 12 [0 12] 0 13] [0 0] 0])
           (cd (soft-cd)) 
           (bc (soft-bc))
           (abcd (soft-abcd)) 

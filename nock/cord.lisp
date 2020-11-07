@@ -1,7 +1,7 @@
 (defpackage #:urbit/nock/cord
-  (:use #:cl #:cl-intbytes)
+  (:use #:cl #:cl-intbytes #:named-readtables)
   (:import-from #:urbit/nock/math #:met)
-  (:export #:cord #:string->cord #:cord->string))
+  (:export #:cord #:string->cord #:cord->string #:cord-readtable))
 
 (in-package #:urbit/nock/cord)
 
@@ -27,3 +27,13 @@
         for i below len
         do (setf (schar str i) (code-char o))
         finally (return str)))
+
+(defun read-cord (stream char)
+  (declare (ignore char))
+  (let ((obj (read stream)))
+    (etypecase obj
+      (symbol (string->cord (string-downcase (symbol-name obj)))))))
+
+(defreadtable cord-readtable
+  (:merge :standard)
+  (:macro-char #\% #'read-cord))

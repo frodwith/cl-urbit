@@ -1,5 +1,6 @@
 (defpackage #:urbit/hoon/k141
-  (:use #:cl #:urbit/nock/common #:urbit/nock/axis #:urbit/nock/math
+  (:use #:cl #:named-readtables
+        #:urbit/nock/common #:urbit/nock/axis #:urbit/nock/math
         #:urbit/nock/cord #:urbit/nock/mug #:urbit/nock/jets #:urbit/nock/data
         #:urbit/nock/nock #:urbit/nock/equality #:urbit/nock/world
         #:urbit/nock/data/slimatom #:urbit/nock/data/slimcell
@@ -22,8 +23,7 @@
            #:+loss #:+leer #:+lore))
 
 (in-package #:urbit/hoon/k141)
-
-(enable-cords)
+(in-readtable cord-readtable)
 
 ; helpers for constructing jet trees and leaves for hoon runtimes
 

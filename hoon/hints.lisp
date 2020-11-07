@@ -1,5 +1,6 @@
 (defpackage #:urbit/hoon/hints
-  (:use #:cl #:urbit/nock/math #:urbit/nock/axis #:urbit/nock/cord
+  (:use #:cl #:named-readtables
+        #:urbit/nock/math #:urbit/nock/axis #:urbit/nock/cord
         #:urbit/nock/data #:urbit/nock/ideal #:urbit/nock/world
         #:urbit/nock/jets #:urbit/nock/common #:urbit/nock/mug
         #:urbit/nock/nock #:urbit/nock/equality #:urbit/nock/data/slimcell
@@ -11,8 +12,7 @@
            #:with-fresh-memos #:memo-hinter #:stack-hinter #:handle-stack))
 
 (in-package #:urbit/hoon/hints)
-
-(enable-cords)
+(in-readtable cord-readtable)
 
 (defun compose-hinters (a b)
   (lambda (tag clue next)

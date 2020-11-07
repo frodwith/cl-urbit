@@ -1,5 +1,6 @@
 (defpackage #:urbit/tests/mug
-  (:use #:cl #:fiveam #:urbit/tests #:urbit/hoon/syntax #:urbit/nock/mug))
+  (:use #:cl #:named-readtables #:fiveam
+        #:urbit/tests #:urbit/hoon/syntax #:urbit/nock/mug))
 
 (in-package #:urbit/tests/mug)
 
@@ -8,8 +9,7 @@
            :in all-tests)
 
 (in-suite mug-tests)
-
-(enable-brackets)
+(in-readtable hoon)
 
 (test murmug-test
   (is (= 2046756072 (murmug 0)))

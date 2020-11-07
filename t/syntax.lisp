@@ -1,5 +1,7 @@
 (defpackage #:urbit/tests/syntax
-  (:use #:cl #:fiveam #:urbit/tests #:urbit/hoon/syntax #:named-readtables))
+  (:use #:cl #:fiveam #:named-readtables #:urbit/tests
+        #:urbit/nock/cord #:urbit/nock/data/slimcell
+        #:urbit/nock/equality #:urbit/hoon/syntax))
 
 (in-package #:urbit/tests/syntax)
 
@@ -8,27 +10,23 @@
            :in all-tests)
 
 (in-suite syntax-tests)
-
-(enable-brackets)
+(in-readtable hoon)
 
 (test edges
-  (let ((*readtable* (find-readtable 'brackets)))
-    (signals arity-error (read-from-string "[]"))
-    (signals arity-error (read-from-string "[1]"))))
+  (is (null []))
+  (is (= 1 [1])))
 
 (test shallow-test
-  (is (equal '(1 2 . 3) [1 2 3]))
-  (is (equal '(40 2 . 42) [40 2 (+ 40 2)])))
+  (is (same '(1 2 . 3) [1 2 3]))
+  (is (same '(40 2 . 42) [40 2 (+ 40 2)])))
 
 (test deep-test
-  (is (equal '(1 2 (3 4 . 5) . 6)
+  (is (same '(1 2 (3 4 . 5) . 6)
              (let ((a 5))
                [1 2 [3 (+ 2 2) a] 6]))))
-
-(enable-cords)
 
 (test cord-test
   (is (= 1953718630 %fast))
   (is (= 97 %a))
-  (let ((*readtable* (find-readtable 'cords)))
-    (signals cord-error (read-from-string "%\"\""))))
+  (let ((*readtable* (find-readtable 'cord-readtable)))
+    (signals error (read-from-string "%\"\""))))

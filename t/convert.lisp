@@ -1,11 +1,10 @@
 (defpackage #:urbit/tests/convert
-  (:use #:cl #:fiveam #:urbit/tests
+  (:use #:cl #:fiveam #:named-readtables #:urbit/tests
         #:urbit/nock/cord #:urbit/hoon/tape
         #:urbit/hoon/syntax #:urbit/nock/equality))
 
 (in-package #:urbit/tests/convert)
-
-(enable-syntax)
+(in-readtable hoon)
 
 (def-suite convert-tests
            :description "test conversions between lisp data and nouns"

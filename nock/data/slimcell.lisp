@@ -1,6 +1,6 @@
 (defpackage #:urbit/nock/data/slimcell
-  (:use #:cl #:urbit/nock/cell-meta)
-  (:export #:slim-cons #:slim-tuple))
+  (:use #:cl #:urbit/nock/cell-meta #:named-readtables)
+  (:export #:slim-cons #:slim-tuple #:slim-brackets))
 
 (in-package #:urbit/nock/data/slimcell)
 
@@ -19,3 +19,12 @@
                  (car es)
                  `(slim-cons ,(car es) ,(rec (cdr es))))))
     (and elements (rec elements))))
+
+(defreadtable slim-brackets
+  (:merge :standard)
+  (:macro-char #\] (lambda (stream char)
+                     (declare (ignore stream char))
+                     (error "unmatched ]")))
+  (:macro-char #\[ (lambda (stream char)
+                     (declare (ignore char))
+                     `(slim-tuple ,@(read-delimited-list #\] stream)))))

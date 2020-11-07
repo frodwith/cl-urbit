@@ -1,16 +1,16 @@
 (defpackage #:urbit/tests/speed
-  (:use #:cl #:fiveam #:urbit/tests #:urbit/nock/ideal #:urbit/nock/world
+  (:use #:cl #:fiveam #:named-readtables
+        #:urbit/tests #:urbit/nock/ideal #:urbit/nock/world
         #:urbit/hoon/syntax #:urbit/nock/jets #:urbit/nock/zig))
 
 (in-package #:urbit/tests/speed)
+(in-readtable hoon)
 
 (def-suite speed-tests
            :description "test the functions on (core) speed objects"
            :in all-tests)
 
 (in-suite speed-tests)
-
-(enable-syntax)
 
 (test valid
   (is (speed-valid :void))

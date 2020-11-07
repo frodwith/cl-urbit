@@ -1,8 +1,10 @@
 (defpackage #:urbit/tests/ideal
-  (:use #:cl #:fiveam #:urbit/tests #:urbit/hoon/syntax #:urbit/nock/data
+  (:use #:cl #:fiveam #:named-readtables
+        #:urbit/tests #:urbit/hoon/syntax #:urbit/nock/data
         #:urbit/nock/ideal #:urbit/nock/world))
 
 (in-package #:urbit/tests/ideal)
+(in-readtable hoon)
 
 (def-suite ideal-tests
            :description "test the world/ideal system"
@@ -10,12 +12,10 @@
 
 (in-suite ideal-tests)
 
-(enable-brackets)
-
 (test uniqueness
   (bottle
     (let* ((a [1 2 [[3 4 5] 6] 7 8])
-           (b (copy-tree a))
+           (b [1 2 [[3 4 5] 6] 7 8])
            (c [1 2 [[4 5] 6] 7 8]))
       (is (not (eq a b)))
       (let ((ai (find-ideal a))
