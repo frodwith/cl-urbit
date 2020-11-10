@@ -55,7 +55,8 @@
              (:file "hints")
              (:file "tape")
              (:file "serial")
-             (:file "k141")))))
+             (:file "k141")
+             (:file "ivory")))))
 
 (defsystem "cl-urbit/base/test"
   :depends-on ("cl-urbit/base" "fiveam")

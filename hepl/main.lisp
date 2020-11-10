@@ -1,127 +1,102 @@
 (defpackage #:urbit/hepl/main
-  (:use #:cl #:urbit/hoon/serial #:urbit/hoon/syntax #:urbit/hoon/hints
+  (:use #:cl #:named-readtables
+        #:urbit/hoon/serial #:urbit/hoon/syntax #:urbit/hoon/hints
         #:urbit/nock/common #:urbit/nock/cord #:urbit/nock/nock
         #:urbit/nock/data #:urbit/nock/mug #:urbit/nock/world
         #:urbit/nock/data/slimatom #:urbit/nock/data/slimcell
-        #:urbit/hoon/k141)
+        #:urbit/hoon/k141 #:urbit/hoon/ivory)
   (:import-from #:cl-intbytes #:octets->uint)
   (:import-from #:alexandria #:when-let)
-  (:import-from #:uiop/image #:register-image-dump-hook)
   (:export #:entry))
 
 (in-package #:urbit/hepl/main)
+(in-readtable hoon)
 
-(enable-syntax)
+(defvar *ivory* (lite-boot *ivory-pill-path* urbit/hepl/jets:+tree+))
+(defmacro defivar (name &body forms)
+  `(defvar ,name (with-ivory *ivory* (sure ,@forms))))
 
-(deftype octet ()
-  '(unsigned-byte 8))
+(defivar *initial-vase* (wish "!>(.)"))
+(defivar *pretty-print* (wish-slam "sell"))
 
-(defun read-cord (s)
+(defivar *eval*
+  (let ((slap (wish-slam "slap"))
+        (rain (wish-slam "rain")))
+    (lambda (vase path cord)
+      (let ((hoon (funcall rain [path cord])))
+        (funcall slap [vase hoon])))))
+
+(defivar *process-trace*
+  (let ((slam (wish-slam "mook")))
+    (lambda (trace)
+      (tail (funcall slam [2 (noun-trace trace)])))))
+
+(defparameter *wash-window* [0 80])
+
+(defivar *tank->wall*
+  (let ((slam (wish-slam "wash")))
+    (lambda (tank)
+      (funcall slam [*wash-window* tank]))))
+
+(defun read-cord ()
   (loop with a = (make-array 100
                              :adjustable t
                              :fill-pointer 0
-                             :element-type 'octet)
-        for c = (read-char s nil nil)
+                             :element-type '(unsigned-byte 8))
+        for c = (read-char nil nil nil)
         while c
         do (vector-push-extend (char-code c) a)
         finally (return (octets->uint a (fill-pointer a)))))
 
 (defun cord-from-file (path)
-  (with-open-file (in path)
-    (read-cord in)))
+  (with-open-file (*standard-input* path)
+    (read-cord)))
 
-(defvar *life-source*)
-(defvar *wish-source*)
-(defvar *ivory-kernel*)
-
-(defun life (eve)
-  (nock eve *life-source*))
-
-(defun lite (arv)
-  (dedata (eve nil nil) arv
-    (life eve)))
-
-(defun wish (cord)
-  (with-fresh-memos
-    (nock [*ivory-kernel* cord] *wish-source*)))
-
-(defmacro with-lite-boot (pill-path &body forms)
-  `(let ((arv (cue-pill ,pill-path)))
-     (format t "lite: arvo formula ~(~x~)~%" (mug arv))
-     (let* ((*life-source* (copy-tree [7 [2 [0 3] 0 2] 0 7]))
-            (*wish-source* (copy-tree [9 2 10 [6 0 3] 9 22 0 2]))
-            (*ivory-kernel* (lite arv)))
-       (format t "lite: core ~(~x~)~%" (mug *ivory-kernel*))
-       ,@forms)))
-
-(defun print-tape (tape &optional out)
-  (loop for n = tape then (tail n)
-        while (deep n)
-        for c = (code-char (cl-integer (head n)))
-        do (write-char c out)))
-
-(defun print-wall (w &optional out)
+(defun print-wall (w)
   (loop for n = w then (tail n)
         while (deep n)
         for tape = (head n)
-        do (print-tape tape out)
+        do (print-tape tape)
         do (terpri)))
 
-(defun boot-unregistered (c)
-  (declare (ignore c))
-  (write "Tried to register a core with an unregistered parent during ")
-  (write-line "ivory boot. Refusing to continue...")
-  (sb-ext:exit :abort t))
+(defun print-stack-trace (trace)
+  (multiple-value-bind (pro mtax)
+    (with-bug-trap
+      (loop for tanks = (funcall *process-trace* trace) then (tail tanks)
+            while (deep tanks)
+            for tank = (head tanks)
+            do (print-wall (funcall *tank->wall* tank))))
+    (declare (ignore pro))
+    (when mtax
+      (warn "crash while printing stack trace")
+      (print-jammed-ux (noun-trace trace)))))
 
-(defun boot-slog (slog)
-  (let ((tank (slog-tank slog)))
-    (handler-case
-      (dedata (@@tag tape) tank 
-        (case tag
-          (%leaf (print-tape tape *standard-output*)
-                 (terpri))
-          (t (error 'exit))))
-      (exit ()
-        (format t "ivory boot slog: ~x" (jam (find-ideal tank)))))
+(defmacro with-trace (&body forms)
+  (let ((pro (gensym)) (tax (gensym)))
+    `(multiple-value-bind (,pro ,tax)
+       (with-bug-trap ,@forms)
+       (or ,pro (print-stack-trace ,tax)))))
+
+(defun print-vase (vase)
+  (with-trace
+    (print-wall
+      (funcall *tank->wall* (funcall *pretty-print* vase)))))
+
+(defun print-slog (slog)
+  (let ((tank (slog-tank slog))
+        (p (slog-priority slog)))
+    (loop repeat p do (princ #\>))
+    (unless (zerop p) (princ #\space))
+    (multiple-value-bind (pro tax) (funcall *tank->wall* tank)
+      (if pro
+          (print-wall pro)
+          (progn
+            (warn "ivory wash failed")
+            (write "tank: ")
+            (print-jammed-ux tank)
+            (write "trace: ")
+            (print-stack-trace tax))))
     (continue)))
-
-(defun nounify-trace (tax)
-  (loop for out = 0 then (slim-cons item out)
-        for item in tax
-        finally (return out)))
-
-(defun print-jammed-trace (tax)
-  (multiple-value-bind (oct len)
-    (jam-to-bytes (find-ideal (nounify-trace tax)))
-    (print-ux-bytes oct len))
-  (terpri))
-
-(defun stack-trace-printer (wash mook out)
-  (lambda (tax)
-    (multiple-value-bind (pro mtax)
-      (with-bug-trap
-        (loop for n = (funcall mook (nounify-trace tax)) then (tail n)
-              while (deep n)
-              for i = (head n)
-              do (print-wall (funcall wash i) out)))
-      (declare (ignore pro))
-      (when mtax
-        (warn "crash while printing stack trace")
-        (print-jammed-trace tax)))))
-
-(defun slog-washer (wash tracer out)
-  (lambda (slog)
-    (let ((tank (slog-tank slog)))
-      (let ((p (slog-priority slog)))
-        (loop repeat p do (princ #\>))
-        (unless (zerop p) (princ #\space)))
-      (multiple-value-bind (pro tax) (funcall wash tank)
-        (if pro
-            (print-wall pro out)
-            (progn
-              (warn "ivory wash failed: ~x" (jam (find-ideal tank)))
-              (funcall tracer tax))))
-      (continue))))
 
 (defun log-unregistered (w)
   (format t "unregistered: ~a at axis ~a~%"
@@ -139,149 +114,68 @@
    :short #\r
    :long "repl"))
 
-(defun help (name)
+(defun help ()
   (opts:describe
          :prefix "standalone hoon interpreter. =~ arguments and pretty-print."
-          :usage-of name
+          :usage-of "hepl"
           :args "[one.hoon two.hoon tre.hoon ...]")
   (sb-ext:exit))
 
-(defun make-hepl-toplevel (&key name world init sell slap mook wash)
-  (lambda ()
-    (multiple-value-bind (options args) (opts:get-opts)
-      (when (getf options :help)
-        (help name))
-      (in-world world
-        (let* ((out *standard-output*)
-               (tracer (stack-trace-printer wash mook out))
-               (slogger (slog-washer wash tracer out)))
-          (macrolet ((with-trace (&body forms)
-                       (let ((pro (gensym)) (tax (gensym)))
-                         `(multiple-value-bind (,pro ,tax)
-                            (with-bug-trap ,@forms)
-                            (unless ,pro (funcall tracer ,tax))
-                            ,pro)))
-                     (try-print (vase)
-                       `(with-trace
-                          (with-fresh-memos
-                            (print-wall
-                              (funcall wash (funcall sell ,vase)))))))
+(defun vase-from-args (args)
+  (with-trace
+    (loop for vase = *initial-vase*
+          then (with-fresh-memos
+                 (funcall *eval* vase path cord))
+          for filename in args
+          for file = (parse-namestring filename)
+          for cord = (cord-from-file file)
+          for path = [(string->cord filename) 0]
+          finally (return vase))))
 
-            (handler-bind
-              ((unregistered-parent #'log-unregistered)
-                (slog slogger))
-              (when-let (subject
-                          (with-trace
-                            (loop for vase = (with-fresh-memos init)
-                                  then (with-fresh-memos
-                                         (funcall slap vase path cord))
-                                  for filename in args
-                                  for file = (parse-namestring filename)
-                                  for cord = (cord-from-file file)
-                                  for path = (slim-cons (string->cord filename) 0)
-                                  finally (return vase))))
-                (if (or (null args) (getf options :repl))
-                  (loop with path = (slim-cons %repl 0)
-                        for line = (progn
-                                     (princ "> ")
-                                     (force-output)
-                                     (read-line *standard-input* nil))
-                        while line
-                        for cord = (string->cord line)
-                        do (with-simple-restart
-                             (continue "Stop processing and skip this input.")
-                             (try-print
-                               ; this condition only exists in SBCL
-                               (handler-bind ((sb-sys:interactive-interrupt
-                                                (lambda (c)
-                                                  (declare (ignore c))
-                                                  (funcall tracer *bug-stack*)
-                                                  (continue))))
-                                 (funcall slap subject path cord)))))
-                  (try-print subject))))))))))
+(defmacro interruptable (&body forms)
+  (let ((pro (gensym)) (tax (gensym)))
+    `(multiple-value-bind (,pro ,tax)
+       (handler-bind
+         ((sb-sys:interactive-interrupt
+              ; this condition only exists in SBCL
+              (lambda (c)
+                (declare (ignore c))
+                (print-stack-trace *bug-stack*)
+                (continue))))
+         (with-bug-trap ,@forms))
+       (unless ,pro (print-stack-trace ,tax))
+       (values))))
 
-; readable hoon dotted notation
-(defun print-ux-bytes (bytes len)
-  (if (zerop len)
-      (format t "0x0")
-      (flet ((chunk (hi lo)
-               (logior (ash (aref bytes hi) 8) (aref bytes lo))))
-        ; write first byte
-        (format t "0x~(~x~)"
-                (let ((hi (1- len)))
-                  (if (oddp len)
-                      (progn
-                        (setq len hi)
-                        (aref bytes hi))
-                      (let ((lo (1- hi)))
-                        (setq len lo)
-                        (chunk hi lo)))))
-        ; length has been evened
-        (loop for i from (1- len) above 0 by 2
-              do (format t ".~(~4,'0x~)" (chunk i (1- i)))))))
-
-(defun hepl-toplevel-from-pill (name pill-path)
-  (in-world (load-k141 urbit/hepl/jets:+tree+)
-    (with-fresh-memos
-      (multiple-value-bind (pro tax)
-        (with-bug-trap
-          (handler-bind
-            ((unregistered-parent #'boot-unregistered)
-             (slog #'boot-slog))
-            (with-lite-boot pill-path
-              (make-hepl-toplevel
-                :name name
-                :world *world*
-                :init (wish (string->cord "!>(.)"))
-                :sell (let ((slam (make-slam (wish %sell))))
-                        (lambda (vase)
-                          (funcall slam vase)))
-                :slap (let ((slap (make-slam (wish %slap)))
-                            (rain (make-slam (wish %rain))))
-                        (lambda (vase path cord)
-                          (funcall
-                            slap
-                            (slim-cons
-                              vase
-                              (funcall rain (slim-cons path cord))))))
-                :mook (let ((slam (make-slam (wish %mook))))
-                        (lambda (tax)
-                          (tail (funcall slam (slim-cons 2 tax)))))
-                :wash (let ((slam (make-slam (wish %wash)))
-                            (win (slim-cons 0 80)))
-                        (lambda (tank)
-                          (funcall slam (slim-cons win tank))))))))
-          (or pro
-              (progn
-                (format t "lite boot crash: printing jammed trace as @ux:~%")
-                (print-jammed-trace tax)
-                (sb-ext:exit :abort t)))))))
-
-(defvar *hepl-toplevel*)
-(defun save-toplevel ()
-  ; looks for "ivory.pill" in toplevel cl-urbit directory
-  (setf *hepl-toplevel*
-        (hepl-toplevel-from-pill
-          "hepl"
-          (merge-pathnames
-            (uiop/pathname:parse-unix-namestring "../ivory.pill")
-            #.*compile-file-pathname*))))
+(defun repl (subject)
+  (loop with path = [%repl 0]
+        for line = (progn
+                     (princ "> ")
+                     (force-output)
+                     (read-line *standard-input* nil))
+        while line
+        for cord = (string->cord line)
+        do (with-simple-restart
+             (continue "Stop processing and skip this input.")
+             (interruptable
+               (with-fresh-memos
+                 (print-vase (funcall *eval* subject path cord)))))))
 
 (defun entry ()
-  (funcall *hepl-toplevel*))
+  (multiple-value-bind (options args) (opts:get-opts)
+    (when (getf options :help)
+      (help))
+    (with-ivory *ivory*
+      (handler-bind
+        ((unregistered-parent #'log-unregistered)
+         (slog #'print-slog))
+        (when-let (subject (vase-from-args args))
+          (if (or (null args) (getf options :repl))
+              (repl subject)
+              (with-fresh-memos (print-vase subject))))))))
 
-(defparameter *dump-hooked* nil)
-(unless *dump-hooked*
-  (setq *dump-hooked* t)
-  (register-image-dump-hook #'save-toplevel))
-
-(defun test-toplevel (ivory-path)
-  (let ((sb-ext:*posix-argv* '("test" "--repl"))
-        (top (hepl-toplevel-from-pill "test" ivory-path)))
-    (funcall top)))
-    ;(sb-sprof:with-profiling (:report :flat
-    ;                          :loop t
-    ;                          :max-samples 10000
-    ;                          :show-progress t)
-    ;  (with-input-from-string (*standard-input* "(add 40 2)")
-    ;    ))))
+;(sb-sprof:with-profiling (:report :flat
+;                          :loop t
+;                          :max-samples 10000
+;                          :show-progress t)
+;  (with-input-from-string (*standard-input* "(add 40 2)")
+;    ))))

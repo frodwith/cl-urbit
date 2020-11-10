@@ -23,7 +23,7 @@
            #:+loss #:+leer #:+lore))
 
 (in-package #:urbit/hoon/k141)
-(in-readtable cord-readtable)
+(in-readtable hoon)
 
 ; helpers for constructing jet trees and leaves for hoon runtimes
 
@@ -596,7 +596,7 @@
             (when-let (vet (call-hook veth ut))
               (multiple-value-bind (sut but pen) (unpack-ut ut)
                 (look-in core battery-fn but pen #'nest-cache
-                         (slim-tuple seg reg vet sut ref))))))))))
+                         [seg reg vet sut ref])))))))))
 
 (defun vet-sut-sam (kernel parent-stencil ideal hooks cache-fn)
   (let ((battery-fn (icell-function ideal)))
@@ -609,7 +609,7 @@
             (when-let (vet (call-hook veth ut))
               (multiple-value-bind (sut but pen) (unpack-ut ut)
                 (look-in core battery-fn but pen cache-fn
-                         (slim-tuple vet sut sam))))))))))
+                         [vet sut sam])))))))))
 
 (defun vrf-sut-sam (kernel parent-stencil ideal hooks cache-fn)
   (let ((battery-fn (icell-function ideal)))
@@ -624,7 +624,7 @@
                         (fab (call-hook fabh ut)))
               (multiple-value-bind (sut but pen) (unpack-ut ut)
                 (look-in core battery-fn but pen cache-fn
-                         (slim-tuple vet fab sut sam))))))))))
+                         [vet fab sut sam])))))))))
 
 (define-compiler-cache crop-cache +small-cache+)
 (defun +crop (kernel parent-stencil ideal hooks)
