@@ -132,19 +132,20 @@
           for path = [(string->cord filename) 0]
           finally (return vase))))
 
-(defmacro interruptable (&body forms)
-  (let ((pro (gensym)) (tax (gensym)))
-    `(multiple-value-bind (,pro ,tax)
-       (handler-bind
-         ((sb-sys:interactive-interrupt
-              ; this condition only exists in SBCL
-              (lambda (c)
-                (declare (ignore c))
-                (print-stack-trace *bug-stack*)
-                (continue))))
-         (with-bug-trap ,@forms))
-       (unless ,pro (print-stack-trace ,tax))
-       (values))))
+(defun eval-and-print (subject path cord)
+  (with-fresh-memos
+    (let (*bug-stack*)
+      (restart-case
+        (handler-case (print-vase (funcall *eval* subject path cord))
+          (exit
+            (e) (declare (ignore e))
+            (invoke-restart 'trace)))
+        (skip ()
+          :report "Stop processing and skip this input."
+          nil)
+        (trace ()
+          :report "Print the hoon stack trace."
+          (print-stack-trace *bug-stack*))))))
 
 (defun repl (subject)
   (loop with path = [%repl 0]
@@ -152,13 +153,9 @@
                      (princ "> ")
                      (force-output)
                      (read-line *standard-input* nil))
-        while line
+        while (and line (not (string= line ":quit")))
         for cord = (string->cord line)
-        do (with-simple-restart
-             (continue "Stop processing and skip this input.")
-             (interruptable
-               (with-fresh-memos
-                 (print-vase (funcall *eval* subject path cord)))))))
+        do (eval-and-print subject path cord)))
 
 (defun entry ()
   (multiple-value-bind (options args) (opts:get-opts)
