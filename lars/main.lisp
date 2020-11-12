@@ -8,190 +8,194 @@
   (:export #:entry))
 
 (in-package #:urbit/lars/main)
-
-(enable-syntax)
+(in-readtable hoon)
 
 (define-condition writ-foul (error) ())
 
-(defun plea (noun)
-  (newt-write *standard-output* noun))
+(defvar *ivory* (lite-boot *ivory-pill-path* urbit/lars/jets:+tree+))
+(defvar *ivory-trace*
+  (with-ivory *ivory*
+    (sure
+      (let ((slam (wish-slam "mook")))
+        (lambda (trace)
+          (tail (funcall slam [2 (noun-trace trace)])))))))
 
-(defmacro with-0mil-timeout (milliseconds form ((condition-symbol) error-form))
-  (let ((mils (gensym))
-        (secs (gensym)))
-    `(let ((,mils ,milliseconds))
-       (if (zerop ,mils)
-           ,form
-           (let ((,secs (ceiling ,mils 1000)))
-             (handler-case (with-timeout (,secs) ,form)
-               (timeout-error
-                 (,condition-symbol)
-                 (declare (ignorable ,condition-symbol))
-                 ,error-form)))))))
+(defvar *eve*)
+(defvar *kernel*)
 
-(defun save-snapshot (eve kernel)
-  (declare (ignore eve kernel))
+(defun save-portable-snapshot ()
+  ;(jam *kernel*)...
+  nil)
+
+(defun save-snapshot ()
   ;(sb-ext:save-lisp-and-die ...)
   nil)
 
-(defun save-portable-snapshot (eve kernel)
-  (declare (ignore eve kernel))
-  ;(jam kernel)...
-  nil)
+(defun pack ()
+  (setq *kernel* (find-ideal *kernel*)))
 
-(defun peek (kernel now path gang)
+(defun writ-live (bulb)
+  (dedata (@@stem @@bulb) bulb
+    (case stem
+      (%cram (unless (= bulb eve)
+               (error 'writ-foul))
+             (save-portable-snapshot))
+      (%save (unless (= bulb eve)
+               (error 'writ-foul))
+             (save-snapshot))
+      (%pack (unless (zerop bulb)
+               (error 'writ-foul))
+             (pack))
+      (%exit (sb-ext:exit :code bulb))
+      (t (error 'writ-foul))))
+  [%live 0])
+
+(defun process-trace (trace)
+  (handler-case (funcall *ivory-trace* trace)
+    (exit () 0)
+    (sb-sys:interactive-interrupt () 0)))
+
+(defmacro with-noun-timeout (millinoun &body forms)
+  (let ((mils (gensym)))
+    `(let ((,mils ,millinoun))
+       (if (zerop ,mils)
+           (progn ,@forms)
+           (with-timeout (ceiling ,mils 1000) ,@forms)))))
+
+(defun peek (now path gang)
   (declare (ignore gang))
-  (slam (nock kernel [9 46 0 1]) [now path]))
+  (slam (nock *kernel* [9 46 0 1]) [now path]))
 
-(defun writ-peek (eve kernel bulb)
+(defun writ-peek (bulb)
   (dedata (@@timeout @@now gang path) bulb
     (if (zerop eve)
         (error 'writ-foul)
+        (sb-sys:with-interrupts
+          (let (*bug-stack*)
+            (flet ((bail (mote)
+                     [%peek %bail mote (process-trace *bug-stack*)]))
+              (handler-case (with-noun-timeout timeout (peek now gang path))
+                (exit () (bail %exit))
+                (timeout-error () (bail %alrm))
+                (sb-sys:interactive-interrupt () (bail %intr)))))))))
+
+(defun poke (event)
+  (dedata (new-kernel effects) (slam (nock kernel [9 47 0 1]) event)
+    (setq *kernel* new-kernel)
+    (incf *eve*)
+    effects))
+
+(defun boot (events)
+  (setq *kernel* (nock events [7 [2 [0 3] 0 2] 0 7])
+        *eve* (lent events)))
+
+(defun writ-play (bulb)
+  (dedata (@@asserted events) bulb
+    (unless (= asserted eve)
+      (error 'writ-foul))
+    (let (*bug-stack*)
+      (flet ((bail (mote)
+               (let ((tax (process-trace *bug-stack*)))
+                 [%play %bail *eve* (mug *kernel*) mote tax])))
         (handler-case
-          (with-0mil-timeout
-            timeout
-            (plea [%peek %done (peek kernel now gang path)])
-            ((e) (plea [%peek %bail %alrm 0]))) ; mook? only have tax on exit
-          (exit
-            (e) 
-            (declare (ignore e)) ; MOOK
-            (plea [%peek %bail %exit 0]))))))
+          (sb-sys:with-interrupts
+            (if (zerop eve)
+                (boot events)
+                (for-?~ (e events) (poke e)))
+            [%play %done (mug *kernel*)])
+          (exit () (bail %exit))
+          (sb-sys:interactive-interrupt () (bail %intr)))))))
 
-; get interrupt / alarm with stack traces in hepl
-; bake an ivory pill into lars (for mook and future runtime support)
-; actually mook stack traces
-; *eve* *kernel* *newt-input* *newt-output*
-; and move things out of do-serf
-; for modularity and testing, etc.
-; for interactivity, etc. might be nice to expose a socket endpoint instead of
-; using stdin/stdout, then use netcat in an urbit-worker script
-; alternatively, open a slime port or something and connect to running stdio
-; process
+(defun writ-work-swap (mote tang event)
+  (dedata (@@then wire card) event
+    (let* ((now (slim-malt (1+ then)))
+           (crud [%crud [mote tang] card])
+           (job [now wire crud])
+           *bug-stack*)
+      (flet ((bail (mote)
+               [%work %bail [(process-trace *bug-stack*) tang 0]]))
+        (handler-case
+          (let ((effects (sb-ext:with-interrupts (poke job))))
+            [%work %swap *eve* (mug *kernel*) job effects])
+          (exit () (bail %exit))
+          (sb-sys:interactive-interrupt () (bail %intr)))))))
 
-(defun do-serf (eve kernel mook)
-  (symbol-macrolet ((kmug '(mug kernel)))
-    (labels
-      ((boot (events)
-         (setq kernel (nock events [7 [2 [0 3] 0 2] 0 7])
-               eve (lent events)))
-       (poke (event)
-         (dedata
-           (new-kernel effects)
-           (slam (nock kernel [9 47 0 1]) event)
-           (setq kernel new-kernel)
-           (incf eve)
-           effects))
-       (writ-live (bulb)
-         (dedata (@@stem @@bulb) bulb
-           (case stem
-             (%cram (unless (= bulb eve)
-                      (error 'writ-foul))
-                    (save-portable-snapshot eve kernel))
-             (%save (unless (= bulb eve)
-                      (error 'writ-foul))
-                    (save-snapshot eve kernel))
-             (%pack (unless (zerop bulb)
-                      (error 'writ-foul))
-                    (setq kernel (find-ideal kernel)))
-             (%exit (sb-ext:exit :code bulb))
-             (t (error 'writ-foul)))
-           (plea [%live 0])))
-       (writ-play (bulb)
-         (handler-case
-           (dedata (@@asserted events) bulb
-             (unless (= asserted eve)
-               (error 'writ-foul))
-             (if (zerop eve)
-                 (boot events)
-                 (for-?~ (e events) (poke e)))
-             (plea [%play %done kmug]))
-           (exit
-             (e)
-             (declare (ignore e)) ; MOOK
-             (plea [%play %bail eve kmug %exit 0]))))
-       (writ-work-swap (event e)
-         (declare (ignore e)) ; MOOK
-         (let ((goof [%exit 0]))
-           (dedata (@@then wire card) event
-             (let* ((now (slim-malt (1+ then)))
-                    (crud [%crud goof card])
-                    (job [now wire crud]))
-               (handler-case
-                 (let ((effects (poke job)))
-                   (plea [%work %swap eve kmug job effects]))
-                 (exit
-                   (e)
-                   (declare (ignore e)) ; MOOK
-                   (let ((rgoof [%exit 0]))
-                     (plea [%work %bail rgoof goof 0]))))))))
-       (writ-work (bulb)
-         (dedata (@@timeout event) bulb
-           (if (zerop eve)
-               (error 'writ-foul)
-               (with-0mil-timeout 
-                 timeout
-                 (handler-case
-                   (let ((effects (poke event)))
-                     (plea [%work %done eve kmug effects]))
-                   (exit (e) (writ-work-swap event e)))
-                 ((e) (let ((goof [%alrm 0])) ; mook?
-                        (plea [%work %bail goof 0])))))))
-       (writ (noun)
-             (dedata (@@stem bulb) noun
-               (case stem
-                 (%live (writ-live bulb))
-                 (%peek (writ-peek eve kernel bulb))
-                 (%play (writ-play bulb))
-                 (%work (writ-work bulb))
-                 (t (error 'writ-foul))))))
-      (plea [%ripe [1 141 4] eve kmug])
-      (loop for noun = (newt-read *standard-input*)
-            do (handler-case (writ noun)
-                 (exit
-                   (e)
-                   (declare (ignore e))
-                   (error 'writ-foul)))))))
+(defun writ-work (bulb)
+  (dedata (@@timeout event) bulb
+    (if (zerop eve)
+        (error 'writ-foul)
+        (let (*bug-stack*)
+          (flet ((bail (mote)
+                   (writ-work-swap mote (process-trace *bug-stack*) event)))
+            (handler-case
+              (with-noun-timeout
+                timeout
+                (let ((effects (sb-sys:with-interrupts (poke event))))
+                  [%work %done *eve* (mug *kernel*) effects]))
+              (exit (bail %exit))
+              (timeout-error () (bail %alrm))
+              (sb-sys:interactive-interrupt () (bail %intr))))))))
 
-(defun slog-string (msg)
-  (plea [%slog 0 (string->cord msg)]))
+(defun handle-writ (writ)
+  (dedata (@@stem bulb) writ
+    (case stem
+      (%live (writ-live bulb))
+      (%peek (writ-peek bulb))
+      (%play (writ-play bulb))
+      (%work (writ-work bulb))
+      (t (error 'writ-foul)))))
 
-(defun handle-toplevel-crash (tax)
-  (declare (ignore tax))
-  (slog-string "toplevel crash"))
+(defun plea-slog (priority msg)
+  (sb-sys:without-interrupts
+    (newt-write [%slog priority msg])))
 
-(defun log-unregistered (w)
-  (slog-string
-    (format nil "unregistered: ~a at axis ~a"
-            (cord->string (unregistered-name w))
-            (unregistered-axis w)))
+(defun handle-slog (slog)
+  (plea-slog (slog-priority slog) (slog-tank slog))
   (continue))
 
-(defun log-slog (slog)
-  (let ((tank (slog-tank slog))
-        (priority (slog-priority slog)))
-    (plea [%slog priority tank])))
+(defun handle-unregistered (w)
+  (plea-slog
+    0
+    (string->cord 
+      (format nil "unregistered: ~a at axis ~a"
+              (cord->string (unregistered-name w))
+              (unregistered-axis w))))
+  (continue))
 
-(defun make-toplevel ()
-  (lambda ()
-    (in-world (load-k141 urbit/lars/jets:+tree+)
-      (with-fresh-memos
-        (handler-case
-          (handler-bind
-            ((unregistered-parent #'log-unregistered)
-             (slog #'log-slog))
-            (do-serf 0 0))
-        (exit (e)
-          (handle-toplevel-crash (exit-stack e))))))))
-
-(defvar *lars-toplevel*)
-(defun save-toplevel ()
-  (setf *lars-toplevel* (make-toplevel)))
+(defun writ-loop ()
+  (handler-bind
+    ((slog #'handle-slog)
+     (unregistered-parent #'handle-unregistered))
+    (loop do (handler-case
+               (sb-sys:without-interrupts
+                 (let* ((writ (newt-read))
+                        (plea (handle-writ writ)))
+                   (newt-write plea)))
+               ; ignore deferred interrupts from above
+               (sb-sys:interactive-interrupt () (values))))))
 
 (defun entry ()
-  (funcall *lars-toplevel*))
-
-(defparameter *dump-hooked* nil)
-(unless *dump-hooked*
-  (setq *dump-hooked* t)
-  (register-image-dump-hook #'save-toplevel))
-
+  ; the standard streams work fine on sbcl as binary streams,
+  ; use those for newt io
+  ; get all input from an empty stream 
+  ; send all output to log.txt
+  (with-open-file (logfile (merge-pathnames "log.txt")
+                           :direction :output
+                           :if-exists :append)
+    (let* ((empty-input (make-string-input-stream ""))
+           (io (make-two-way-stream empty-input logfile))
+           (*newt-input* *standard-input*) 
+           (*newt-output* *standard-output*)
+           (*debug-io* io)
+           (*error-output* logfile)
+           (*query-io* io)
+           (*standard-input* empty-input)
+           (*standard-output* logfile)
+           (*trace-output* logfile)
+           (*kernel* 0)
+           (*eve* 0))
+      (handler-case (with-ivory *ivory*
+                      (newt-write [%ripe [1 141 4] *eve* (mug *kernel*)])
+                      (writ-loop))
+        (exit () (sb-ext:exit :abort t))    
+        (writ-foul () (sb-ext:exit :abort t))))))
