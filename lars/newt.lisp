@@ -1,11 +1,11 @@
 (defpackage #:urbit/lars/newt
   (:use #:cl #:trivial-bit-streams #:urbit/hoon/serial #:urbit/nock/world)
-  (:export #:newt-read #:newt-write))
+  (:export #:newt-read #:newt-write *newt-input* *newt-output*))
 
 (in-package #:urbit/lars/newt)
 
-(defparameter *newt-input* *standard-input*)
-(defparameter *newt-output* *standard-output*)
+(defvar *newt-input*)
+(defvar *newt-output*)
 
 (defun get-byte ()
   (read-byte *newt-input*))
