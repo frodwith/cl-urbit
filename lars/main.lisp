@@ -1,9 +1,9 @@
 (defpackage #:urbit/lars/main
-  (:use #:cl #:trivial-timeout
+  (:use #:cl #:named-readtables #:trivial-timeout
         #:urbit/hoon/syntax #:urbit/nock/nock #:urbit/nock/world
         #:urbit/nock/cord #:urbit/hoon/k141 #:urbit/hoon/hints
         #:urbit/nock/data #:urbit/nock/common #:urbit/lars/newt
-        #:urbit/nock/data/slimatom)
+        #:urbit/nock/data/slimatom #:urbit/nock/mug #:urbit/hoon/ivory)
   (:import-from #:uiop/image #:register-image-dump-hook)
   (:export #:entry))
 
@@ -37,10 +37,10 @@
 (defun writ-live (bulb)
   (dedata (@@stem @@bulb) bulb
     (case stem
-      (%cram (unless (= bulb eve)
+      (%cram (unless (= bulb *eve*)
                (error 'writ-foul))
              (save-portable-snapshot))
-      (%save (unless (= bulb eve)
+      (%save (unless (= bulb *eve*)
                (error 'writ-foul))
              (save-snapshot))
       (%pack (unless (zerop bulb)
@@ -56,11 +56,11 @@
     (sb-sys:interactive-interrupt () 0)))
 
 (defmacro with-noun-timeout (millinoun &body forms)
-  (let ((mils (gensym)))
+  (let ((mils (gensym)) )
     `(let ((,mils ,millinoun))
        (if (zerop ,mils)
            (progn ,@forms)
-           (with-timeout (ceiling ,mils 1000) ,@forms)))))
+           (with-timeout ((ceiling ,mils 1000)) ,@forms)))))
 
 (defun peek (now path gang)
   (declare (ignore gang))
@@ -68,7 +68,7 @@
 
 (defun writ-peek (bulb)
   (dedata (@@timeout @@now gang path) bulb
-    (if (zerop eve)
+    (if (zerop *eve*)
         (error 'writ-foul)
         (sb-sys:with-interrupts
           (let (*bug-stack*)
@@ -80,7 +80,7 @@
                 (sb-sys:interactive-interrupt () (bail %intr)))))))))
 
 (defun poke (event)
-  (dedata (new-kernel effects) (slam (nock kernel [9 47 0 1]) event)
+  (dedata (new-kernel effects) (slam (nock *kernel* [9 47 0 1]) event)
     (setq *kernel* new-kernel)
     (incf *eve*)
     effects))
@@ -91,7 +91,7 @@
 
 (defun writ-play (bulb)
   (dedata (@@asserted events) bulb
-    (unless (= asserted eve)
+    (unless (= asserted *eve*)
       (error 'writ-foul))
     (let (*bug-stack*)
       (flet ((bail (mote)
@@ -99,40 +99,42 @@
                  [%play %bail *eve* (mug *kernel*) mote tax])))
         (handler-case
           (sb-sys:with-interrupts
-            (if (zerop eve)
+            (if (zerop *eve*)
                 (boot events)
                 (for-?~ (e events) (poke e)))
             [%play %done (mug *kernel*)])
           (exit () (bail %exit))
           (sb-sys:interactive-interrupt () (bail %intr)))))))
 
-(defun writ-work-swap (mote tang event)
+(defun writ-work-swap (event goof)
   (dedata (@@then wire card) event
     (let* ((now (slim-malt (1+ then)))
-           (crud [%crud [mote tang] card])
+           (crud [%crud goof card])
            (job [now wire crud])
            *bug-stack*)
       (flet ((bail (mote)
-               [%work %bail [(process-trace *bug-stack*) tang 0]]))
+               (let ((swap-goof [mote (process-trace *bug-stack*)]))
+                 [%work %bail swap-goof goof 0])))
         (handler-case
-          (let ((effects (sb-ext:with-interrupts (poke job))))
+          (let ((effects (sb-sys:with-interrupts (poke job))))
             [%work %swap *eve* (mug *kernel*) job effects])
           (exit () (bail %exit))
           (sb-sys:interactive-interrupt () (bail %intr)))))))
 
 (defun writ-work (bulb)
   (dedata (@@timeout event) bulb
-    (if (zerop eve)
+    (if (zerop *eve*)
         (error 'writ-foul)
         (let (*bug-stack*)
           (flet ((bail (mote)
-                   (writ-work-swap mote (process-trace *bug-stack*) event)))
+                   (let ((goof [mote (process-trace *bug-stack*)]))
+                     (writ-work-swap event goof))))
             (handler-case
               (with-noun-timeout
                 timeout
                 (let ((effects (sb-sys:with-interrupts (poke event))))
                   [%work %done *eve* (mug *kernel*) effects]))
-              (exit (bail %exit))
+              (exit () (bail %exit))
               (timeout-error () (bail %alrm))
               (sb-sys:interactive-interrupt () (bail %intr))))))))
 
@@ -172,7 +174,7 @@
                         (plea (handle-writ writ)))
                    (newt-write plea)))
                ; ignore deferred interrupts from above
-               (sb-sys:interactive-interrupt () (values))))))
+               (sb-sys:interactive-interrupt () (continue))))))
 
 (defun entry ()
   ; the standard streams work fine on sbcl as binary streams,

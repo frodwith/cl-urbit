@@ -113,13 +113,14 @@
 
 (defsystem "cl-urbit/lars"
   :description "urbit worker process"
-  :depends-on ("cl-urbit/base" "cl-urbit/urcrypt")
+  :depends-on ("cl-urbit/base" "cl-urbit/urcrypt" "trivial-timeout")
   :build-operation program-op
   :build-pathname "bin/lars"
-  :entry-point "urbit/lars/main::entry"
+  :entry-point "urbit/lars/main:entry"
   :components
   ((module "lars"
            :serial t
            :components
            ((:file "jets")
+            (:file "newt")
             (:file "main")))))
