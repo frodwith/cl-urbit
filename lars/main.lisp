@@ -51,7 +51,7 @@
   [%live 0])
 
 (defun process-trace (trace)
-  (handler-case (funcall *ivory-trace* trace)
+  (handler-case (sb-sys:with-interrupts (funcall *ivory-trace* trace))
     (exit () 0)
     (sb-sys:interactive-interrupt () 0)))
 
@@ -70,14 +70,15 @@
   (dedata (@@timeout @@now gang path) bulb
     (if (zerop *eve*)
         (error 'writ-foul)
-        (sb-sys:with-interrupts
-          (let (*bug-stack*)
-            (flet ((bail (mote)
-                     [%peek %bail mote (process-trace *bug-stack*)]))
-              (handler-case (with-noun-timeout timeout (peek now gang path))
-                (exit () (bail %exit))
-                (timeout-error () (bail %alrm))
-                (sb-sys:interactive-interrupt () (bail %intr)))))))))
+        (let (*bug-stack*)
+          (flet ((bail (mote)
+                   [%peek %bail mote (process-trace *bug-stack*)]))
+            (handler-case (with-noun-timeout timeout
+                            (sb-sys:with-interrupts
+                              (peek now gang path)))
+              (exit () (bail %exit))
+              (timeout-error () (bail %alrm))
+              (sb-sys:interactive-interrupt () (bail %intr))))))))
 
 (defun poke (event)
   (dedata (new-kernel effects) (slam (nock *kernel* [9 47 0 1]) event)
