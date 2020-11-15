@@ -55,6 +55,9 @@
     (exit () 0)
     (sb-sys:interactive-interrupt () 0)))
 
+(defun goof (mote)
+  [mote (process-trace *bug-stack*)])
+
 (defmacro with-noun-timeout (millinoun &body forms)
   (let ((mils (gensym)) )
     `(let ((,mils ,millinoun))
@@ -71,8 +74,7 @@
     (if (zerop *eve*)
         (error 'writ-foul)
         (let (*bug-stack*)
-          (flet ((bail (mote)
-                   [%peek %bail mote (process-trace *bug-stack*)]))
+          (flet ((bail (mote) [%peek %bail (goof mote)]))
             (handler-case (with-noun-timeout timeout
                             (sb-sys:with-interrupts
                               (peek now gang path)))
@@ -95,9 +97,7 @@
     (unless (= asserted *eve*)
       (error 'writ-foul))
     (let (*bug-stack*)
-      (flet ((bail (mote)
-               (let ((tax (process-trace *bug-stack*)))
-                 [%play %bail *eve* (mug *kernel*) mote tax])))
+      (flet ((bail (mote) [%play %bail *eve* (mug *kernel*) (goof mote)]))
         (handler-case
           (sb-sys:with-interrupts
             (if (zerop *eve*)
@@ -107,15 +107,13 @@
           (exit () (bail %exit))
           (sb-sys:interactive-interrupt () (bail %intr)))))))
 
-(defun writ-work-swap (event goof)
+(defun writ-work-swap (event event-goof)
   (dedata (@@then wire card) event
     (let* ((now (slim-malt (1+ then)))
-           (crud [%crud goof card])
+           (crud [%crud event-goof card])
            (job [now wire crud])
            *bug-stack*)
-      (flet ((bail (mote)
-               (let ((swap-goof [mote (process-trace *bug-stack*)]))
-                 [%work %bail swap-goof goof 0])))
+      (flet ((bail (mote) [%work %bail (goof mote) event-goof 0]))
         (handler-case
           (let ((effects (sb-sys:with-interrupts (poke job))))
             [%work %swap *eve* (mug *kernel*) job effects])
@@ -127,9 +125,7 @@
     (if (zerop *eve*)
         (error 'writ-foul)
         (let (*bug-stack*)
-          (flet ((bail (mote)
-                   (let ((goof [mote (process-trace *bug-stack*)]))
-                     (writ-work-swap event goof))))
+          (flet ((bail (mote) (writ-work-swap event (goof mote))))
             (handler-case
               (with-noun-timeout
                 timeout
@@ -153,8 +149,7 @@
     (newt-write [%slog priority msg])))
 
 (defun handle-slog (slog)
-  (plea-slog (slog-priority slog) (slog-tank slog))
-  (continue))
+  (plea-slog (slog-priority slog) (slog-tank slog)))
 
 (defun handle-unregistered (w)
   (plea-slog
@@ -163,19 +158,18 @@
       (format nil "unregistered: ~a at axis ~a"
               (cord->string (unregistered-name w))
               (unregistered-axis w))))
-  (continue))
+  (muffle-warning w))
 
 (defun writ-loop ()
   (handler-bind
     ((slog #'handle-slog)
      (unregistered-parent #'handle-unregistered))
-    (loop do (handler-case
-               (sb-sys:without-interrupts
-                 (let* ((writ (newt-read))
-                        (plea (handle-writ writ)))
-                   (newt-write plea)))
-               ; ignore deferred interrupts from above
-               (sb-sys:interactive-interrupt () (continue))))))
+    (loop
+      (handler-case (sb-sys:without-interrupts
+                      (sb-sys:allow-with-interrupts
+                        (newt-write (handle-writ (newt-read)))))
+        ; ignore deferred interrupts from above
+        (sb-sys:interactive-interrupt () (values))))))
 
 (defun entry ()
   ; the standard streams work fine on sbcl as binary streams,

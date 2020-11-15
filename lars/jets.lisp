@@ -6,6 +6,12 @@
 
 (in-package #:urbit/lars/jets)
 
+; TODO: any calls to urcrypt functions should be wrapped in
+;       (sb-sys:without-interrupts) because they are liable to use malloc,
+;       and it is expected that lars will receive sigint/alrm as part of its
+;       normal operation. Memory leaks could be created if these functions
+;       were interrupted in between malloc and free.
+
 (defund shal+< (@@len @@ruz)
   (@ (shal ruz len)))
 (defgate +shal #'shal+<)

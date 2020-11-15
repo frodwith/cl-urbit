@@ -138,8 +138,7 @@
   (declare (ignore subject))
   (handler-case
     (dedata (@pri ^tank) clue
-      (with-simple-restart (continue "Continue execution.")
-        (signal 'slog :priority pri :tank tank)))
+      (signal 'slog :priority pri :tank tank))
     (exit () nil)))
 
 (defparameter +handle-slog+ (cons :before #'slog-handler))

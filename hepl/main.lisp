@@ -95,14 +95,13 @@
             (write "tank: ")
             (print-jammed-ux tank)
             (write "trace: ")
-            (print-stack-trace tax))))
-    (continue)))
+            (print-stack-trace tax))))))
 
 (defun log-unregistered (w)
   (format t "unregistered: ~a at axis ~a~%"
           (cord->string (unregistered-name w))
           (unregistered-axis w))
-  (continue))
+  (muffle-warning w))
 
 (opts:define-opts
   (:name :help
@@ -140,7 +139,7 @@
           (exit
             (e) (declare (ignore e))
             (invoke-restart 'trace)))
-        (skip ()
+        (abort ()
           :report "Stop processing and skip this input."
           nil)
         (trace ()
