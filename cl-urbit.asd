@@ -12,13 +12,17 @@
                "cl-urbit/lars")
   :in-order-to ((test-op (test-op "cl-urbit/base"))))
 
+(defsystem "cl-urbit/intbytes"
+  :description "translate common lisp integers to and from byte vectors"
+  :components ((:file "intbytes")))
+
 (defsystem "cl-urbit/base"
   :description "nock/hoon runtime"
   :depends-on ("alexandria"
                "named-readtables"
                "trivial-bit-streams"
                "cl-murmurhash"
-               "cl-intbytes")
+               "cl-urbit/intbytes")
   :in-order-to ((test-op (test-op "cl-urbit/base/test")))
   :components
   ((:module "nock"
@@ -81,7 +85,7 @@
 (defsystem "cl-urbit/urcrypt"
   :description "bindings to liburcrypt"
   :defsystem-depends-on ("cffi-grovel")
-  :depends-on ("cffi" "secure-random")
+  :depends-on ("cffi" "secure-random" "cl-urbit/intbytes")
   :in-order-to ((test-op (test-op "cl-urbit/urcrypt/test")))
   :components ((:module "urcrypt"
                 :serial t
@@ -113,7 +117,11 @@
 
 (defsystem "cl-urbit/lars"
   :description "urbit worker process"
-  :depends-on ("cl-urbit/base" "cl-urbit/urcrypt" "trivial-timeout")
+  :depends-on ("cl-urbit/base"
+               "cl-urbit/urcrypt"
+               "uiop"
+               "trivial-timeout"
+               "cl-ppcre")
   :build-operation program-op
   :build-pathname "bin/lars"
   :entry-point "urbit/lars/main:entry"

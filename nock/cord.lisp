@@ -1,6 +1,5 @@
 (defpackage #:urbit/nock/cord
-  (:use #:cl #:cl-intbytes #:named-readtables)
-  (:import-from #:urbit/nock/math #:met)
+  (:use #:cl #:named-readtables #:urbit/intbytes #:urbit/nock/math)
   (:export #:cord #:string->cord #:cord->string #:cord-readtable))
 
 (in-package #:urbit/nock/cord)
@@ -17,13 +16,13 @@
         for c across s
         for i below len
         do (setf (aref oct i) (char-code c))
-        finally (return (octets->uint oct len))))
+        finally (return (bytes->int oct len))))
 
 (defun cord->string (a)
   (declare (cord a))
   (loop with len = (met 3 a)
         with str = (make-string len)
-        for o across (int->octets a len)
+        for o across (int->bytes a len)
         for i below len
         do (setf (schar str i) (code-char o))
         finally (return str)))

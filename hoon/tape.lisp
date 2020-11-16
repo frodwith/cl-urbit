@@ -1,6 +1,5 @@
 (defpackage #:urbit/hoon/tape
-  (:use #:cl #:urbit/nock/cord #:urbit/nock/data)
-  (:import-from #:cl-intbytes #:int->octets #:octets->uint)
+  (:use #:cl #:urbit/intbytes #:urbit/nock/cord #:urbit/nock/data)
   (:import-from #:urbit/nock/math #:met #:end)
   (:import-from #:urbit/nock/data/slimcell #:slim-cons)
   (:export #:string->tape #:tape->string #:cord->tape #:tape->cord))
@@ -28,7 +27,7 @@
 (defun cord->tape (a)
   (declare (cord a))
   (loop with len = (met 3 a)
-        with vec = (int->octets a len)
+        with vec = (int->bytes a len)
         for tape = 0 then (cons c tape)
         for i from (1- len) downto 0
         for c = (aref vec i)
@@ -41,4 +40,4 @@
         while (deep n)
         for c = (end 0 8 (head n))
         do (vector-push-extend c oct)
-        finally (return (the cord (values (octets->uint oct (length oct)))))))
+        finally (return (the cord (values (bytes->int oct (length oct)))))))

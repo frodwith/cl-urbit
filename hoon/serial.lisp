@@ -1,9 +1,10 @@
 (defpackage #:urbit/hoon/serial
-  (:use #:cl #:cl-intbytes #:trivial-bit-streams
+  (:use #:cl #:trivial-bit-streams #:urbit/intbytes
         #:urbit/nock/math #:urbit/nock/data #:urbit/nock/ideal
         #:urbit/nock/data/slimcell #:urbit/nock/data/slimatom)
   (:export #:jam #:cue #:jam-to-write #:jam-to-bytes #:cue-from-read
-           #:cue-slim-from-int #:cue-pill))
+           #:cue-slim-from-read #:cue-slim-from-int
+           #:read-from-octets #:cue-pill))
 
 (in-package #:urbit/hoon/serial)
 
@@ -59,25 +60,25 @@
                    (take stack))))))
         (give ideal nil)))))
 
-; trivial-bit-streams read-bits will build the integer incrementally.
-; we avoid some overhead by reading fixnums-at-a-time, and make a nicer
-; api by just bailing if the bits aren't available
-(defun chunk-bits (bit-stream bits-to-read)
-  (multiple-value-bind (whole left) (truncate bits-to-read +fixnum-bits+)
-    (multiple-value-bind (big len)
-      (loop for total = 0 then (logior total (ash fix len))
-            for len upfrom 0 by +fixnum-bits+
-            for i below whole
-            for fix = (multiple-value-bind (n bits-read)
-                        (read-bits +fixnum-bits+ bit-stream)
-                        (if (= bits-read +fixnum-bits+)
-                            n
-                            (error 'exit)))
-            finally (return (values total len)))
-      (multiple-value-bind (r got) (read-bits left bit-stream)
-        (if (= got left)
-            (logior big (ash r len))
-            (error 'exit))))))
+(defun chunk-by-vector (bit-stream bits-to-read)
+  (multiple-value-bind (whole left) (truncate bits-to-read 8)
+    (loop with bytes = (if (zerop left) whole (1+ whole))
+          with vec = (make-array bytes :element-type '(unsigned-byte 8))
+          for i from 0 below whole
+          for byt = (multiple-value-bind (n bits-read)
+                      (read-bits 8 bit-stream)
+                      (if (= bits-read 8)
+                          n
+                          (error 'exit)))
+          do (setf (aref vec i) byt)
+          finally (progn
+                    (unless (zerop left)
+                      (multiple-value-bind (n bits-read)
+                        (read-bits left bit-stream)
+                        (if (= bits-read left)
+                            (setf (aref vec whole) n)
+                            (error 'exit))))
+                    (return (bytes->int vec bytes))))))
 
 ; see trivial-bit-streams for read-fn
 ; atom-fn will be passed a common lisp integer to make atoms
@@ -92,7 +93,7 @@
                    (1 (incf cursor)
                       (read-bit s))
                    (t (setq cursor (+ cursor n))
-                      (chunk-bits s n))))
+                      (chunk-by-vector s n))))
                (one ()
                  (incf cursor)
                  (let ((b (read-bit s)))
@@ -134,14 +135,15 @@
 (defun read-from-octets (len octs)
   (let ((done 0))
     (lambda (buf)
-      (loop for i from done below (min (- len done) (length buf))
-            do (setf (aref buf i) (aref octs i))
-            finally (progn (setq done (+ i done))
+      (loop for i from 0 below (min (- len done) (length buf))
+            for pos upfrom done
+            do (setf (aref buf i) (aref octs pos))
+            finally (progn (setq done (1+ pos))
                            (return i))))))
 
 (defun read-from-int (a)
   (let ((len (met 3 a)))
-    (read-from-octets len (int->octets a len))))
+    (read-from-octets len (int->bytes a len))))
 
 (defun jam-to-bytes (ideal)
   (let ((oct (make-array 100 :adjustable t :fill-pointer 0)))
@@ -155,7 +157,7 @@
 (defun jam (ideal)
   (multiple-value-bind (oct len)
     (jam-to-bytes ideal)
-    (octets->uint oct len)))
+    (bytes->int oct len)))
 
 (defun cue (int atom-fn cell-fn)
   (cue-from-read (read-from-int int) atom-fn cell-fn))

@@ -1,11 +1,20 @@
 (defpackage #:urbit/lars/newt
-  (:use #:cl #:trivial-bit-streams #:urbit/hoon/serial #:urbit/nock/world)
+  (:use #:cl #:urbit/hoon/serial #:urbit/nock/world)
   (:export #:newt-read #:newt-write *newt-input* *newt-output*))
 
 (in-package #:urbit/lars/newt)
 
 (defvar *newt-input*)
 (defvar *newt-output*)
+
+(defmacro loudly (caption form)
+  `(let ((cap ,caption))
+     (format t "starting ~a~%" cap)
+     (force-output)
+     (let ((val ,form))
+       (format t "~a: ~a~%" cap val)
+       (force-output)
+       val)))
 
 (defun get-byte ()
   (read-byte *newt-input*))
@@ -25,21 +34,40 @@
     (ash (get-byte) 56)))
 
 (defun read-bytes (n)
-  (loop for r = 0 then (dpb byt (byte 8 pos) r)
-        repeat n
-        for pos upfrom 0 by 8
-        for byt = (get-byte)
-        finally (return r)))
-
-(defun read-frame ()
-  (read-bytes (read-size)))
+  (format t "reading ~a bytes~%" n)
+  (force-output)
+  (let ((seq (make-array n :element-type '(unsigned-byte 8))))
+    (read-sequence seq *newt-input* :end n)
+    seq))
 
 (defun newt-read ()
-  (cue-slim-from-int (read-frame)))
+  (let* ((size (read-size))
+         (bytes (read-bytes size)))
+    (format t "cueing ~a bytes..." size)
+    (force-output)
+    (handler-case
+      (let ((noun (cue-slim-from-read (read-from-octets size bytes))))
+        (format t "cued.~%")
+        (force-output)
+        (format t "mug: ~a~%" (urbit/nock/mug:mug noun))
+; hard to do from here, maybe standalone script that tries to cue and
+; mug urbit.pill
+;                (sb-sprof:with-profiling (:max-samples 1000
+;                                          :report :flat
+;                                          :loop nil
+;                                          :show-progress t)
+;                                         
+;                                         ))
+        (force-output)
+        noun) 
+      (condition (c) (format t "a condition, a condition! ~a~%" c)
+                 (force-output)))))
 
 (define-condition oversized-newt (error) ())
 
 (defun newt-write (noun)
+  (format t "write: ~a~%" noun)
+  (force-output)
   (let* ((bytes (jam-to-bytes (find-ideal noun)))
          (len (length bytes)))
     (unless (typep len '(unsigned-byte 64))
@@ -48,4 +76,5 @@
           for byt = (ldb (byte 8 pos) len)
           do (put-byte byt))
     (write-sequence bytes *newt-output*)
+    (force-output *newt-output*)
     (values)))

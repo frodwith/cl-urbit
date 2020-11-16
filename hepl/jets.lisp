@@ -1,6 +1,5 @@
 (defpackage #:urbit/hepl/jets
-  (:use #:cl #:urbit/hoon/k141 #:ironclad #:cl-intbytes)
-  (:import-from #:urbit/nock/math #:uint #:met)
+  (:use #:cl #:urbit/intbytes #:urbit/nock/math #:urbit/hoon/k141 #:ironclad)
   (:export +tree+))
 
 (in-package #:urbit/hepl/jets)
@@ -10,24 +9,24 @@
 
 (defun shal (len ruz)
   (declare (uint len ruz))
-  (octets->uint
-    (digest-sequence :sha512 (int->octets ruz len))
+  (bytes->int
+    (digest-sequence :sha512 (int->bytes ruz len))
     64))
 (defbinary shal+< #'shal)
 (defgate +shal #'shal+<)
 
 (defun sha1 (ruz)
   (declare (uint ruz))
-  (octets->uint
-    (reverse (digest-sequence :sha1 (int->octets ruz (met 3 ruz))))
+  (bytes->int
+    (reverse (digest-sequence :sha1 (int->bytes ruz (met 3 ruz))))
     20))
 (defunary sha1+< #'sha1)
 (defgate +sha1 #'sha1+<)
 
 (defun shay (len ruz)
   (declare (uint len ruz))
-  (octets->uint
-    (digest-sequence :sha256 (int->octets ruz len))
+  (bytes->int
+    (digest-sequence :sha256 (int->bytes ruz len))
     32))
 (defbinary shay+< #'shay)
 (defgate +shay #'shay+<)

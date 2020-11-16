@@ -1,5 +1,6 @@
 (defpackage #:urbit/nock/mug
-  (:use #:cl #:urbit/nock/data #:urbit/nock/math #:urbit/nock/common #:murmurhash)
+  (:use #:cl #:murmurhash #:urbit/intbytes
+        #:urbit/nock/data #:urbit/nock/math #:urbit/nock/common)
   (:export #:mug #:murmug #:murmugs))
 
 ; although "mug" is a hoon concept, having a lazily cached noun hash
@@ -10,9 +11,9 @@
 (deftype u32 () '(unsigned-byte 32))
 
 (defun raw (int seed)
-  (declare (uint int seed))
+  (declare (uint int) (u32 seed))
   (let ((*hash-size* 32))
-    (the u32 (murmurhash int :seed seed))))
+    (the u32 (murmurhash (int->bytes int (byte-length int)) :seed seed))))
 
 (deftype mug () '(unsigned-byte 31))
 

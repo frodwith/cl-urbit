@@ -22,6 +22,7 @@
 
 (defvar *eve*)
 (defvar *kernel*)
+(defvar *options*)
 
 (defun save-portable-snapshot ()
   ;(jam *kernel*)...
@@ -171,28 +172,87 @@
         ; ignore deferred interrupts from above
         (sb-sys:interactive-interrupt () (values))))))
 
+(defun parse-key (str)
+  (multiple-value-bind (sub matches)
+    (cl-ppcre:scan-to-strings 
+      "^([0-9a-fA-F]{1,16}):([0-9a-fA-F]{1,16}):([0-9a-fA-F]{1,16}):([0-9a-fA-F]{1,16})$"
+      str)
+    (when sub
+      (loop for digits across matches
+          collecting (read-from-string (concatenate 'string "#x" digits))))))
+
+(defun parse-hap (str)
+  (when (cl-ppcre:scan "^\\d{1,10}$" str)
+    (let ((n (read-from-string str)))
+      (when (<= (integer-length n) 32)
+        (if (zerop n)
+            nil
+            n)))))
+
+(defun parse-eve (str)
+  (when (cl-ppcre:scan "^\\d+$" str)
+    (values (read-from-string str))))
+
+(defun parse-wag (str)
+  (when (cl-ppcre:scan "^\\d{1,10}$" str)
+    (let ((flags (read-from-string str)))
+      (when (<= (integer-length flags) 32)
+        (loop for (name val) in '((:debug-ram #x1)
+                                  (:debug-cpu #x2)
+                                  (:check-corrupt #x4)
+                                  (:check-fatal #x8)
+                                  (:verbose #x10)
+                                  (:dry-run #x20)
+                                  (:quiet #x40)
+                                  (:hashless #x80)
+                                  (:trace #x100))
+              unless (zerop (logand flags val)) collect name and collect t)))))
+
+(defun parse-arguments (arglist)
+  ; (analogically) [%serf dir=@t key=@t wag=@t hap=@ud eve=@ud]
+  (destructuring-bind (command dir key wag hap eve) arglist
+    (let ((path (uiop:parse-unix-namestring dir :ensure-directory t)))
+      `(:command ,(if (string= command "serf")
+                      :serf
+                      (error "bad command: ~a" command))
+        :directory ,path
+        :encryption-key ,(parse-key key)
+        :memoization-cap ,(parse-hap hap)
+        :event-number ,(parse-eve eve)
+        ,@(parse-wag wag)))))
+
 (defun entry ()
+  ; TODO: use a separate world from the ivory pill so we can respect some
+  ;       of these options (particularly quiet for no slog compilation)
+  ;       but most of these options are currently ignored.
   ; the standard streams work fine on sbcl as binary streams,
   ; use those for newt io
   ; get all input from an empty stream 
   ; send all output to log.txt
-  (with-open-file (logfile (merge-pathnames "log.txt")
-                           :direction :output
-                           :if-exists :append)
-    (let* ((empty-input (make-string-input-stream ""))
-           (io (make-two-way-stream empty-input logfile))
-           (*newt-input* *standard-input*) 
-           (*newt-output* *standard-output*)
-           (*debug-io* io)
-           (*error-output* logfile)
-           (*query-io* io)
-           (*standard-input* empty-input)
-           (*standard-output* logfile)
-           (*trace-output* logfile)
-           (*kernel* 0)
-           (*eve* 0))
-      (handler-case (with-ivory *ivory*
-                      (newt-write [%ripe [1 141 4] *eve* (mug *kernel*)])
-                      (writ-loop))
-        (exit () (sb-ext:exit :abort t))    
-        (writ-foul () (sb-ext:exit :abort t))))))
+  (let ((*options* (parse-arguments (uiop:command-line-arguments)))
+        (logfile (open "log.txt" 
+                       :direction :output
+                       :if-does-not-exist :create
+                       :if-exists :rename-and-delete)))
+      (format logfile "opened logfile~%")
+      (let* ((empty-input (make-string-input-stream ""))
+             (io (make-two-way-stream empty-input logfile))
+             (*newt-input* *standard-input*) 
+             (*newt-output* *standard-output*)
+             (*debug-io* io)
+             (*error-output* logfile)
+             (*query-io* io)
+             (*standard-input* empty-input)
+             (*standard-output* logfile)
+             (*trace-output* logfile)
+             (*kernel* 0)
+             (*eve* 0))
+        (format t "starting up~%")
+        (handler-case (with-ivory *ivory*
+                        (format t "writing ripe~%")
+                        (newt-write [%ripe [1 141 4] *eve* (mug *kernel*)])
+                        (format t "entering loop~%")
+                        (finish-output)
+                        (writ-loop))
+          (exit () (sb-ext:exit :abort t))    
+          (writ-foul () (sb-ext:exit :abort t))))))

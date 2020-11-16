@@ -1,11 +1,10 @@
 (defpackage #:urbit/hepl/main
-  (:use #:cl #:named-readtables
+  (:use #:cl #:named-readtables #:urbit/intbytes
         #:urbit/hoon/serial #:urbit/hoon/syntax #:urbit/hoon/hints
         #:urbit/nock/common #:urbit/nock/cord #:urbit/nock/nock
         #:urbit/nock/data #:urbit/nock/mug #:urbit/nock/world
         #:urbit/nock/data/slimatom #:urbit/nock/data/slimcell
         #:urbit/hoon/k141 #:urbit/hoon/ivory)
-  (:import-from #:cl-intbytes #:octets->uint)
   (:import-from #:alexandria #:when-let)
   (:export #:entry))
 
@@ -46,7 +45,7 @@
         for c = (read-char nil nil nil)
         while c
         do (vector-push-extend (char-code c) a)
-        finally (return (octets->uint a (fill-pointer a)))))
+        finally (return (bytes->int a (fill-pointer a)))))
 
 (defun cord-from-file (path)
   (with-open-file (*standard-input* path)

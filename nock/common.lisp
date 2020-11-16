@@ -29,6 +29,17 @@
                         (take (funcall slow c h r) (cdr stack))))))))
     (more cell nil)))
 
+; for comparison, a simple recursive version
+;(defun sum-cell (cell atomic fast slow)
+;  (labels 
+;    ((rec (n)
+;       (multiple-value-bind (answer deep) (funcall fast n)
+;         (or answer
+;             (if deep
+;                 (funcall slow n (rec (head n)) (rec (tail n)))
+;                 (funcall atomic n))))))
+;    (rec cell)))
+
 (defun sum-noun (noun atomic fast slow)
   (multiple-value-bind (answer deep) (funcall fast noun)
     (or answer 

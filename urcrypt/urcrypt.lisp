@@ -11,6 +11,8 @@
 
 (deftype uint () 'unsigned-byte)
 
+; TODO: use the vector functions in urbit/intbytes instead
+
 (defun write-ptr (ptr bytes int)
   (declare (uint int bytes))
   (loop for i from 0 below bytes
