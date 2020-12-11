@@ -10,7 +10,9 @@ bin/hepl: ivory.pill
 		--eval '(asdf:make "cl-urbit/hepl")' \
 		--eval '(sb-ext:exit :code 0)'
 
-bin/lars:
+bin/lars: ivory.pill
 	@sbcl --noinform \
+		--control-stack-size 90 \
+		--dynamic-space-size 2048 \
 		--eval '(asdf:make "cl-urbit/lars")' \
 		--eval '(sb-ext:exit :code 0)'

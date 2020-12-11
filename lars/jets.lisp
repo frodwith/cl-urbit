@@ -1,5 +1,5 @@
 (defpackage #:urbit/lars/jets
-  (:use #:cl #:urbit/hoon/k141 #:urbit/urcrypt #:cl-intbytes #:urbit/nock/data)
+  (:use #:cl #:urbit/hoon/k141 #:urbit/urcrypt #:urbit/nock/data)
   (:import-from #:urbit/nock/math #:uint #:met)
   (:import-from #:urbit/nock/common #:loob)
   (:export +tree+))

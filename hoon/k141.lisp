@@ -153,9 +153,7 @@
 
 ; push a mean onto the stack and die
 (defmacro exit-mean-leaf (str)
-  (let* ((tape (string->tape str :cell-fn #'cons))
-         (tank (cons %leaf tape)))
-    `(exit-with (cons %mean (copy-tree ',tank)))))
+  `(exit-with [%mean [1 %leaf (string->tape ,str)] 0]))
 
 (defund dec+< (@@a)
   (if (zerop a)
@@ -451,9 +449,11 @@
   (multiple-value-bind (tag val)
     (with-fresh-memos (soft scry (nock subject formula)))
     (ecase tag
-      (:success (slim-cons 0 val))
-      (:block (slim-cons 1 (tail val)))
-      (:error (slim-cons 2 (flop val))))))
+      (:success [0 val])
+      (:block [1 (tail val)])
+      (:error (loop for tax = 0 then [i tax]
+                    for i in val
+                    finally (return [2 tax]))))))
 (defund mink+< ((subject formula) scry)
   (mink subject formula scry))
 (defgate +mink #'mink+<)
@@ -541,7 +541,7 @@
 
 ; each cached compiler function gets its own cache
 (defmacro define-compiler-cache (name size)
-  (let ((table (intern (format nil "*~a-table*" name))))
+  (let ((table (intern (format nil "*~A-TABLE*" name))))
     `(progn
        (defparameter ,table (make-hash-table :test 'eq :weakness :key))
        (defun ,name (ut-battery ut-context)
@@ -556,9 +556,8 @@
   (cache-lookup (funcall cache-fn ut-battery ut-context)
                 noun-key
                 (funcall battery-fn core)))
-
-(defparameter +large-cache+ 1024)
-(defparameter +small-cache+ 256)
+(defparameter +large-cache+ 8192)
+(defparameter +small-cache+ 1024)
 
 ; the cache sizes are arbitrary - tune them? i took a guess at which ones
 ; should be bigger, but the main idea is that you can size them independently,

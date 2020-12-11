@@ -49,7 +49,6 @@
                         (safety 0)))
      ,(formula-form formula)))
 
-
 (defconstant +light-threshold+ 100)
 (defconstant +heavy-threshold+ 1000)
 (declaim (fixnum +light-threshold+ +heavy-threshold+))

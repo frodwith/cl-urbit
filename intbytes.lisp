@@ -45,8 +45,7 @@
     (labels
       ((give (len start stack)
          (if (< len 2)
-             (take (if (zerop len) 0 (aref bytes start))
-                   stack)
+             (take (if (zerop len) 0 (aref bytes start)) stack)
              (let* ((half (ash len -1))
                     (kont
                       (lambda (low stack)

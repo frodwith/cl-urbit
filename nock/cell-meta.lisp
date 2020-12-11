@@ -51,28 +51,22 @@
        (,head c))
 
      (defmethod (setf head) (val (c ,klass))
-       (let ((m (,meta c)))
-         (when (typep m '(or null mug))
-           (setf (,head c) val)))
-       val)
+       (unless (typep (,head c) 'icell)
+         (setf (,head c) val)) val)
 
      (defmethod tail ((c ,klass))
        (,tail c))
 
      (defmethod (setf tail) (val (c ,klass))
-       (let ((m (,meta c)))
-         (unless (typep m 'icell)
-           (setf (,tail c) val)))
+       (unless (typep (,tail c) 'icell)
+         (setf (,tail c) val))
        val)
 
-     ; assumption: if we have a cached speed, our head is already ideal
      (defmethod cached-battery ((c ,klass))
-       (let ((m (,meta c)))
-         (typecase m
-           (icell (icell-head m))
-           ((or cons core-speed) (,head c)))))
+       (let ((h (,head c)))
+         (and (typep h 'icell) h)))
 
-     (defmethod (setf cached-battery) (val (c ,klass))
+     (defmethod (setf cached-battery) ((val icell) (c ,klass))
        (setf (,head c) val))
 
      (defmethod cached-speed ((c ,klass))

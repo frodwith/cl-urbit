@@ -10,9 +10,10 @@
 (in-package #:urbit/lars/main)
 (in-readtable hoon)
 
-(define-condition writ-foul (error) ())
+(define-condition writ-foul (simple-error) ())
 
 (defvar *ivory* (lite-boot *ivory-pill-path* urbit/lars/jets:+tree+))
+
 (defvar *ivory-trace*
   (with-ivory *ivory*
     (sure
@@ -39,20 +40,28 @@
   (dedata (@@stem @@bulb) bulb
     (case stem
       (%cram (unless (= bulb *eve*)
-               (error 'writ-foul))
+               (error 'writ-foul
+                      :format-control "cram(~a) at ~a"
+                      :format-arguments (list bulb *eve*)))
              (save-portable-snapshot))
       (%save (unless (= bulb *eve*)
-               (error 'writ-foul))
+               (error 'writ-foul
+                      :format-control "bulb(~a) at ~a"
+                      :format-arguments (list bulb *eve*)))
              (save-snapshot))
       (%pack (unless (zerop bulb)
-               (error 'writ-foul))
+               (error 'writ-foul :format-control "pack at 0"))
              (pack))
       (%exit (sb-ext:exit :code bulb))
-      (t (error 'writ-foul))))
+      (t (error 'writ-foul
+                :format-control "bad live stem ~a"
+                :format-arguments (list stem)))))
   [%live 0])
 
 (defun process-trace (trace)
-  (handler-case (sb-sys:with-interrupts (funcall *ivory-trace* trace))
+  (handler-case (sb-sys:with-interrupts
+                  (with-fresh-memos
+                    (funcall *ivory-trace* trace)))
     (exit () 0)
     (sb-sys:interactive-interrupt () 0)))
 
@@ -68,12 +77,12 @@
 
 (defun peek (now path gang)
   (declare (ignore gang))
-  (slam (nock *kernel* [9 46 0 1]) [now path]))
+  (with-fresh-memos (slam (nock *kernel* [9 46 0 1]) [now path])))
 
 (defun writ-peek (bulb)
   (dedata (@@timeout @@now gang path) bulb
     (if (zerop *eve*)
-        (error 'writ-foul)
+        (error 'writ-foul :format-control "peek at 0")
         (let (*bug-stack*)
           (flet ((bail (mote) [%peek %bail (goof mote)]))
             (handler-case (with-noun-timeout timeout
@@ -84,19 +93,22 @@
               (sb-sys:interactive-interrupt () (bail %intr))))))))
 
 (defun poke (event)
-  (dedata (new-kernel effects) (slam (nock *kernel* [9 47 0 1]) event)
+  (dedata (new-kernel effects)
+          (with-fresh-memos (slam (nock *kernel* [9 47 0 1]) event))
     (setq *kernel* new-kernel)
     (incf *eve*)
     effects))
 
 (defun boot (events)
-  (setq *kernel* (nock events [7 [2 [0 3] 0 2] 0 7])
+  (setq *kernel* (with-fresh-memos (nock events [7 [2 [0 3] 0 2] 0 7]))
         *eve* (lent events)))
 
 (defun writ-play (bulb)
   (dedata (@@asserted events) bulb
-    (unless (= asserted *eve*)
-      (error 'writ-foul))
+    (unless (= asserted (1+ *eve*))
+      (error 'writ-foul
+             :format-control "play(~a) at ~a"
+             :format-arguments (list asserted *eve*)))
     (let (*bug-stack*)
       (flet ((bail (mote) [%play %bail *eve* (mug *kernel*) (goof mote)]))
         (handler-case
@@ -124,7 +136,9 @@
 (defun writ-work (bulb)
   (dedata (@@timeout event) bulb
     (if (zerop *eve*)
-        (error 'writ-foul)
+        (error 'writ-foul
+               :format-control "work at ~a"
+               :format-arguments (list *eve*))
         (let (*bug-stack*)
           (flet ((bail (mote) (writ-work-swap event (goof mote))))
             (handler-case
@@ -143,7 +157,9 @@
       (%peek (writ-peek bulb))
       (%play (writ-play bulb))
       (%work (writ-work bulb))
-      (t (error 'writ-foul)))))
+      (t (error 'writ-foul
+                :format-control "bad writ ~a"
+                :format-arguments (list stem))))))
 
 (defun plea-slog (priority msg)
   (sb-sys:without-interrupts
@@ -225,6 +241,15 @@
   ; TODO: use a separate world from the ivory pill so we can respect some
   ;       of these options (particularly quiet for no slog compilation)
   ;       but most of these options are currently ignored.
+  ;
+  ;       maybe better, don't boot the pill during image generation
+  ;       but use the command line arguments (quiet, etc) for both
+  ;       ivory and normal execution. If we were passed --quiet,
+  ;       the ivory pill shouldn't slog either.
+  ;
+  ;       Alternatively, we could just have the slog handler ignore
+  ;       the slogs in the presence of :quiet.
+  ;
   ; the standard streams work fine on sbcl as binary streams,
   ; use those for newt io
   ; get all input from an empty stream 
@@ -234,7 +259,6 @@
                        :direction :output
                        :if-does-not-exist :create
                        :if-exists :rename-and-delete)))
-      (format logfile "opened logfile~%")
       (let* ((empty-input (make-string-input-stream ""))
              (io (make-two-way-stream empty-input logfile))
              (*newt-input* *standard-input*) 
@@ -247,12 +271,14 @@
              (*trace-output* logfile)
              (*kernel* 0)
              (*eve* 0))
-        (format t "starting up~%")
         (handler-case (with-ivory *ivory*
-                        (format t "writing ripe~%")
                         (newt-write [%ripe [1 141 4] *eve* (mug *kernel*)])
-                        (format t "entering loop~%")
-                        (finish-output)
                         (writ-loop))
-          (exit () (sb-ext:exit :abort t))    
-          (writ-foul () (sb-ext:exit :abort t))))))
+          (exit ()
+                (format logfile "unhandled exit~%")
+                (force-output logfile)
+                (sb-ext:exit :abort t))
+          (writ-foul (f)
+                (format logfile "~a~%" f)
+                (force-output logfile)
+                (sb-ext:exit :abort t))))))

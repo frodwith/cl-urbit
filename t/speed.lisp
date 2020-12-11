@@ -87,7 +87,7 @@
   (random-heads-yes (make-assumption)))
 
 (test zig-changes-slug
-  (let ((spd (cons :slug (make-assumption))))
+  (let ((spd (make-slug (make-assumption))))
     (for-all-axes (a z)
       (is (zig-changes-speed z spd)))))
 

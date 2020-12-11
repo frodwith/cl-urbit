@@ -28,7 +28,7 @@
   (declare (cord a))
   (loop with len = (met 3 a)
         with vec = (int->bytes a len)
-        for tape = 0 then (cons c tape)
+        for tape = 0 then (slim-cons c tape)
         for i from (1- len) downto 0
         for c = (aref vec i)
         finally (return tape)))

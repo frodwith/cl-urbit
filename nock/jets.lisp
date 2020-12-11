@@ -347,7 +347,7 @@
            #*
            (case payload
              ,@case-pairs
-             (t (cons :slug ,assumption)))))))
+             (t (make-slug ,assumption)))))))
 
 (defmacro get-speed (core)
   (let ((c (gensym))

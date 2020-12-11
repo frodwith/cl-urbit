@@ -45,11 +45,33 @@
         (declare (ignore as bs))
         nil)))
 
+; extra attention is paid to promoting ideals: without this assurance,
+; we don't know that cells which have a cached speed necessarily have an
+; icell head. Idealness is also highly desirable, so it's worth doing
+; a little extra work during unification to preserve / enhance it.
+(defmacro copy-part (part a b)
+  (let ((aval (gensym))
+        (bval (gensym))
+        (apart (gensym))
+        (bpart (gensym))
+        (cideal (gensym)))
+    `(let* ((,aval ,a)
+            (,bval ,b)
+            (,apart (,part ,aval)))
+       (if (typep ,apart 'ideal)
+           (setf (,part ,bval) ,apart)
+           (let ((,bpart (,part ,bval)))
+             (if (typep ,bpart 'ideal)
+                 (setf (,part ,aval) ,bpart)
+                 (let ((,cideal (or (cached-ideal ,apart)
+                                    (cached-ideal ,bpart))))
+                   (if ,cideal
+                       (setf (,part ,aval) ,cideal (,part ,bval) ,cideal)
+                       (setf (,part ,bval) ,apart)))))))))
+
 (defun copy-parts (a b)
-  ; ponder checking for ideals here. how necessary is it in the presence of
-  ; the idealization that happens "underneath"?
-  (setf (head b) (head a))
-  (setf (tail b) (tail a)))
+  (copy-part head a b)
+  (copy-part tail a b))
 
 ; compare an ideal atom with a non-eql, non-ideal atom
 (defun ideal-atom=mundane (i a)

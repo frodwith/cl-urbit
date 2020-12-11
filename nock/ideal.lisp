@@ -12,6 +12,7 @@
            #:assumption #:make-assumption #:assumption-valid
            #:core-speed #:speed-valid #:valid-cached-speed
            #:void #:mean #:fast #:spry #:slow #:slug #:stop
+           #:make-slug #:slug-assumption
            #:make-slow #:slow-to #:slow-parent #:make-spry #:spry-valid
            #:match #:match-meter #:root-match #:child-match
            #:make-root-match #:root-match-constants
@@ -80,15 +81,6 @@
 (defstruct assumption
   (valid t :type boolean))
 
-(deftype core-speed ()
-  '(or void   ; not a core (cell with atom head) 
-       mean   ; battery unknown to jet system (most cores)
-       fast   ; matches a stencil
-       spry   ; child, fast parent
-       slow   ; child, parent not fast
-       slug   ; root, wrong constant
-       stop)) ; payload wrong shape at zig
-
 ; we can never be fast til the parent is fast, so don't need an assumption
 (defstruct (slow (:constructor make-slow (to parent)))
   (to nil :type zig :read-only t)
@@ -99,11 +91,22 @@
                  (:constructor make-spry (to parent valid)))
   (valid nil :type assumption :read-only t))
 
+(defstruct (slug (:constructor make-slug (assumption)))
+  (assumption nil :type assumption :read-only t))
+
 (deftype fast () 'stencil)
 (deftype mean () 'assumption)
-(deftype slug () '(cons (eql :slug) assumption))
 (deftype stop () 'zig)
 (deftype void () '(eql :void))
+
+(deftype core-speed ()
+  '(or void   ; not a core (cell with atom head)
+       mean   ; battery unknown to jet system (most cores)
+       fast   ; matches a stencil
+       spry   ; child, fast parent
+       slow   ; child, parent not fast
+       slug   ; root, wrong constant
+       stop)) ; payload wrong shape at zig
 
 (defun speed-valid (spd)
   (etypecase spd
@@ -111,7 +114,7 @@
     (mean (assumption-valid spd))
     (spry (assumption-valid (spry-valid spd)))
     (slow (speed-valid (slow-parent spd)))
-    (slug (assumption-valid (cdr spd)))))
+    (slug (assumption-valid (slug-assumption spd)))))
 
 (defun valid-cached-speed (core)
   (when-let (spd (cached-speed core))
