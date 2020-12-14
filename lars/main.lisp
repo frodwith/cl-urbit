@@ -21,9 +21,8 @@
         (lambda (trace)
           (tail (funcall slam [2 (noun-trace trace)])))))))
 
-(defvar *eve*)
-(defvar *kernel*)
-(defvar *options*)
+(defparameter *eve* 0)
+(defparameter *kernel* 0)
 
 (defun save-portable-snapshot ()
   ;(jam *kernel*)...
@@ -58,22 +57,60 @@
                 :format-arguments (list stem)))))
   [%live 0])
 
+(defparameter *newt-interrupt-handler*
+  (lambda ()
+    ; by default, newt ignores interrupts
+    (values)))
+
+(defun newt-handle-interrupt ()
+  (funcall *newt-interrupt-handler*))
+
+(defun compute-fn (timeout main)
+  (flet ((quint (thread fn)
+           (handler-case (sb-thread:interrupt-thread thread fn)
+             (sb-thread:interrupt-thread-error () nil))
+           (values)))
+    (let ((thread (sb-thread:make-thread main :name "compute")))
+      (flet ((stop (mote)
+               (quint thread (lambda ()
+                               (sb-thread:return-from-thread
+                                 (values mote *bug-stack*))))))
+        (let ((*newt-interrupt-handler* (lambda () (stop %intr))))
+          (if (or (null timeout) (zerop timeout))
+            (sb-thread:join-thread thread)
+            ; you don't get a bug stack with the :timeout parameter
+            (let ((timer (sb-thread:make-thread
+                           (lambda ()
+                             (sleep (/ timeout 1000))
+                             (stop %alrm))
+                           :name "alarm")))
+              (multiple-value-prog1 (sb-thread:join-thread thread)
+                (quint timer #'sb-thread:abort-thread)))))))))
+
+; execute forms. return multiple values (mote val). if mote is nil,
+; val is the result of executing forms. Otherwise, mote is
+; ?(%exit %intr %alrm) and val is the *bug-stack* from the thread.
+; timeout is a number of milliseconds after which to %alrm bail.
+; if timeout is 0 or nil, the computation will not time out.
+(defmacro compute (timeout &body forms)
+  `(compute-fn
+     ,timeout
+     (lambda () ; happens in a new thread
+       (multiple-value-bind (val tax)
+         ; so we have to with-ivory
+         (with-ivory *ivory* (with-bug-trap ,@forms))
+         (if val
+             (values nil val)
+             (values %exit tax))))))
+
+; mook. an exit or an interrupt will result in the empty trace.
 (defun process-trace (trace)
-  (handler-case (sb-sys:with-interrupts
-                  (with-fresh-memos
-                    (funcall *ivory-trace* trace)))
-    (exit () 0)
-    (sb-sys:interactive-interrupt () 0)))
+  (multiple-value-bind (mote val)
+    (compute nil (funcall *ivory-trace* trace))
+    (if mote 0 val)))
 
-(defun goof (mote)
-  [mote (process-trace *bug-stack*)])
-
-(defmacro with-noun-timeout (millinoun &body forms)
-  (let ((mils (gensym)) )
-    `(let ((,mils ,millinoun))
-       (if (zerop ,mils)
-           (progn ,@forms)
-           (with-timeout ((ceiling ,mils 1000)) ,@forms)))))
+(defun goof (mote tax)
+  [mote (process-trace tax)])
 
 (defun peek (now path gang)
   (declare (ignore gang))
@@ -81,16 +118,13 @@
 
 (defun writ-peek (bulb)
   (dedata (@@timeout @@now gang path) bulb
-    (if (zerop *eve*)
-        (error 'writ-foul :format-control "peek at 0")
-        (let (*bug-stack*)
-          (flet ((bail (mote) [%peek %bail (goof mote)]))
-            (handler-case (with-noun-timeout timeout
-                            (sb-sys:with-interrupts
-                              (peek now gang path)))
-              (exit () (bail %exit))
-              (timeout-error () (bail %alrm))
-              (sb-sys:interactive-interrupt () (bail %intr))))))))
+    (when (zerop *eve*)
+      (error 'writ-foul :format-control "peek at 0"))
+    (multiple-value-bind (mote val)
+      (compute timeout (peek now gang path))
+      (if mote
+          [%peek %bail (goof mote val)]
+          [%peek %done val]))))
 
 (defun poke (event)
   (dedata (new-kernel effects)
@@ -103,52 +137,45 @@
   (setq *kernel* (with-fresh-memos (nock events [7 [2 [0 3] 0 2] 0 7]))
         *eve* (lent events)))
 
+(define-symbol-macro kmug (mug *kernel*))
+
 (defun writ-play (bulb)
   (dedata (@@asserted events) bulb
     (unless (= asserted (1+ *eve*))
       (error 'writ-foul
              :format-control "play(~a) at ~a"
              :format-arguments (list asserted *eve*)))
-    (let (*bug-stack*)
-      (flet ((bail (mote) [%play %bail *eve* (mug *kernel*) (goof mote)]))
-        (handler-case
-          (sb-sys:with-interrupts
-            (if (zerop *eve*)
-                (boot events)
-                (for-?~ (e events) (poke e)))
-            [%play %done (mug *kernel*)])
-          (exit () (bail %exit))
-          (sb-sys:interactive-interrupt () (bail %intr)))))))
+    (multiple-value-bind (mote val)
+      (compute nil
+        (if (zerop *eve*)
+            (boot events)
+            (for-?~ (e events) (poke e))))
+      (if mote
+          [%play %bail *eve* kmug (goof mote val)]
+          [%play %done kmug]))))
 
 (defun writ-work-swap (event event-goof)
   (dedata (@@then wire card) event
     (let* ((now (slim-malt (1+ then)))
            (crud [%crud event-goof card])
-           (job [now wire crud])
-           *bug-stack*)
-      (flet ((bail (mote) [%work %bail (goof mote) event-goof 0]))
-        (handler-case
-          (let ((effects (sb-sys:with-interrupts (poke job))))
-            [%work %swap *eve* (mug *kernel*) job effects])
-          (exit () (bail %exit))
-          (sb-sys:interactive-interrupt () (bail %intr)))))))
+           (job [now wire crud]))
+      (multiple-value-bind (mote val)
+        (compute nil (poke job))
+        (if mote
+            [%work %bail (goof mote val) event-goof 0]
+            [%work %swap *eve* kmug job val])))))
 
 (defun writ-work (bulb)
   (dedata (@@timeout event) bulb
-    (if (zerop *eve*)
-        (error 'writ-foul
-               :format-control "work at ~a"
-               :format-arguments (list *eve*))
-        (let (*bug-stack*)
-          (flet ((bail (mote) (writ-work-swap event (goof mote))))
-            (handler-case
-              (with-noun-timeout
-                timeout
-                (let ((effects (sb-sys:with-interrupts (poke event))))
-                  [%work %done *eve* (mug *kernel*) effects]))
-              (exit () (bail %exit))
-              (timeout-error () (bail %alrm))
-              (sb-sys:interactive-interrupt () (bail %intr))))))))
+    (when (zerop *eve*)
+      (error 'writ-foul
+             :format-control "work at ~a"
+             :format-arguments (list *eve*)))
+    (multiple-value-bind (mote val)
+      (compute timeout (poke event))
+      (if mote
+          (writ-work-swap event (goof mote val))
+          [%work %done *eve* kmug val]))))
 
 (defun handle-writ (writ)
   (dedata (@@stem bulb) writ
@@ -162,8 +189,7 @@
                 :format-arguments (list stem))))))
 
 (defun plea-slog (priority msg)
-  (sb-sys:without-interrupts
-    (newt-write [%slog priority msg])))
+  (newt-write [%slog priority msg]))
 
 (defun handle-slog (slog)
   (plea-slog (slog-priority slog) (slog-tank slog)))
@@ -181,12 +207,44 @@
   (handler-bind
     ((slog #'handle-slog)
      (unregistered-parent #'handle-unregistered))
-    (loop
-      (handler-case (sb-sys:without-interrupts
-                      (sb-sys:allow-with-interrupts
-                        (newt-write (handle-writ (newt-read)))))
-        ; ignore deferred interrupts from above
-        (sb-sys:interactive-interrupt () (values))))))
+    (loop (handler-case (newt-write (handle-writ (newt-read)))))))
+
+(defun newt-main (opts)
+  (declare (ignore opts))
+  ; the standard streams work fine on sbcl as binary streams
+  ; use those for newt io
+  ; get all input from an empty stream
+  ; send all output to log.txt
+  ; XX: we should probably boot the ivory pill here rather than at load time,
+  ;     so we can respect --quiet etc.
+  (let* ((logfile (open "log.txt"
+                        :direction :output
+                        :if-does-not-exist :create
+                        :if-exists :rename-and-delete))
+         (empty-input (make-string-input-stream ""))
+         (io (make-two-way-stream empty-input logfile))
+         (*newt-input* *standard-input*)
+         (*newt-output* *standard-output*)
+         (*debug-io* io)
+         (*error-output* logfile)
+         (*query-io* io)
+         (*standard-input* empty-input)
+         (*standard-output* logfile)
+         (*trace-output* logfile))
+    (handler-case
+      (progn
+        (newt-write [%ripe [1 141 4] *eve* kmug])
+        (writ-loop))
+      (exit
+        ()
+        (format logfile "unhandled exit~%")
+        (force-output logfile)
+        (sb-ext:exit :abort t))
+      (writ-foul
+        (f)
+        (format logfile "~a~%" f)
+        (force-output logfile)
+        (sb-ext:exit :abort t)))))
 
 (defun parse-key (str)
   (multiple-value-bind (sub matches)
@@ -238,47 +296,13 @@
         ,@(parse-wag wag)))))
 
 (defun entry ()
-  ; TODO: use a separate world from the ivory pill so we can respect some
-  ;       of these options (particularly quiet for no slog compilation)
-  ;       but most of these options are currently ignored.
-  ;
-  ;       maybe better, don't boot the pill during image generation
-  ;       but use the command line arguments (quiet, etc) for both
-  ;       ivory and normal execution. If we were passed --quiet,
-  ;       the ivory pill shouldn't slog either.
-  ;
-  ;       Alternatively, we could just have the slog handler ignore
-  ;       the slogs in the presence of :quiet.
-  ;
-  ; the standard streams work fine on sbcl as binary streams,
-  ; use those for newt io
-  ; get all input from an empty stream 
-  ; send all output to log.txt
-  (let ((*options* (parse-arguments (uiop:command-line-arguments)))
-        (logfile (open "log.txt" 
-                       :direction :output
-                       :if-does-not-exist :create
-                       :if-exists :rename-and-delete)))
-      (let* ((empty-input (make-string-input-stream ""))
-             (io (make-two-way-stream empty-input logfile))
-             (*newt-input* *standard-input*) 
-             (*newt-output* *standard-output*)
-             (*debug-io* io)
-             (*error-output* logfile)
-             (*query-io* io)
-             (*standard-input* empty-input)
-             (*standard-output* logfile)
-             (*trace-output* logfile)
-             (*kernel* 0)
-             (*eve* 0))
-        (handler-case (with-ivory *ivory*
-                        (newt-write [%ripe [1 141 4] *eve* (mug *kernel*)])
-                        (writ-loop))
-          (exit ()
-                (format logfile "unhandled exit~%")
-                (force-output logfile)
-                (sb-ext:exit :abort t))
-          (writ-foul (f)
-                (format logfile "~a~%" f)
-                (force-output logfile)
-                (sb-ext:exit :abort t))))))
+  ; The main thread absorbs interrupts so newt can choose to ignore them
+  (loop with opts = (parse-arguments (uiop:command-line-arguments))
+        with newt = (sb-thread:make-thread
+                      #'newt-main :name "newt" :arguments opts)
+        do (with-simple-restart (continue "Ignore interrupt.")
+             (handler-case (return (sb-thread:join-thread newt))
+               (sb-sys:interactive-interrupt
+                 ()
+                 (sb-thread:interrupt-thread newt #'newt-handle-interrupt)
+                 (continue))))))
