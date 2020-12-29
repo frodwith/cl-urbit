@@ -1,5 +1,5 @@
 (defpackage #:urbit/lars/newt
-  (:use #:cl #:urbit/hoon/serial #:urbit/nock/world)
+  (:use #:cl #:urbit/hoon/serial #:urbit/nock/world #:urbit/nock/ideal)
   (:export #:newt-read #:newt-write *newt-input* *newt-output*))
 
 (in-package #:urbit/lars/newt)
@@ -36,8 +36,9 @@
 
 (define-condition oversized-newt (error) ())
 
-(defun newt-write (noun)
-  (let* ((bytes (jam-to-bytes (find-ideal noun)))
+(defun newt-write (i)
+  (declare (ideal i))
+  (let* ((bytes (jam-to-bytes i))
          (len (length bytes)))
     (unless (typep len '(unsigned-byte 64))
       (error 'oversized-newt))

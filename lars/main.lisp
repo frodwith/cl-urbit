@@ -1,5 +1,5 @@
 (defpackage #:urbit/lars/main
-  (:use #:cl #:named-readtables #:trivial-timeout
+  (:use #:cl #:named-readtables #:bordeaux-threads #:calispel
         #:urbit/hoon/syntax #:urbit/nock/nock #:urbit/nock/world
         #:urbit/nock/cord #:urbit/hoon/k141 #:urbit/hoon/hints
         #:urbit/nock/data #:urbit/nock/common #:urbit/lars/newt
@@ -23,39 +23,6 @@
 
 (defparameter *eve* 0)
 (defparameter *kernel* 0)
-
-(defun save-portable-snapshot ()
-  ;(jam *kernel*)...
-  nil)
-
-(defun save-snapshot ()
-  ;(sb-ext:save-lisp-and-die ...)
-  nil)
-
-(defun pack ()
-  (setq *kernel* (find-ideal *kernel*)))
-
-(defun writ-live (bulb)
-  (dedata (@@stem @@bulb) bulb
-    (case stem
-      (%cram (unless (= bulb *eve*)
-               (error 'writ-foul
-                      :format-control "cram(~a) at ~a"
-                      :format-arguments (list bulb *eve*)))
-             (save-portable-snapshot))
-      (%save (unless (= bulb *eve*)
-               (error 'writ-foul
-                      :format-control "bulb(~a) at ~a"
-                      :format-arguments (list bulb *eve*)))
-             (save-snapshot))
-      (%pack (unless (zerop bulb)
-               (error 'writ-foul :format-control "pack at 0"))
-             (pack))
-      (%exit (sb-ext:exit :code bulb))
-      (t (error 'writ-foul
-                :format-control "bad live stem ~a"
-                :format-arguments (list stem)))))
-  [%live 0])
 
 (defparameter *newt-interrupt-handler*
   (lambda ()
@@ -177,16 +144,7 @@
           (writ-work-swap event (goof mote val))
           [%work %done *eve* kmug val]))))
 
-(defun handle-writ (writ)
-  (dedata (@@stem bulb) writ
-    (case stem
-      (%live (writ-live bulb))
-      (%peek (writ-peek bulb))
-      (%play (writ-play bulb))
-      (%work (writ-work bulb))
-      (t (error 'writ-foul
-                :format-control "bad writ ~a"
-                :format-arguments (list stem))))))
+
 
 (defun plea-slog (priority msg)
   (newt-write [%slog priority msg]))
@@ -204,10 +162,12 @@
   (muffle-warning w))
 
 (defun writ-loop ()
+  ; this handler-binding is dynamic and won't apply to the execution threads
+  ; need to do this binding near with-ivory in compute
   (handler-bind
     ((slog #'handle-slog)
      (unregistered-parent #'handle-unregistered))
-    (loop (handler-case (newt-write (handle-writ (newt-read)))))))
+    (loop (newt-write (handle-writ (newt-read))))))
 
 (defun newt-main (opts)
   (declare (ignore opts))
@@ -245,6 +205,224 @@
         (format logfile "~a~%" f)
         (force-output logfile)
         (sb-ext:exit :abort t)))))
+
+;(defun entry ()
+;  ; The main thread absorbs interrupts so newt can choose to ignore them
+;  (loop with opts = (parse-arguments (uiop:command-line-arguments))
+;        with newt = (sb-thread:make-thread
+;                      #'newt-main :name "newt" :arguments opts)
+;        do (with-simple-restart (continue "Ignore interrupt.")
+;             (handler-case (return (sb-thread:join-thread newt))
+;               (sb-sys:interactive-interrupt
+;                 ()
+;                 (sb-thread:interrupt-thread newt #'newt-handle-interrupt)
+;                 (continue))))))
+
+;(defun test-reader ()
+;  (with-ivory *ivory*
+;    (let ((bytes (flexi-streams:with-output-to-sequence (out)
+;                   (let ((*newt-output* out))
+;                     (newt-write %foo)
+;                     (newt-write %bar)
+;                     (newt-write [%baz 42])))))
+;      (flexi-streams:with-input-from-sequence (in bytes)
+;        (loop with chan = (make-newt-reader in)
+;              for noun = (? chan)
+;              until (null noun)
+;              do (format t "~a~%" noun)
+;              finally (write-line "done"))))))
+;
+;(defun test-writer ()
+;  (with-ivory *ivory*
+;    (macrolet ((i (n) `(find-ideal ,n)))
+;      (let ((bytes (flexi-streams:with-output-to-sequence (out)
+;                     (let ((chan (make-newt-writer out)))
+;                       (! chan (i %foo))
+;                       (! chan (i %bar))
+;                       (! chan (i [%bar 42]))
+;                       (! chan nil)))))
+;        (flexi-streams:with-input-from-sequence (in bytes)
+;          (let ((*newt-input* in))
+;            (format t "~a ~a ~a~%" (newt-read) (newt-read) (newt-read))))))))
+
+; main thread gets a channel back from starting the control thread
+; read from this channel in a loop, setting variable for thread-to-interrupt
+; on interactive-interrupt, interrupt that thread (report *bug-stack*)
+; this way, the control thread gets to (synchronously!) turn interrupts on/off
+
+; to get timeouts, nock should be on its own thread
+; yeah, and main thread should start it, deliver interrupts to it
+; if it's currently running something, it stops and sends an interrupt result
+
+; control thread gives a timeout to ? if it wants to timeout
+; if it expires, it interrupts the nock thread and reads again
+
+; in fact the main thread could be the executor thread. in a loop, it reads
+; tasks from the control thread. if it gets SIGINT during this process, it
+; writes an interrupt result to its response channel. if it gets interrupts
+; while it's waiting for a task from the control thread, it ignores them
+; and continues waiting. pretty good! can utilize "with-timeout" that way,
+; in the main/executor thread.
+
+; might not work exactly because you want to be shielded from sigints while
+; you're handling sigint (like, constructing the bail result and delivering it
+; to the control thread).
+
+; you could probably get the main thread to only deliver one interrupt at a
+; time, and only when it is told to, on the other hand.
+
+; possibly use sb-ext:atomic-update in some fashion, because
+; asynchrony (inherent in interrupting threads) is hard to deal with.
+
+; actually there is without-interrupts, which you could use to atomically
+; handle sigint in the main thread.
+; (handler-case ... (interactive-interrupt () (without-interrupts ...)))
+
+;(test-writer)
+
+(defvar *interrupt-channel*)
+
+; when we do peek (here, next)
+; for compute we write a thread and fn to *interrupt-channel*
+; the fn will raise an interrupt condition
+; do our stuff (possibly wrapped in bordeaux-threads:with-timeout)
+; and then write nil to the same channel.
+
+(defun save-portable-snapshot ()
+  ;(jam *kernel*)...
+  nil)
+
+(defun save-snapshot ()
+  ;(sb-ext:save-lisp-and-die ...)
+  nil)
+
+(defun pack ()
+  (setq *kernel* (find-ideal *kernel*)))
+
+(defun writ-live (bulb)
+  (dedata (@@stem @@bulb) bulb
+    (case stem
+      (%cram (unless (= bulb *eve*)
+               (error 'writ-foul
+                      :format-control "cram(~a) at ~a"
+                      :format-arguments (list bulb *eve*)))
+             (save-portable-snapshot)
+             [%live 0])
+      (%save (unless (= bulb *eve*)
+               (error 'writ-foul
+                      :format-control "bulb(~a) at ~a"
+                      :format-arguments (list bulb *eve*)))
+             (save-snapshot)
+             [%live 0])
+      (%pack (unless (zerop bulb)
+               (error 'writ-foul :format-control "pack at 0"))
+             (pack)
+             [%live 0])
+      (%exit (! *interrupt-channel* bulb)
+             nil)
+      (t (error 'writ-foul
+                :format-control "bad live stem ~a"
+                :format-arguments (list stem))))))
+
+(defun handle-writ (writ)
+  (handler-case
+    (dedata (@@stem bulb) writ
+      (case stem
+        (%live (writ-live bulb))
+        (%peek (writ-peek bulb))
+        (%play (writ-play bulb))
+        (%work (writ-work bulb))
+        (t (error 'writ-foul
+                  :format-control "bad stem: ~a"
+                  :format-arguments (list stem)))))
+    (exit () (error 'writ-foul
+                    :format control "exit: ~a"
+                    :format-arguments (list writ)))))
+
+(defun make-control (opts writ plea)
+  (let ((chan (make-instance 'channel)))
+    (prog1 chan
+      (make-thread
+        (lambda ()
+          (handler-bind
+            ((slog
+               (lambda (c)
+                 (! plea [%slog (slog-priority c) (slog-tank c)])))
+             (unregistered-parent
+               (lambda (w)
+                 (let ((msg (format nil "unregistered: ~a at axis ~a"
+                                    (cord->string (unregistered-name w))
+                                    (unregistered-axis w))))
+                   (! plea [slog 0 (string->cord msg)])))))
+            (let ((*interrupt-channel* chan))
+              (with-ivory *ivory*
+                (loop for w = (? writ)
+                      when (null w) do (! chan -1) and do (return)
+                      for p = (handler-case (handle-writ w)
+                                (writ-foul
+                                  (f)
+                                  (write-line *error-output* f)
+                                  (! chan -1)
+                                  (return)))
+                      until (null p) ; writ-live returns null on exit
+                      do (! plea (find-ideal p)))))))
+        :name "control"))))
+
+; on the main thread, ignore interrupts until we get a receiver on chan.
+; until the receiver is changed, deliver it at most 1 interrupt and loop.
+; receiver is a cons of thread and interrupt function,
+; nil (ignore interrupts for now),
+; or an integer exit code (returned as final value).
+(defun soak-interrupts (chan)
+  (let (receiver)
+    (sb-sys:without-interrupts
+      (loop 
+        (handler-case
+          (let ((r (sb-sys:with-local-interrupts (? chan))))
+            (if (integerp r)
+                (return r)
+                (setq receiver r)))
+          (sb-sys:interactive-interrupt
+            ()
+            (when receiver
+              (interrupt-thread (car receiver) (cdr receiver))
+              (setq receiver nil))))))))
+
+(defun make-newt-writer (output)
+  (let ((chan (make-instance 'channel)))
+    (prog1 chan
+      (make-thread
+        (lambda ()
+          (let ((*newt-output* output))
+            (loop for i = (? chan)
+                  until (null i)
+                  do (newt-write i))))
+        :name "newt-writer"))))
+
+(defun make-newt-reader (input)
+  (let ((chan (make-instance 'channel)))
+    (values
+      chan
+      (make-thread
+        (lambda ()
+          (! chan
+             (let ((*newt-input* input))
+               (handler-case 
+                 (loop (! chan (newt-read)))
+                 (stream-error () nil)))))
+        :name "newt-reader"))))
+
+(defun main (opts input output)
+  (multiple-value-bind (writ stop-writ) (make-newt-reader input)
+    (let* ((plea (make-newt-writer output))
+           (code (soak-interrupts (make-control opts writ plea))))
+      ; the plea thread reads from a channel, so we can just send it a quit
+      (! plea nil)
+      ; the writ thread just reads from a stream, so to shut it down 
+      ; we could either close that stream (which is usually standard-input),
+      ; or just destroy the thread
+      (stop-writ)
+      (sb-ext:exit :code code))))
 
 (defun parse-key (str)
   (multiple-value-bind (sub matches)
@@ -296,13 +474,6 @@
         ,@(parse-wag wag)))))
 
 (defun entry ()
-  ; The main thread absorbs interrupts so newt can choose to ignore them
-  (loop with opts = (parse-arguments (uiop:command-line-arguments))
-        with newt = (sb-thread:make-thread
-                      #'newt-main :name "newt" :arguments opts)
-        do (with-simple-restart (continue "Ignore interrupt.")
-             (handler-case (return (sb-thread:join-thread newt))
-               (sb-sys:interactive-interrupt
-                 ()
-                 (sb-thread:interrupt-thread newt #'newt-handle-interrupt)
-                 (continue))))))
+  (main (parse-arguments (uiop:comand-line-arguments))
+        *standard-input*
+        *standard-output*))

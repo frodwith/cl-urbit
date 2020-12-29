@@ -120,8 +120,9 @@
   :depends-on ("cl-urbit/base"
                "cl-urbit/urcrypt"
                "uiop"
-               "trivial-timeout"
-               "cl-ppcre")
+               "cl-ppcre"
+               "bordeaux-threads"
+               "calispel")
   :build-operation program-op
   :build-pathname "bin/lars"
   :entry-point "urbit/lars/main:entry"
@@ -131,4 +132,6 @@
            :components
            ((:file "jets")
             (:file "newt")
+            (:file "threads")
+            (:file "serf")
             (:file "main")))))
