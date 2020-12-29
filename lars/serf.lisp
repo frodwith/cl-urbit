@@ -1,7 +1,8 @@
 (defpackage #:urbit/lars/serf
   (:use #:cl #:named-readtables #:bordeaux-threads #:calispel
         #:urbit/nock/nock #:urbit/nock/world #:urbit/nock/common 
-        #:urbit/nock/data #:urbit/nock/mug #:urbit/nock/data/slimatom
+        #:urbit/nock/data #:urbit/nock/mug
+        #:urbit/nock/cord #:urbit/nock/data/slimatom
         #:urbit/hoon/syntax #:urbit/hoon/hints
         #:urbit/hoon/k141 #:urbit/hoon/ivory
         #:urbit/lars/jets #:urbit/lars/threads)
@@ -172,34 +173,42 @@
   ; but would increase parallelism slightly.
   (! *plea-channel* (find-ideal noun)))
 
+(defmacro format-plea (priority format-string &rest format-args)
+  `(plea [%slog ,priority
+               (string->cord (format nil ,format-string ,@format-args))]))
+
 (defun writ-loop ()
   (with-ivory *ivory*
     (handler-bind
       ((slog (lambda (c) (plea [%slog (slog-priority c) (slog-tank c)])))
        (unregistered-parent
          (lambda (w)
-           (let ((msg (format nil "unregistered: ~a at axis ~a"
-                              (cord->string (unregistered-name w))
-                              (unregistered-axis w))))
-             (plea [slog 0 (string->cord msg)])))))
+           (format-plea 0 "unregistered: ~a at axis ~a"
+                        (cord->string (unregistered-name w))
+                        (unregistered-axis w)))))
       (loop for w = (? *writ-channel*)
             if (null w) return -1
             else do (handler-case (plea (handle-writ w))
                       (shutdown (c) (return (exit-code c)))   
                       (writ-foul
                         (c)
-                        (write-line c *error-output*)
+                        (format-plea 2 "~a" c)
                         (return -1)))))))
+
+(defun ripe ()
+  (plea [%ripe [1 141 4] *eve* kmug]))
 
 (defun serve (opts input output)
   (declare (ignore opts))
   (multiple-value-bind (writ stop) (make-newt-reader input)
-    (let* ((plea (make-newt-writer output))
-           (code (stop-sigint
-                   (lambda ()
-                     (let ((*writ-channel* writ)
-                           (*plea-channel* plea))
-                       (writ-loop))))))
-      (! plea nil)
-      (funcall stop)
-      (or code -1))))
+    (let ((plea (make-newt-writer output)))
+      (in-relative-silence
+        (let ((code (stop-sigint
+                      (lambda ()
+                        (let ((*writ-channel* writ)
+                              (*plea-channel* plea))
+                          (ripe)
+                          (writ-loop))))))
+          (! plea nil)
+          (funcall stop)
+          (or code -1))))))
