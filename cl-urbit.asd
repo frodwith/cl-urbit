@@ -132,6 +132,17 @@
            :components
            ((:file "jets")
             (:file "newt")
-            (:file "threads")
-            (:file "serf")
-            (:file "main")))))
+            (:file "earth")
+            (:file "mars")
+            (:file "main"))))
+  :in-order-to ((test-op (test-op "cl-urbit/lars/test"))))
+
+(defsystem "cl-urbit/lars/test"
+  :description "test the earthly parts of lars"
+  :depends-on ("fiveam"
+               "flexi-streams"
+               "bordeaux-threads"
+               "cl-urbit/lars")
+  :components ((:file "t/lars"))
+  :perform (test-op (o s)
+             (uiop:symbol-call '#:urbit/lars/test '#:test-lars)))

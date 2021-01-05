@@ -1,5 +1,5 @@
 (defpackage #:urbit/lars/main
-  (:use #:cl #:urbit/lars/serf)
+  (:use #:cl #:calispel #:urbit/lars/earth #:urbit/lars/mars)
   (:export #:entry))
 
 (in-package #:urbit/lars/main)
@@ -56,6 +56,13 @@
         ,@(parse-wag wag)))))
 
 (defun entry ()
-  (serve (parse-arguments (uiop:command-line-arguments))
-         *standard-input*
-         *standard-output*))
+  (let ((opts (parse-arguments (uiop:command-line-arguments))))
+    (declare (ignore opts))
+    (in-relative-silence
+      (multiple-value-bind (writ-chan writ-thread)
+        (make-newt-reader *standard-input*)
+        (let* ((plea (make-newt-writer *standard-output*))
+               (code (stop-sigint (make-mars writ-chan plea))))
+          (! plea nil)
+          (stop writ-thread)
+          (or code -1))))))
