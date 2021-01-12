@@ -187,7 +187,7 @@
                   (shutdown (c) (return (exit-code c)))
                   (writ-foul
                     (c)
-                    (format-plea 2 "~a" c)
+                    (format-plea 2 "~a~c~c" c #\return #\linefeed)
                     (return -1)))))
 
 (defun on-slog (c)
@@ -195,16 +195,20 @@
   (continue))
 
 (defun on-unregistered (w)
-  (format-plea 0 "unregistered: ~a at axis ~a"
+  (format-plea 0 "tried to register ~a with unregistered parent at axis ~a~c~c"
                (cord->string (unregistered-name w))
-               (unregistered-axis w))
+               (unregistered-axis w)
+               #\return
+               #\linefeed)
   (muffle-warning w))
 
-(defun make-mars (writ plea)
+(defun make-mars (opts writ plea)
   (make-thread
     (lambda ()
       (let ((*writ-channel* writ)
-            (*plea-channel* plea))
+            (*plea-channel* plea)
+            (*memo-size* (or (getf opts :memoization-cap)
+                             *memo-size*)))
         (with-ivory *ivory*
           (ripe)
           (handler-bind

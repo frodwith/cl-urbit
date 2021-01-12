@@ -5,7 +5,6 @@
 
 (in-package #:urbit/hoon/cache)
 
-; so far caches just have noun keys
 (defstruct (cache (:constructor mkcache (slots table)))
   ; goes down to zero as the cache fills up
   (slots 0 :type (integer 0)) 

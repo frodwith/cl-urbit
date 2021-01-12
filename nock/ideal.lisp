@@ -242,9 +242,8 @@
 
 (defun icell-copy (i c)
   (declare (icell i))
-  (if-let (ispd (icell-speed i))
-    (setf (cached-speed c) ispd)
-    (when-let (cspd (valid-cached-speed c))
+  (when-let (cspd (valid-cached-speed c))
+    (unless (icell-speed i)
       (setf (icell-speed i) cspd)))
   (setf (cached-ideal c) i))
 

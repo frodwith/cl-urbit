@@ -526,140 +526,94 @@
 ; but we haven't written a version of lore yet and it's going away.
 (defgate +lore #'leer+<)
 
-; "partial memoization" caches for the hoon compiler
+; "partial memoization" for the hoon compiler
+; currently using the nock memoization cache, but could be separate
+; using the memo cache keeps it bounded and simple
+(defun partially-memoized-trap (battery extract)
+  (trap
+    ; using a gensym for the memo id gives us unique keys per caller, so
+    ; different callers with identical keys (i.e. different versions of the
+    ; hoon compiler drivers) won't interfere with each other.
+    (let ((memo-id (gensym))
+          (compute (icell-function battery)))
+      (lambda (core)
+        (when-let (noun (funcall extract core))
+          (cache-lookup *memo-cache*
+                        (cons memo-id noun)
+                        (funcall compute core)))))))
 
-; a version of the hoon compiler is specified as the battery of ut and an
-; icell for ut's static context. these are weakrefs, so losing all references
-; to a hoon compiler clears its caches.
-(defun versioned-compiler-cache (table ut-battery ut-context size)
-  (if-let (top (gethash ut-battery table))
-    (or (gethash ut-context top)
-        (setf (gethash ut-context top) (make-cache size 'same)))
-    (let* ((top (make-hash-table :test 'eq :weakness :key)))
-      (setf (gethash ut-battery table) top)
-      (setf (gethash ut-context top) (make-cache size 'same)))))
+(defun sut (ut)
+  (head (tail ut)))
 
-; each cached compiler function gets its own cache
-(defmacro define-compiler-cache (name size)
-  (let ((table (intern (format nil "*~A-TABLE*" name))))
-    `(progn
-       (defparameter ,table (make-hash-table :test 'eq :weakness :key))
-       (defun ,name (ut-battery ut-context)
-         (versioned-compiler-cache ,table ut-battery ut-context ,size)))))
-
-(defun unpack-ut (ut-core)
-  (let* ((upay (tail ut-core))
-         (pen (get-ideal-cell (tail (tail upay)))))
-    (values (head upay) pen (get-battery ut-core))))
-
-(defun look-in (core battery-fn ut-battery ut-context cache-fn noun-key)
-  (cache-lookup (funcall cache-fn ut-battery ut-context)
-                noun-key
-                (funcall battery-fn core)))
-(defparameter +large-cache+ 8192)
-(defparameter +small-cache+ 1024)
-
-; the cache sizes are arbitrary - tune them? i took a guess at which ones
-; should be bigger, but the main idea is that you can size them independently,
-; and they don't step on each others' values.
-(define-compiler-cache nest-cache +large-cache+)
 (defun +nest (kernel parent-stencil ideal hooks)
-  ; would like to access the arm version rather than the formula version
-  ; in these fallbacks. Maybe a proto-stencil object to be passed to the
-  ; drivers that could hold onto the dispatch function, and make the
-  ; signatures for a lot of these functions (resolve-hook, etc) nicer.
-  ; then profiling would be more accurate, and we can implement different
-  ; declarations for arms vs. formulas
-  ; more aggressive optimizations and longer time spent for fast arms
-  ; turn the optimizer down and go for compilation speed and space in formulas
-  ; might even make sense to use an interpreter as a base tier
-  ; like every formula starts interpreted, till its run 100 times, then
-  ; we compile it with the optimizer turned down till it runs 10k times,
-  ; then we turn the optimizer up.
-  ; and fast arms always have the optimizer turned all the way up.
-  ; that could cut down on our startup time.
-  (let ((battery-fn (icell-function ideal)))
-    (when-let (veth (resolve-hook %vet kernel parent-stencil hooks :skip 3))
-      (trap
-        (lambda (core)
-          (let* ((nest-in (tail core))
-                 (in-pay (tail nest-in))
-                 (in-sam (head in-pay))
-                 (seg (head in-sam))
-                 (reg (head (tail in-sam)))
-                 (nest (tail in-pay))
-                 (nest-pay (tail nest))
-                 (nest-sam (head nest-pay))
-                 (ref (tail nest-sam))
-                 (ut (tail nest-pay)))
-            (when-let (vet (call-hook veth ut))
-              (multiple-value-bind (sut but pen) (unpack-ut ut)
-                (look-in core battery-fn but pen #'nest-cache
-                         [seg reg vet sut ref])))))))))
+  (when-let (veth (resolve-hook %vet kernel parent-stencil hooks :skip 3))
+    (partially-memoized-trap
+      ideal
+      (lambda (core)
+        (let* ((nest-in (tail core))
+               (in-pay (tail nest-in))
+               (nest (tail in-pay))
+               (nest-pay (tail nest))
+               (ut (tail nest-pay))
+               (vet (call-hook veth ut)))
+          (when vet
+            (let* ((in-sam (head in-pay))
+                   (seg (head in-sam))
+                   (reg (head (tail in-sam)))
+                   (nest-sam (head nest-pay))
+                   (ref (tail nest-sam)))
+              [seg reg vet (sut ut) ref])))))))
 
-(defun vet-sut-sam (kernel parent-stencil ideal hooks cache-fn)
-  (let ((battery-fn (icell-function ideal)))
-    (when-let (veth (resolve-hook %vet kernel parent-stencil hooks :skip 1))
-      (trap
-        (lambda (core)
-          (let* ((pay (tail core))
-                 (sam (head pay))
-                 (ut (tail pay)))
-            (when-let (vet (call-hook veth ut))
-              (multiple-value-bind (sut but pen) (unpack-ut ut)
-                (look-in core battery-fn but pen cache-fn
-                         [vet sut sam])))))))))
+(defun vet-sut-sam (kernel parent-stencil ideal hooks)
+  (when-let (veth (resolve-hook %vet kernel parent-stencil hooks :skip 1))
+    (partially-memoized-trap
+      ideal
+      (lambda (core)
+        (let* ((pay (tail core))
+               (sam (head pay))
+               (ut (tail pay)))
+          (when-let (vet (call-hook veth ut))
+            [vet (sut ut) sam]))))))
 
-(defun vrf-sut-sam (kernel parent-stencil ideal hooks cache-fn)
-  (let ((battery-fn (icell-function ideal)))
-    (when-let* ((veth (resolve-hook %vet kernel parent-stencil hooks :skip 1))
-                (fabh (resolve-hook %fab kernel parent-stencil hooks :skip 1)))
-      (trap
-        (lambda (core)
-          (let* ((pay (tail core))
-                 (sam (head pay))
-                 (ut (tail pay)))
-            (when-let* ((vet (call-hook veth ut))
-                        (fab (call-hook fabh ut)))
-              (multiple-value-bind (sut but pen) (unpack-ut ut)
-                (look-in core battery-fn but pen cache-fn
-                         [vet fab sut sam])))))))))
+(defun vrf-sut-sam (kernel parent-stencil ideal hooks)
+  (when-let* ((veth (resolve-hook %vet kernel parent-stencil hooks :skip 1))
+              (fabh (resolve-hook %fab kernel parent-stencil hooks :skip 1)))
+    (partially-memoized-trap
+      ideal
+      (lambda (core)
+        (let* ((pay (tail core))
+               (sam (head pay))
+               (ut (tail pay)))
+          (when-let* ((vet (call-hook veth ut))
+                      (fab (call-hook fabh ut)))
+            [vet fab (sut ut) sam]))))))
 
-(define-compiler-cache crop-cache +small-cache+)
 (defun +crop (kernel parent-stencil ideal hooks)
-  (vet-sut-sam kernel parent-stencil ideal hooks #'crop-cache))
+  (vet-sut-sam kernel parent-stencil ideal hooks))
 
-(define-compiler-cache fish-cache +small-cache+)
 (defun +fish (kernel parent-stencil ideal hooks)
-  (vet-sut-sam kernel parent-stencil ideal hooks #'fish-cache))
+  (vet-sut-sam kernel parent-stencil ideal hooks))
 
-(define-compiler-cache fond-cache +small-cache+)
 (defun +fond (kernel parent-stencil ideal hooks)
-  (vet-sut-sam kernel parent-stencil ideal hooks #'fond-cache))
+  (vet-sut-sam kernel parent-stencil ideal hooks))
 
-(define-compiler-cache fuse-cache +small-cache+)
 (defun +fuse (kernel parent-stencil ideal hooks)
-  (vet-sut-sam kernel parent-stencil ideal hooks #'fuse-cache))
+  (vet-sut-sam kernel parent-stencil ideal hooks))
 
-(define-compiler-cache mint-cache +large-cache+)
 (defun +mint (kernel parent-stencil ideal hooks)
-  (vrf-sut-sam kernel parent-stencil ideal hooks #'mint-cache))
+  (vrf-sut-sam kernel parent-stencil ideal hooks))
 
-(define-compiler-cache mull-cache +large-cache+)
 (defun +mull (kernel parent-stencil ideal hooks)
-  (vet-sut-sam kernel parent-stencil ideal hooks #'mull-cache))
+  (vet-sut-sam kernel parent-stencil ideal hooks))
 
-(define-compiler-cache peek-cache +small-cache+)
 (defun +peek (kernel parent-stencil ideal hooks)
-  (vet-sut-sam kernel parent-stencil ideal hooks #'peek-cache))
+  (vet-sut-sam kernel parent-stencil ideal hooks))
 
-(define-compiler-cache play-cache +small-cache+)
 (defun +play (kernel parent-stencil ideal hooks)
-  (vrf-sut-sam kernel parent-stencil ideal hooks #'play-cache))
+  (vrf-sut-sam kernel parent-stencil ideal hooks))
 
-(define-compiler-cache rest-cache +small-cache+)
 (defun +rest (kernel parent-stencil ideal hooks)
-  (vet-sut-sam kernel parent-stencil ideal hooks #'rest-cache))
+  (vet-sut-sam kernel parent-stencil ideal hooks))
 
 (defun k141-hinter (tag clue next)
   (when clue

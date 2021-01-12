@@ -9,7 +9,8 @@
            #:handle-fast #:fast-hinter #:bad-fast #:unregistered-parent
            #:unregistered-name #:unregistered-axis #:unregistered-core
            #:slog #:handle-slog #:slog-hinter #:slog-priority #:slog-tank
-           #:with-fresh-memos #:memo-hinter #:stack-hinter #:handle-stack))
+           #:with-fresh-memos #:*memo-size* #:*memo-cache* #:memo-hinter
+           #:stack-hinter #:handle-stack))
 
 (in-package #:urbit/hoon/hints)
 (in-readtable cord-readtable)
@@ -152,7 +153,6 @@
 ; %memo
 ; use WITH-FRESH-MEMOS to dynamically bind a fresh cache (per road, etc)
 
-(defconstant +memo-size+ 8192)
 (defvar *memo-cache*)
 
 (defun memo= (a b)
@@ -160,13 +160,16 @@
        (same (cdr a) (cdr b))))
 
 (defun memo-hash (k)
-  (murmugs (icell-mug (car k))
-           (mug (cdr k))))
+  (sxhash (cons (car k) (mug (cdr k)))))
+
+; keys are a cons of unique object (via eq, ie. ideal, symbol) and noun
 
 (sb-ext:define-hash-table-test memo= memo-hash)
 
+(defparameter *memo-size* 8192)
+
 (defmacro with-fresh-memos (&body forms)
-  `(let ((*memo-cache* (make-cache +memo-size+ 'memo=)))
+  `(let ((*memo-cache* (make-cache *memo-size* 'memo=)))
      ,@forms))
 
 (defun memo-before (formula)
@@ -199,11 +202,11 @@
 (defun make-stack-handler (tag)
   (cons :around (cons (stack-before tag) #'stack-after)))
 
-(defparameter +handle-hunk+ (make-stack-handler %hunk))
-(defparameter +handle-hand+ (make-stack-handler %hand))
-(defparameter +handle-mean+ (make-stack-handler %mean))
-(defparameter +handle-lose+ (make-stack-handler %lose))
-(defparameter +handle-spot+ (make-stack-handler %spot))
+(defvar +handle-hunk+ (make-stack-handler %hunk))
+(defvar +handle-hand+ (make-stack-handler %hand))
+(defvar +handle-mean+ (make-stack-handler %mean))
+(defvar +handle-lose+ (make-stack-handler %lose))
+(defvar +handle-spot+ (make-stack-handler %spot))
 
 (defun handle-stack (tag)
   (case tag
