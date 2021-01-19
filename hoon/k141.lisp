@@ -527,93 +527,64 @@
 (defgate +lore #'leer+<)
 
 ; "partial memoization" for the hoon compiler
-; currently using the nock memoization cache, but could be separate
-; using the memo cache keeps it bounded and simple
-(defun partially-memoized-trap (battery extract)
+; using the memo cache causes lots of cache interference
+; performance is much better using a cache per stencil
+; although this is an unbounded memory leak!
+; TODO: some cleanup mechanism to empty the caches in between events
+;       would mitigate that problem.
+(defun partially-memoized-trap (battery extract &optional save-p)
   (trap
-    ; using a gensym for the memo id gives us unique keys per caller, so
-    ; different callers with identical keys (i.e. different versions of the
-    ; hoon compiler drivers) won't interfere with each other.
-    (let ((memo-id (gensym))
+    (let ((cache (make-cache 1024 #'same))
           (compute (icell-function battery)))
       (lambda (core)
-        (when-let (noun (funcall extract core))
-          (cache-lookup *memo-cache*
-                        (cons memo-id noun)
-                        (funcall compute core)))))))
+        (when-let (key (nullify-exit (funcall extract core)))
+          (or (cache-get cache key)
+              (let ((pro (funcall compute core)))
+                (prog1 pro
+                  ; save can be conditional (nest)
+                  (when (or (null save-p)
+                            (nullify-exit (funcall save-p core pro)))
+                    (cache-put cache key pro))))))))))
 
-(defun sut (ut)
-  (head (tail ut)))
+(defun sigp (n)
+  (and (not (deep n))
+       (zerop (cl-integer n))))
 
+; nest is weird in a couple respects
+;   it's just the dext arm so it's nested in inner cores
+;   it only memo-saves sometimes.
 (defun +nest (kernel parent-stencil ideal hooks)
-  (when-let (veth (resolve-hook %vet kernel parent-stencil hooks :skip 3))
-    (partially-memoized-trap
-      ideal
-      (lambda (core)
-        (let* ((nest-in (tail core))
-               (in-pay (tail nest-in))
-               (nest (tail in-pay))
-               (nest-pay (tail nest))
-               (ut (tail nest-pay))
-               (vet (call-hook veth ut)))
-          (when vet
-            (let* ((in-sam (head in-pay))
-                   (seg (head in-sam))
-                   (reg (head (tail in-sam)))
-                   (nest-sam (head nest-pay))
-                   (ref (tail nest-sam)))
-              [seg reg vet (sut ut) ref])))))))
+  (declare (ignore kernel parent-stencil hooks))
+  (partially-memoized-trap
+    ideal
+    (lambda (core)
+      (deaxis ((vet 4086) (sut 254) (ref 125)) core
+        [vet sut ref]))
+    (lambda (core pro)
+      (case (cl-integer pro)
+        (0 (deaxis ((seg 28)) core (sigp seg)))
+        (1 (deaxis ((reg 58)) core (sigp reg)))))))
 
-(defun vet-sut-sam (kernel parent-stencil ideal hooks)
-  (when-let (veth (resolve-hook %vet kernel parent-stencil hooks :skip 1))
-    (partially-memoized-trap
-      ideal
-      (lambda (core)
-        (let* ((pay (tail core))
-               (sam (head pay))
-               (ut (tail pay)))
-          (when-let (vet (call-hook veth ut))
-            [vet (sut ut) sam]))))))
+; everything else 1 gate deep, just extracts a key and saves unconditionally
+; (defcap is short for "define decapitated")
+(defmacro defcap (name &rest parts)
+  `(defun ,name (kernel parent-stencil ideal hooks)
+     (declare (ignore kernel parent-stencil hooks))
+     (partially-memoized-trap
+       ideal
+       (lambda (core)
+         (deaxis ,parts core
+           [,@(mapcar #'car parts)])))))
 
-(defun vrf-sut-sam (kernel parent-stencil ideal hooks)
-  (when-let* ((veth (resolve-hook %vet kernel parent-stencil hooks :skip 1))
-              (fabh (resolve-hook %fab kernel parent-stencil hooks :skip 1)))
-    (partially-memoized-trap
-      ideal
-      (lambda (core)
-        (let* ((pay (tail core))
-               (sam (head pay))
-               (ut (tail pay)))
-          (when-let* ((vet (call-hook veth ut))
-                      (fab (call-hook fabh ut)))
-            [vet fab (sut ut) sam]))))))
-
-(defun +crop (kernel parent-stencil ideal hooks)
-  (vet-sut-sam kernel parent-stencil ideal hooks))
-
-(defun +fish (kernel parent-stencil ideal hooks)
-  (vet-sut-sam kernel parent-stencil ideal hooks))
-
-(defun +fond (kernel parent-stencil ideal hooks)
-  (vet-sut-sam kernel parent-stencil ideal hooks))
-
-(defun +fuse (kernel parent-stencil ideal hooks)
-  (vet-sut-sam kernel parent-stencil ideal hooks))
-
-(defun +mint (kernel parent-stencil ideal hooks)
-  (vrf-sut-sam kernel parent-stencil ideal hooks))
-
-(defun +mull (kernel parent-stencil ideal hooks)
-  (vet-sut-sam kernel parent-stencil ideal hooks))
-
-(defun +peek (kernel parent-stencil ideal hooks)
-  (vet-sut-sam kernel parent-stencil ideal hooks))
-
-(defun +play (kernel parent-stencil ideal hooks)
-  (vrf-sut-sam kernel parent-stencil ideal hooks))
-
-(defun +rest (kernel parent-stencil ideal hooks)
-  (vet-sut-sam kernel parent-stencil ideal hooks))
+(defcap +crop (vet 502) (sut 30) (ref 6))
+(defcap +fish (vet 502) (sut 30) (ref 6))
+(defcap +fond (vet 502) (sut 30) (way 12) (hyp 13))
+(defcap +fuse (vet 502) (sut 30) (ref 6))
+(defcap +mint (vrf 251) (sut 30) (gol 12) (gen 13))
+(defcap +mull (vet 502) (sut 30) (gol 12) (dox 26) (gen 27))
+(defcap +peek (vet 502) (sut 30) (way 12) (hyp 13))
+(defcap +play (vrf 251) (sut 30) (gen 6))
+(defcap +rest (vet 502) (sut 30) (gen 6))
 
 (defun k141-hinter (tag clue next)
   (when clue

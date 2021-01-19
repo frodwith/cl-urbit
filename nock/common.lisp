@@ -2,7 +2,7 @@
   (:use #:cl #:urbit/nock/data)
   (:import-from #:urbit/nock/math #:uint)
   (:export #:sum-cell #:sum-noun #:cell= #:shallow #:loob
-           #:denoun #:dedata #:decons))
+           #:denoun #:dedata #:decons #:deaxis))
 
 (in-package #:urbit/nock/common)
 
@@ -182,3 +182,46 @@
   `(denoun (:head decar :tail decdr :deep consp :int need-int)
            ,bindings ,expr ,@forms))
 
+(defmacro deaxis (bindings expr &body forms)
+  (if (null bindings)
+      `(progn ,expr ,@forms)
+      (if (null (cdr bindings))
+          (loop with (s a) = (car bindings)
+                for e = expr then (list acc e)
+                for i from (- (integer-length a) 2) downto 0
+                for bit = (ldb (byte 1 i) a)
+                for acc = (if (zerop bit) 'head 'tail)
+                finally (return `(let ((,s ,e)) ,@forms)))
+          (loop
+            with h = (make-hash-table) ; maps axis -> symbol
+            for (s a) in bindings
+            do (setf (gethash a h) s)
+            finally ; fill in parents with gensyms
+            (return
+              (loop
+                for more = bindings then par
+                for par = (loop
+                            for (s a) in more
+                            for p = (ash a -1)
+                            unless (or (zerop p) (gethash p h))
+                            collect (let ((ps (gensym)))
+                                      (setf (gethash p h) ps)
+                                      (list ps p)))
+                while par
+                finally ; all subparts named: hash -> (list binding)
+                (return
+                  (loop
+                    for a being the hash-keys in h using (hash-value s)
+                    collect (list s a) into all
+                    finally ; bind 1 to expr and generate sorted let
+                    (return
+                      (destructuring-bind (top . down)
+                        (sort all (lambda (a b) (<= (cadr a) (cadr b))))
+                        `(let* ((,(car top) ,expr)
+                                ,@(loop
+                                    for (s a) in down
+                                    for par = (gethash (ash a -1) h)
+                                    for bit = (ldb (byte 1 0) a)
+                                    for acc = (if (zerop bit) 'head 'tail)
+                                    collect `(,s (,acc ,par))))
+                           ,@forms)))))))))))

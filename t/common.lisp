@@ -64,3 +64,11 @@
     (is (= 5 e))
     (is (= 6 f))
     (is (= 7 g))))
+
+(test deaxis
+  (deaxis ((sam 6)) [%bat %sam %pay]
+    (is (= %sam sam)))
+  (deaxis ((bat 2) (sam 6) (con-sam 30)) [%bat %sam %cat %cam %coc]
+    (is (= %bat bat)
+        (= %sam sam)
+        (= %cam con-sam))))
