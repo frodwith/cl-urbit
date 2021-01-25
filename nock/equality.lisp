@@ -174,16 +174,13 @@
                   (if (= m (cached-mug a))
                       :deep
                       :diff)
-                  :diff)
+                  :deep)
                 ((a b ai flipped)
                  (declare (ignore a))
                  (shallow
-                   (if flipped
-                       (icell=mundane ai b)
-                       (if-let (bm (cached-mug b))
-                         (and (= bm (imug ai))
-                              (icell=mugcell ai b))
-                         (icell=unmugcell ai b)))))
+                   (if flipped ; means b is mugged
+                       (icell=mugcell ai b)
+                       (icell=mundane ai b))))
                 ((ai bi) (shallow (eq ai bi))))))
     (when (cell= a b
            #'deep #'deep

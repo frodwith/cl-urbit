@@ -145,6 +145,15 @@
         (~/ cue #'+cue)
         (leaf muk 27 #'+muk)
         (~/ weld #'+weld)
+        (container in 3
+          (~/ has (debug-core #'+has-in))
+          ;(~/ put #'+put-in)
+          ;(~/ del #'+del-in)
+          )
+        (container by 3
+          (~/ get #'+get-by)
+          (~/ put #'+put-by)
+          (~/ del #'+del-by))
         (layer tri
           (~/ shal #'+shal)
           (~/ sha1 #'+sha1)

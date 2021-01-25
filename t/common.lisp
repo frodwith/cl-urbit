@@ -69,6 +69,6 @@
   (deaxis ((sam 6)) [%bat %sam %pay]
     (is (= %sam sam)))
   (deaxis ((bat 2) (sam 6) (con-sam 30)) [%bat %sam %cat %cam %coc]
-    (is (= %bat bat)
-        (= %sam sam)
-        (= %cam con-sam))))
+    (is (= %bat bat))
+    (is (= %sam sam))
+    (is (= %cam con-sam))))

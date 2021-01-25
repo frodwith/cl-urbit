@@ -78,6 +78,7 @@
                  (:file "common")
                  (:file "ideal")
                  (:file "speed")
+                 (:file "equality")
                  (:file "nock"))))
   :perform (test-op (o s)
              (uiop:symbol-call '#:urbit/tests '#:test-urbit)))

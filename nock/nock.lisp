@@ -503,7 +503,9 @@
           (setq testing nil)
           (unwind-protect
             (if (same pro (funcall arm core))
-                (princ #\.)
+                (progn
+                  (princ #\. *error-output*)
+                  (force-output *error-output*))
                 (break))
             (setq testing t)))
         pro))))

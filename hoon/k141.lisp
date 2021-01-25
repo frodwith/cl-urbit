@@ -17,6 +17,8 @@
            #:+rap #:+rep #:+rip #:+rsh #:+con #:+dis #:+mix
            #:+mug #:+dor #:+gor #:+mor
            #:flop #:+flop #:+lent #:+reap #:+jam #:+cue #:+muk #:+weld
+           #:+get-by #:+put-by #:+del-by
+           #:+has-in
            #:+shal #:+shan #:+shay #:+trip #:+mink #:+mule
            #:+crop #:+fish #:+fond #:+fuse #:+mint
            #:+mull #:+peek #:+play #:+rest #:+nest
@@ -351,19 +353,24 @@
 (defgate +mug #'mug+<)
 
 (defun dor (a b)
-  (labels ((rec (a b)
-             (or (same a b)
-                 (if (deep a)
-                     (when (deep b)
-                       (let ((ha (head a))
-                             (hb (head b)))
-                         (if (same ha hb)
-                             (rec (tail a) (tail b))
-                             (rec ha hb))))
-                     (or (deep b)
-                         (< (cl-integer a) (cl-integer b)))))))
-    (loob (rec a b))))
-(defwrap dor+< 2 #'dor)
+  (labels
+    ((rec (a b)
+       (or (same a b)
+           (if (deep a)
+               (when (deep b)
+                 (let ((ha (head a))
+                       (hb (head b)))
+                   (if (same ha hb)
+                       (rec (tail a) (tail b))
+                       (rec ha hb))))
+               (or (deep b)
+                   (< (cl-integer a) (cl-integer b)))))))
+    (rec a b)))
+
+(defun ldor (a b)
+  (loob (dor a b)))
+
+(defwrap dor+< 2 #'ldor)
 (defgate +dor #'dor+<)
 
 (defun gor (a b)
@@ -371,8 +378,12 @@
         (d (mug b)))
     (if (= c d)
         (dor a b)
-        (loob (< c d)))))
-(defwrap gor+< 2 #'gor)
+        (< c d))))
+
+(defun lgor (a b)
+  (loob (gor a b)))
+
+(defwrap gor+< 2 #'lgor)
 (defgate +gor #'gor+<)
 
 (defun mor (a b)
@@ -380,8 +391,12 @@
         (d (murmug (mug b))))
     (if (= c d)
         (dor a b)
-        (loob (< c d)))))
-(defwrap mor+< 2 #'mor)
+        (< c d))))
+
+(defun lmor (a b)
+  (loob (mor a b)))
+
+(defwrap mor+< 2 #'lmor)
 (defgate +mor #'mor+<)
 
 (defun flop (list)
@@ -428,7 +443,6 @@
   ; no need to malt
   (muk syd len key))
 (defgate +muk #'muk+<)
-
 
 (defun vector-onto-nlist (vector list)
   (loop for n = list then (slim-cons a n)
@@ -562,8 +576,8 @@
         [vet sut ref]))
     (lambda (core pro)
       (case (cl-integer pro)
-        (0 (deaxis ((seg 28)) core (sigp seg)))
-        (1 (deaxis ((reg 58)) core (sigp reg)))))))
+        (0 (deaxis ((reg 58)) core (sigp reg)))
+        (1 (deaxis ((seg 28)) core (sigp seg)))))))
 
 ; everything else 1 gate deep, just extracts a key and saves unconditionally
 ; (defcap is short for "define decapitated")
@@ -585,6 +599,107 @@
 (defcap +peek (vet 502) (sut 30) (way 12) (hyp 13))
 (defcap +play (vrf 251) (sut 30) (gen 6))
 (defcap +rest (vet 502) (sut 30) (gen 6))
+
+; many things (list, sets) are cells or zero (other atoms should crash)
+(defun empty (nlr)
+  (and (not (deep nlr))
+       (or (zerop (cl-integer nlr))
+           (error 'exit))))
+
+(defun del-by (map key)
+  (labels
+    ((del (n l r)
+       (cond ((empty l) r)
+             ((empty r) l)
+             ((mor (head (head l)) (head (head r)))
+              (dedata (nl ll rl) l
+                [nl ll (del n rl r)]))
+             (t (dedata (nr lr rr) r
+                  [nr (del n l lr) rr]))))
+     (rec (a)
+       (if (empty a)
+           ~
+           (dedata (n l r) a
+             (let ((p (head n)))
+               (cond ((same p key) (del n l r))
+                     ((gor key p) [n (rec l) r])
+                     (t [n l (rec r)])))))))
+    (rec map)))
+
+(defmacro defax (name parts &body forms)
+  (destructuring-bind (k p i h c) (loop repeat 5 collect (gensym))
+    `(defun ,name (,k ,p ,i ,h)
+       (declare (ignore ,k ,p ,i ,h))
+       (trap
+         (lambda (,c)
+           (deaxis ,parts ,c ,@forms))))))
+
+(defax +del-by ((a 30) (b 6))
+  (del-by a b))
+
+(defun get-by (map key)
+  (labels
+    ((rec (a)
+       (if (empty a)
+           ~
+           (let* ((n (head a))
+                  (p (head n)))
+             (if (same key p)
+                 [~ (tail n)]
+                 (rec
+                   (let ((down (tail a)))
+                     (if (gor key p)
+                         (head down)
+                         (tail down)))))))))
+    (rec map)))
+
+(defax +get-by ((a 30) (b 6))
+  (get-by a b))
+
+(defun put-by (map key val)
+  (labels
+    ((rec (a)
+       (if (empty a)
+           [[key val] ~ ~]
+           (let* ((n (head a))
+                  (p (head n)))
+             (if (same p key)
+                 (if (same (tail n) val)
+                     (return-from put-by map)
+                     [[p val] (tail a)])
+                 (let ((down (tail a)))
+                   (if (gor key p)
+                       (let ((d (rec (head down)))
+                             (r (tail down)))
+                         (if (mor p (head (head d)))
+                             [n d r]
+                             (dedata (nd ld rd) d
+                               [nd ld n rd r])))
+                       (let ((d (rec (tail down)))
+                             (l (head down)))
+                         (if (mor p (head (head d)))
+                             [n l d]
+                             (dedata (nd ld rd) d
+                               [nd [n l ld] rd]))))))))))
+    (rec map)))
+
+(defax +put-by ((a 30) (b 12) (c 13))
+  (put-by a b c))
+
+(defun has-in (map key)
+  (labels
+    ((rec (a)
+       (unless (empty a)
+         (let ((n (head a)))
+           (or (same key n)
+               (let ((down (tail a)))
+                 (rec (if (gor key n)
+                          (head down)
+                          (tail down)))))))))
+    (rec map)))
+
+(defax +has-in ((a 30) (b 6))
+  (loob (has-in a b)))
 
 (defun k141-hinter (tag clue next)
   (when clue
