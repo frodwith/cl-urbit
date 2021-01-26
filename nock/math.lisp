@@ -1,7 +1,7 @@
 (defpackage #:urbit/nock/math
   (:use #:cl)
-  (:export #:uint #:pint #:met #:mix #:con #:dis #:lsh #:rsh #:end #:bex
-           #:dec #:add #:sub #:mul #:div #:dvr #:hmod #:hmax #:hmin
+  (:export #:uint #:pint #:met #:mix #:con #:dis #:lsh #:rsh #:end #:cat #:cut
+           #:bex #:dec #:add #:sub #:mul #:div #:dvr #:hmod #:hmax #:hmin
            #:+fixnum-bits+))
 
 (in-package #:urbit/nock/math)
@@ -80,6 +80,16 @@
 (defun end (b n a)
   (declare (uint b n a))
   (the uint (low-bits (ash n b) a)))
+
+(defun cat (a b c)
+  (declare (uint a b c))
+  (the uint (logior b (lsh a (met a b) c))))
+
+(defun cut (bloq from-end bloq-count atom)
+  (declare (uint bloq from-end bloq-count atom))
+  (ldb (byte (ash bloq-count bloq)
+             (ash from-end bloq))
+       atom))
 
 ; mnemomic: binary exponent
 ; 1 << a

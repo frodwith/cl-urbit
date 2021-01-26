@@ -1,7 +1,8 @@
 (defpackage #:urbit/tests/ideal
   (:use #:cl #:fiveam #:named-readtables
         #:urbit/tests #:urbit/hoon/syntax #:urbit/nock/data
-        #:urbit/nock/ideal #:urbit/nock/world))
+        #:urbit/nock/ideal #:urbit/nock/world)
+  (:shadowing-import-from #:fiveam #:!!))
 
 (in-package #:urbit/tests/ideal)
 (in-readtable hoon)

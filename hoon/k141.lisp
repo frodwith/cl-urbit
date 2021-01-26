@@ -5,20 +5,20 @@
         #:urbit/nock/nock #:urbit/nock/equality #:urbit/nock/world
         #:urbit/nock/data/slimatom #:urbit/nock/data/slimcell
         #:urbit/hoon/tape #:urbit/hoon/cache #:urbit/hoon/syntax
+        #:urbit/hoon/list #:urbit/hoon/ord #:urbit/hoon/nlr
         #:urbit/hoon/serial #:urbit/hoon/hints)
   (:import-from #:alexandria #:when-let #:when-let* #:if-let)
   (:export #:@ #:defunary #:defbinary #:defgate #:defund
            #:load-k141 #:debug-core
            #:hoon-jet-tree #:layer #:container #:leaf #:~/ 
-           #:for-?~ #:for-?^ #:lent
            #:+add #:+dec #:+div #:+dvr #:+gte #:+gth #:+lte #:+lth
            #:+max #:+min #:+mod #:+mul #:+sub #:+cap #:+mas #:+peg
            #:+turn #:+bex #:+can #:+cat #:+cut #:+end #:+lsh #:+met
            #:+rap #:+rep #:+rip #:+rsh #:+con #:+dis #:+mix
            #:+mug #:+dor #:+gor #:+mor
-           #:flop #:+flop #:+lent #:+reap #:+jam #:+cue #:+muk #:+weld
+           #:+flop #:+lent #:+reap #:+jam #:+cue #:+muk #:+weld
            #:+get-by #:+put-by #:+del-by
-           #:+has-in
+           #:+has-in #:+put-in #:+del-in
            #:+shal #:+shan #:+shay #:+trip #:+mink #:+mule
            #:+crop #:+fish #:+fond #:+fuse #:+mint
            #:+mull #:+peek #:+play #:+rest #:+nest
@@ -28,47 +28,6 @@
 (in-readtable hoon)
 
 ; helpers for constructing jet trees and leaves for hoon runtimes
-
-; there are basically two ways to test for the end of a list in hoon,
-; and both are idiomatic: test cell depth or test equality to 0. These
-; are equivalent for the list type, but of course nock is untyped.
-; When you send an improper list like [1 2 3] to a depth-checking loop,
-; it treats the trailing 3 as the list terminator.  A zero-checking loop
-; will instead crash. Jets have to care in order to avoid mismatches, so
-; we provide two list-iteration macros:
-
-(defmacro for-?^ ((var list) &body forms)
-  (let ((s (gensym)))
-    `(nlist-for ,s (deep ,s) ,var ,list ,@forms)))
-
-(defmacro sig-or-die (noun)
-  `(unless (zerop (cl-integer ,noun))
-     (error 'exit)))
-
-(defmacro test-?~ (var)
-  `(or (deep ,var)
-       (progn
-         (sig-or-die ,var)
-         nil)))
-
-(defmacro for-?~ ((var list) &body forms)
-  (let ((s (gensym)))
-    `(nlist-for ,s (test-?~ ,s) ,var ,list ,@forms)))
-
-(defmacro nlist-for (cur while i list &body forms)
-  `(loop for ,cur = ,list then (tail ,cur)
-         while ,while
-         for ,i = (head ,cur)
-         do (progn ,@forms)))
-
-; when you need a random access to a list (like to iterate over it backwards)
-; strict means it will crash if the terminator isn't 0
-(defmacro nlist->vector (list &key (strict t) (size 10))
-  `(let ((vec (stack-vector ,size)))
-     (,(if strict 'for-?~ 'for-?^)
-       (i ,list)
-       (vector-push-extend i vec))
-     vec))
 
 ; typically hoon jet trees have a single root with no driver,
 ; and are named after the kelvin version
@@ -205,9 +164,8 @@
 (defgate +min #'min+<)
 
 (defund mod+< (@@a @@b)
-  (if (zerop b)
-      (error 'exit)
-      (@ (hmod a b))))
+  (?< (zerop b))
+  (@ (hmod a b)))
 (defgate +mod #'mod+<)
 
 (defbinary mul+< #'mul)
@@ -238,17 +196,7 @@
   (let ((args (gensyms arity)))
     `(defund ,name ,args (funcall ,fn ,@args))))
 
-(defmacro stack-vector (init-size)
-  `(make-array ,init-size :adjustable t :fill-pointer 0))
-
-(defun turn (list gate)
-  (loop with slam = (make-slam gate)
-        with vec = (nlist->vector list)
-        for r = 0 then (slim-cons pro r)
-        for i from (1- (length vec)) downto 0
-        for pro = (funcall slam (aref vec i))
-        finally (return r)))
-(defwrap turn+< 2 #'turn)
+(defwrap turn+< 2 (lambda (list gate) (turn list (make-slam gate))))
 (defgate +turn #'turn+<)
 
 (defunary bex+< #'bex)
@@ -259,28 +207,12 @@
   `(defund ,name (@@bloq list)
      (@ (funcall ,fn bloq list))))
 
-(defun can (bloq list)
-  (declare (uint bloq))
-  (let ((r 0) (size 0))
-    (for-?~ (pair list)
-      (dedata (@@bloqs @@data) pair
-        (setq r (logior r (lsh bloq size (end bloq bloqs data))))
-        (setq size (+ size bloqs))))
-    r))
 (defbloqlist can+< #'can)
 (defgate +can #'can+<)
 
-(defun cat (a b c)
-  (declare (uint a b c))
-  (logior b (lsh a (met a b) c)))
 (defmath cat+< 3 #'cat)
 (defgate +cat #'cat+<)
 
-(defun cut (bloq from-end bloq-count atom)
-  (declare (uint bloq from-end bloq-count atom))
-  (ldb (byte (ash bloq-count bloq)
-             (ash from-end bloq))
-       atom))
 (defund cut+< (@@a (@@b @@c) @@d)
   (cut a b c d))
 (defgate +cut #'cut+<)
@@ -290,29 +222,14 @@
 
 (defmath lsh+< 3 #'lsh)
 (defgate +lsh #'lsh+<)
-(lsh+< '(3 1 . 255))
 
 (defbinary met+< #'met)
 (defgate +met #'met+<)
 
-(defun rap (bloq list)
-  (declare (uint bloq))
-  (let ((r 0))
-    (for-?~ (i list)
-      (setq r (cat bloq r (cl-integer i))))
-    r))
 (defbloqlist rap+< #'rap)
 (defgate +rap #'rap+<)
 
-(defun rep (bloq list)
-  (declare (uint bloq))
-  (let ((size (ash 1 bloq))
-        (c 0)
-        (r 0))
-    (for-?~ (i list)
-      (setq r (logior r (ash (ldb (byte size 0) (cl-integer i)) c)))
-      (setq c (+ c size)))
-    r))
+
 (defbloqlist rep+< #'rap)
 (defgate +rep #'rap+<)
 
@@ -329,7 +246,7 @@
                 for r = (if (> last-bits 0)
                             (slim-cons (funcall malt last-bits) 0)
                             0)
-                then (slim-cons (funcall malt part) r)
+                then [(funcall malt part) r]
                 for pos from (- ipos size) downto 0 by size
                 for part = (ldb (byte size pos) a)
                 finally (return r)))))
@@ -352,74 +269,21 @@
 (defwrap mug+< 1 #'mug)
 (defgate +mug #'mug+<)
 
-(defun dor (a b)
-  (labels
-    ((rec (a b)
-       (or (same a b)
-           (if (deep a)
-               (when (deep b)
-                 (let ((ha (head a))
-                       (hb (head b)))
-                   (if (same ha hb)
-                       (rec (tail a) (tail b))
-                       (rec ha hb))))
-               (or (deep b)
-                   (< (cl-integer a) (cl-integer b)))))))
-    (rec a b)))
+(defmacro deford (fn +< +)
+  `(progn
+     (defwrap ,+< 2 (lambda (a b) (loob (,fn a b))))
+     (defgate ,+ #',+<)))
 
-(defun ldor (a b)
-  (loob (dor a b)))
+(deford dor dor+< +dor)
+(deford gor gor+< +gor)
+(deford mor mor+< +mor)
 
-(defwrap dor+< 2 #'ldor)
-(defgate +dor #'dor+<)
-
-(defun gor (a b)
-  (let ((c (mug a))
-        (d (mug b)))
-    (if (= c d)
-        (dor a b)
-        (< c d))))
-
-(defun lgor (a b)
-  (loob (gor a b)))
-
-(defwrap gor+< 2 #'lgor)
-(defgate +gor #'gor+<)
-
-(defun mor (a b)
-  (let ((c (murmug (mug a)))
-        (d (murmug (mug b))))
-    (if (= c d)
-        (dor a b)
-        (< c d))))
-
-(defun lmor (a b)
-  (loob (mor a b)))
-
-(defwrap mor+< 2 #'lmor)
-(defgate +mor #'mor+<)
-
-(defun flop (list)
-  (let ((r 0))
-    (for-?~ (i list)
-      (setq r (slim-cons i r)))
-    r))
 (defwrap flop+< 1 #'flop)
 (defgate +flop #'flop+<)
 
-(defun lent (list)
-  (let ((len 0))
-    (for-?~ (i list)
-      (incf len))
-    len))
 (defwrap lent+< 1 #'lent)
 (defgate +lent #'lent+<)
 
-(defun reap (times item)
-  (declare (uint times))
-  (loop for r = 0 then (slim-cons item r)
-        repeat times
-        finally (return r)))
 (defund reap+< (@@times item)
   (reap times item))
 (defgate +reap #'reap+<)
@@ -454,6 +318,32 @@
   (vector-onto-nlist (nlist->vector a) b))
 (defwrap weld+< 2 #'weld)
 (defgate +weld #'weld+<)
+
+(defmacro defax (name parts &body forms)
+  (destructuring-bind (k p i h c) (loop repeat 5 collect (gensym))
+    `(defun ,name (,k ,p ,i ,h)
+       (declare (ignore ,k ,p ,i ,h))
+       (trap
+         (lambda (,c)
+           (deaxis ,parts ,c ,@forms))))))
+
+(defax +del-by ((a 30) (b 6))
+  (del-by a b))
+
+(defax +get-by ((a 30) (b 6))
+  (get-by a b))
+
+(defax +put-by ((a 30) (b 12) (c 13))
+  (put-by a b c))
+
+(defax +has-in ((a 30) (b 6))
+  (loob (has-in a b)))
+
+(defax +put-in ((a 30) (b 6))
+  (put-in a b))
+
+(defax +del-in ((a 30) (b 6))
+  (del-in a b))
 
 (defund trip+< (@@cord)
   (cord->tape cord))
@@ -522,7 +412,7 @@
 (defun leer (cord)
   (declare (uint cord))
   (loop with len = (integer-length cord)
-        with out = (stack-vector 10)
+        with out = (make-array 10 :adjustable t :fill-pointer 0)
         for i = 0 then (+ 8 j)
         for j = (loop for pos from i below len by 8
                       for c = (ldb (byte 8 pos) cord)
@@ -560,10 +450,6 @@
                             (nullify-exit (funcall save-p core pro)))
                     (cache-put cache key pro))))))))))
 
-(defun sigp (n)
-  (and (not (deep n))
-       (zerop (cl-integer n))))
-
 ; nest is weird in a couple respects
 ;   it's just the dext arm so it's nested in inner cores
 ;   it only memo-saves sometimes.
@@ -576,8 +462,8 @@
         [vet sut ref]))
     (lambda (core pro)
       (case (cl-integer pro)
-        (0 (deaxis ((reg 58)) core (sigp reg)))
-        (1 (deaxis ((seg 28)) core (sigp seg)))))))
+        (0 (deaxis ((reg 58)) core (empty reg)))
+        (1 (deaxis ((seg 28)) core (empty seg)))))))
 
 ; everything else 1 gate deep, just extracts a key and saves unconditionally
 ; (defcap is short for "define decapitated")
@@ -599,107 +485,6 @@
 (defcap +peek (vet 502) (sut 30) (way 12) (hyp 13))
 (defcap +play (vrf 251) (sut 30) (gen 6))
 (defcap +rest (vet 502) (sut 30) (gen 6))
-
-; many things (list, sets) are cells or zero (other atoms should crash)
-(defun empty (nlr)
-  (and (not (deep nlr))
-       (or (zerop (cl-integer nlr))
-           (error 'exit))))
-
-(defun del-by (map key)
-  (labels
-    ((del (n l r)
-       (cond ((empty l) r)
-             ((empty r) l)
-             ((mor (head (head l)) (head (head r)))
-              (dedata (nl ll rl) l
-                [nl ll (del n rl r)]))
-             (t (dedata (nr lr rr) r
-                  [nr (del n l lr) rr]))))
-     (rec (a)
-       (if (empty a)
-           ~
-           (dedata (n l r) a
-             (let ((p (head n)))
-               (cond ((same p key) (del n l r))
-                     ((gor key p) [n (rec l) r])
-                     (t [n l (rec r)])))))))
-    (rec map)))
-
-(defmacro defax (name parts &body forms)
-  (destructuring-bind (k p i h c) (loop repeat 5 collect (gensym))
-    `(defun ,name (,k ,p ,i ,h)
-       (declare (ignore ,k ,p ,i ,h))
-       (trap
-         (lambda (,c)
-           (deaxis ,parts ,c ,@forms))))))
-
-(defax +del-by ((a 30) (b 6))
-  (del-by a b))
-
-(defun get-by (map key)
-  (labels
-    ((rec (a)
-       (if (empty a)
-           ~
-           (let* ((n (head a))
-                  (p (head n)))
-             (if (same key p)
-                 [~ (tail n)]
-                 (rec
-                   (let ((down (tail a)))
-                     (if (gor key p)
-                         (head down)
-                         (tail down)))))))))
-    (rec map)))
-
-(defax +get-by ((a 30) (b 6))
-  (get-by a b))
-
-(defun put-by (map key val)
-  (labels
-    ((rec (a)
-       (if (empty a)
-           [[key val] ~ ~]
-           (let* ((n (head a))
-                  (p (head n)))
-             (if (same p key)
-                 (if (same (tail n) val)
-                     (return-from put-by map)
-                     [[p val] (tail a)])
-                 (let ((down (tail a)))
-                   (if (gor key p)
-                       (let ((d (rec (head down)))
-                             (r (tail down)))
-                         (if (mor p (head (head d)))
-                             [n d r]
-                             (dedata (nd ld rd) d
-                               [nd ld n rd r])))
-                       (let ((d (rec (tail down)))
-                             (l (head down)))
-                         (if (mor p (head (head d)))
-                             [n l d]
-                             (dedata (nd ld rd) d
-                               [nd [n l ld] rd]))))))))))
-    (rec map)))
-
-(defax +put-by ((a 30) (b 12) (c 13))
-  (put-by a b c))
-
-(defun has-in (map key)
-  (labels
-    ((rec (a)
-       (unless (empty a)
-         (let ((n (head a)))
-           (or (same key n)
-               (let ((down (tail a)))
-                 (rec (if (gor key n)
-                          (head down)
-                          (tail down)))))))))
-    (rec map)))
-
-(defax +has-in ((a 30) (b 6))
-  (loob (has-in a b)))
 
 (defun k141-hinter (tag clue next)
   (when clue

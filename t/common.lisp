@@ -1,6 +1,8 @@
 (defpackage #:urbit/tests/common
-  (:use #:cl #:fiveam #:named-readtables
-        #:urbit/tests #:urbit/hoon/syntax #:urbit/nock/common #:urbit/nock/data))
+  (:use #:cl #:fiveam #:named-readtables #:urbit/tests
+        #:urbit/hoon/syntax #:urbit/nock/common #:urbit/nock/data)
+  (:shadowing-import-from #:fiveam #:!!))
+
 
 (in-package #:urbit/tests/common)
 (in-readtable hoon)

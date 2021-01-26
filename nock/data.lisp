@@ -1,7 +1,7 @@
 (defpackage #:urbit/nock/data
   (:use #:cl #:urbit/nock/math #:urbit/nock/axis)
   (:export #:data-error #:unimplemented #:atom-required #:cell-required
-           #:exit #:nullify-exit
+           #:exit #:nullify-exit #:!! #:?> #:?< #:~
            #:deep #:head #:tail #:cl-integer #:fragment #:d0
            #:cached-mug #:cached-ideal #:cached-battery #:cached-speed))
 
@@ -78,9 +78,19 @@
     (setq data (if tail (tail data) (head data))))
   data)
 
+(define-symbol-macro !! (error 'exit))
+
+(defmacro ?> (assertion)
+  `(unless ,assertion !!))
+
+(defmacro ?< (negative)
+  `(when ,negative !!))
+
+(defconstant ~ 0)
+
 (defun d0 (axis data)
   (declare (uint axis))
   (case axis
-    (0 (error 'exit))
+    (0 !!)
     (1 data)
     (t (fragment axis data))))

@@ -146,10 +146,9 @@
         (leaf muk 27 #'+muk)
         (~/ weld #'+weld)
         (container in 3
-          (~/ has (debug-core #'+has-in))
-          ;(~/ put #'+put-in)
-          ;(~/ del #'+del-in)
-          )
+          (~/ has #'+has-in)
+          (~/ put #'+put-in)
+          (~/ del #'+del-in))
         (container by 3
           (~/ get #'+get-by)
           (~/ put #'+put-by)

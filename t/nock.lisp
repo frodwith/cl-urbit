@@ -3,7 +3,8 @@
         #:urbit/tests #:urbit/hoon/syntax #:urbit/nock/nock
         #:urbit/hoon/serial #:urbit/hoon/hints #:urbit/nock/common
         #:urbit/nock/jets #:urbit/hoon/k141 #:urbit/nock/equality
-        #:urbit/nock/data #:urbit/nock/data/slimatom))
+        #:urbit/nock/data #:urbit/nock/data/slimatom)
+  (:shadowing-import-from #:fiveam #:!!))
 
 (in-package #:urbit/tests/nock)
 (in-readtable hoon)

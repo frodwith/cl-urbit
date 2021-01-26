@@ -59,6 +59,9 @@
              (:file "hints")
              (:file "tape")
              (:file "serial")
+             (:file "list")
+             (:file "ord")
+             (:file "nlr")
              (:file "k141")
              (:file "ivory")))))
 

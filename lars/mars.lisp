@@ -3,7 +3,7 @@
         #:urbit/nock/nock #:urbit/nock/world #:urbit/nock/common 
         #:urbit/nock/data #:urbit/nock/mug
         #:urbit/nock/cord #:urbit/nock/data/slimatom
-        #:urbit/hoon/syntax #:urbit/hoon/hints
+        #:urbit/hoon/syntax #:urbit/hoon/hints #:urbit/hoon/list
         #:urbit/hoon/k141 #:urbit/hoon/ivory
         #:urbit/lars/jets #:urbit/lars/earth)
   (:export #:make-mars))
@@ -108,8 +108,10 @@
     effects))
 
 (defun play (events)
-  (for-?~ (e events)
-    (poke e)))
+  (loop for in = events then (tail in)
+        until (empty in)
+        for e = (head in)
+        do (poke e)))
 
 (define-symbol-macro kmug (mug *kernel*))
 

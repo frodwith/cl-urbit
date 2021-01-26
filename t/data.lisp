@@ -2,7 +2,8 @@
   (:use #:cl #:fiveam #:named-readtables #:urbit/tests #:urbit/hoon/syntax
         #:urbit/nock/world #:urbit/nock/data
         #:urbit/nock/equality #:urbit/nock/ideal
-        #:urbit/nock/data/slimcell #:urbit/nock/data/slimatom))
+        #:urbit/nock/data/slimcell #:urbit/nock/data/slimatom)
+  (:shadowing-import-from #:fiveam #:!!))
 
 (in-package #:urbit/tests/data)
 
