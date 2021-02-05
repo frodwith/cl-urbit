@@ -1,5 +1,5 @@
 (defpackage #:urbit/nock/nock
-  (:use #:cl #:urbit/nock/math #:urbit/nock/axis #:urbit/nock/zig
+  (:use #:cl #:urbit/nock/math #:urbit/nock/axis
         #:urbit/nock/common #:urbit/nock/cord
         #:urbit/nock/jets #:urbit/nock/equality
         #:urbit/nock/ideal #:urbit/nock/world

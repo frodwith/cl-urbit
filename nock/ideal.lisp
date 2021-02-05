@@ -1,5 +1,5 @@
 (defpackage #:urbit/nock/ideal
-  (:use #:cl #:urbit/nock/math #:urbit/nock/axis #:urbit/nock/zig
+  (:use #:cl #:urbit/nock/math #:urbit/nock/axis
         #:urbit/nock/data #:urbit/nock/mug #:urbit/nock/common)
   (:import-from #:alexandria #:if-let #:when-let)
   (:export #:kernel #:kernel-name #:kernel-driver #:kernel-children
@@ -50,7 +50,7 @@
 (defstruct (dynamic-kernel
              (:include child-kernel)
              (:constructor dynamic-kernel (parent name axis driver)))
-  (axis nil :type decomposable :read-only t))
+  (axis nil :type axis :read-only t))
 
 (defstruct (stencil (:constructor stencil (ideal hooks kernel jet)))
   (ideal nil :type ideal :read-only t) ; battery or static core (see kernel)
