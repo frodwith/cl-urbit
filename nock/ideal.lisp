@@ -12,7 +12,7 @@
            #:assumption #:make-assumption #:assumption-valid
            #:core-speed #:speed-valid #:valid-cached-speed
            #:void #:mean #:fast #:spry #:slow #:slug #:stop
-           #:make-slug #:slug-assumption
+           #:make-stop #:stop-axis #:make-slug #:slug-assumption
            #:make-slow #:slow-to #:slow-parent #:make-spry #:spry-valid
            #:match #:match-meter #:root-match #:child-match
            #:make-root-match #:root-match-constants
@@ -50,7 +50,7 @@
 (defstruct (dynamic-kernel
              (:include child-kernel)
              (:constructor dynamic-kernel (parent name axis driver)))
-  (axis nil :type zig :read-only t))
+  (axis nil :type decomposable :read-only t))
 
 (defstruct (stencil (:constructor stencil (ideal hooks kernel jet)))
   (ideal nil :type ideal :read-only t) ; battery or static core (see kernel)
@@ -83,7 +83,7 @@
 
 ; we can never be fast til the parent is fast, so don't need an assumption
 (defstruct (slow (:constructor make-slow (to parent)))
-  (to nil :type zig :read-only t)
+  (to nil :type axis :read-only t)
   (parent nil :type core-speed :read-only t))
 
 ; we're one measly registration away from being fast, maybe!
@@ -91,12 +91,14 @@
                  (:constructor make-spry (to parent valid)))
   (valid nil :type assumption :read-only t))
 
+(defstruct (stop (:constructor make-stop (axis)))
+  (axis nil :type axis :read-only t))
+
 (defstruct (slug (:constructor make-slug (assumption)))
   (assumption nil :type assumption :read-only t))
 
 (deftype fast () 'stencil)
 (deftype mean () 'assumption)
-(deftype stop () 'zig)
 (deftype void () '(eql :void))
 
 (deftype core-speed ()
@@ -106,7 +108,7 @@
        spry   ; child, fast parent
        slow   ; child, parent not fast
        slug   ; root, wrong constant
-       stop)) ; payload wrong shape at zig
+       stop)) ; payload wrong shape at axis
 
 (defun speed-valid (spd)
   (etypecase spd
@@ -133,7 +135,7 @@
 
 (defstruct (child-match (:include match)
                         (:constructor make-child-match (axis parents meter)))
-  (axis nil :type zig)
+  (axis nil :type axis)
   (parents nil :type hash-table))
 
 (defstruct battery

@@ -1,5 +1,5 @@
 (defpackage #:urbit/nock/jets
-  (:use #:cl #:urbit/nock/common #:urbit/nock/math #:urbit/nock/zig
+  (:use #:cl #:urbit/nock/common #:urbit/nock/math #:urbit/nock/axis
         #:urbit/nock/data/core #:urbit/nock/data
         #:urbit/nock/ideal #:urbit/nock/world)
   (:import-from #:alexandria #:if-let)
@@ -8,7 +8,7 @@
            #:jet-root #:jet-core #:jet-deaf-gate
            #:deaf #:trap #:gate #:deaf-gate-driver
            #:get-speed #:get-battery #:measure #:measure-battery
-           #:zig-changes-speed #:cell->core #:parent-axis
+           #:axle-changes-speed #:cell->core #:parent-axis
            #:install-child-stencil #:install-root-stencil
            #:load-world #:save-jet-pack #:install-jet-pack))
 
@@ -46,7 +46,7 @@
 (defun make-child (name axis parent driver)
   (if (and (= 1 axis) (kernel-static parent))
       (child-kernel parent name driver)
-      (dynamic-kernel parent name (axis->zig axis) driver)))
+      (dynamic-kernel parent name axis driver)))
 
 (define-condition reinstall-kernel (error) (kernel))
 
@@ -129,18 +129,19 @@
                   (setf (match-meter match) (meet (case-pairs constants)))
                   (save stencil))))))))))
 
-(defun install-child-stencil (name battery-ideal axis parent hooks)
+(defun install-child-stencil (name battery-ideal a parent hooks)
+  (declare (axis a))
   (let* ((battery (icell-battery battery-ideal))
          (match (battery-match battery)))
     (flet ((save (stencil)
              (push stencil (world-stencils *world*))
              stencil)
-           (meet (z pairs)
+           (meet (a pairs)
              (invalidate-battery battery)
-             (compile-child-meter (battery-stable battery) z pairs))
+             (compile-child-meter (battery-stable battery) a pairs))
            (make-stencil ()
              (let* ((parentk (stencil-kernel parent))
-                    (kernel (find-child parentk name axis))
+                    (kernel (find-child parentk name a))
                     (ideal (if (kernel-static kernel)
                                (find-cons battery-ideal
                                           (stencil-ideal parent))
@@ -152,14 +153,13 @@
         (null
           (let* ((parents (make-hash-table :test 'eq))
                  (stencil (make-stencil))
-                 (z (axis->zig axis))
-                 (meter (meet z `((,parent ',stencil))))
-                 (match (make-child-match z parents meter)))
+                 (meter (meet a `((,parent ',stencil))))
+                 (match (make-child-match a parents meter)))
             (setf (gethash parent parents) stencil)
             (setf (battery-match battery) match)
             (save stencil)))
         (child-match
-          (if (not (= (iint axis) (zig->axis (child-match-axis match))))
+          (if (not (= (iint a) (child-match-axis match)))
               (error 'payload-conflict :battery battery)
               (let ((parents (child-match-parents match)))
                 (if-let (old (gethash parent parents))
@@ -167,7 +167,7 @@
                   (let ((stencil (make-stencil)))
                     (setf (gethash parent parents) stencil)
                     (setf (match-meter match)
-                          (meet (axis->zig axis) (case-pairs parents)))
+                          (meet a (case-pairs parents)))
                     (save stencil))))))))))
 
 ; jet trees are used to specify kernel drivers
@@ -262,13 +262,10 @@
             unless (cdr c) do (rplacd c 0)
             finally (return list))))
 
-(defun parent-zig (kernel)
+(defun parent-axis (kernel)
   (etypecase kernel
     (dynamic-kernel (dynamic-kernel-axis kernel))
-    (child-kernel #*)))
-
-(defun parent-axis (kernel)
-  (zig->axis (parent-zig kernel)))
+    (child-kernel 1)))
 
 (defun save-jet-pack ()
   (find-ideal
@@ -307,33 +304,50 @@
 
 ; core measurement, for identifying cores that match prior registrations
 
-(defun zig-changes-speed (z spd)
-  (declare (zig z) (core-speed spd))
-  (or (zerop (bit z 0)) ; editing the battery always changes speed
-      (etypecase spd
-        ((or void mean) nil)
-        (slug t)
-        (stop (zig-sub-p (subseq z 1) spd))
-        ; spry is a struct-subtype of slow, and not treated differently here
-        (slow
-          (multiple-value-bind (shared more)
-            (zig-common (subseq z 1) (slow-to spd))
-            (and shared
-                 (or (zerop (length more))
-                     (zig-changes-speed more (slow-parent spd))))))
-        (fast
-          (or (= 1 (length z))
-              (labels
-                ((recur (z k)
-                   (or (kernel-static k)
-                       (multiple-value-bind (shared more)
-                         (zig-common z (parent-zig k))
-                         (when shared
-                           (or (zerop (length more))
-                               (zerop (bit more 0))
-                               (recur (subseq more 1)
-                                      (child-kernel-parent k))))))))
-                (recur (subseq z 1) (stencil-kernel spd))))))))
+(defun axle-changes-speed (a len spd)
+  (declare (axle a) (axle-length len) (core-speed spd))
+  (dax (a len) (in-tail more)
+    (or (not in-tail) ; editing the battery always changes speed
+        (etypecase spd
+          ((or void mean) nil)
+          (slug t)
+          (stop ; payload wrong shape: more must include stopped axis
+            (let ((long (stop-axis spd))
+                  (end (zerop more)))
+              (if (= 1 long)
+                  end
+                  (or end
+                      (let ((lang (axis-length long)))
+                        (and (<= more lang)
+                             (subaxle-p a long more (- lang more))))))))
+          ; spry is a struct-subtype of slow, and treated identically here
+          (slow
+            (let* ((to (slow-to spd))
+                   (tal (axis-length to)))
+              (if (<= more tal)
+                  ; includes to
+                  (subaxle-p a to more (- tal more))
+                  ; somewhere inside to, recurse
+                  (let ((diff (- more tal)))
+                    (and (subaxle-p to a tal diff)
+                         (axle-changes-speed a diff (slow-parent spd)))))))
+          (fast
+            (labels
+              ((rec (len k)
+                 (declare (axis-length len) (kernel k))
+                 (or
+                   (zerop len) ; whole core
+                   (kernel-static k) ; any part of static core
+                   (let* ((to (parent-axis k))
+                          (tal (axis-length to)))
+                     (if (<= len tal)
+                         (subaxle-p a to len (- tal len)) ; includes to
+                         (let ((diff (- len tal)))
+                           (when (subaxle-p to a tal diff) ; under to
+                             (dax (a diff) (in-tail more)
+                               (or (not in-tail) ; battery
+                                   (rec more (child-kernel-parent k)))))))))))
+              (rec more (stencil-kernel spd))))))))
 
 (defun case-pairs (h)
   (loop for k being the hash-keys in h using (hash-value v)
@@ -344,7 +358,7 @@
     nil
     `(lambda (payload)
        (if (deep payload)
-           #*
+           (make-stop 1)
            (case payload
              ,@case-pairs
              (t (make-slug ,assumption)))))))
@@ -366,43 +380,57 @@
          (core-cons (cached-battery cell) (tail cell) spd
                     (or (cached-ideal cell) (cached-mug cell)))))))
 
-(defun zig-compile-parent-frag (z payload)
-  (let ((len (length z)))
-    (if (zerop len)
-        `(if (deep ,payload)
-             (get-speed ,payload)
-             (values nil ,z))
-        (let* ((less (1- len))
-               (last-accessor (if (zerop (bit z less)) 'head 'tail))
-               (subz (subseq z 0 less)))
-          `(multiple-value-bind (last-cell fail)
-             ,(zig-compile-fail subz payload 'head 'tail 'deep)
-             (if (null last-cell)
-                 (values nil fail)
-                 (if (not (deep last-cell))
-                     (values nil ,subz)
-                     (let ((core-cell (,last-accessor last-cell)))
-                       (if (not (deep core-cell))
-                           (values nil ,z)
-                           (let ((core (cell->core core-cell)))
-                             (setf (,last-accessor last-cell) core)
-                             (core-speed core)))))))))))
+(defun compile-frag-fail (a)
+  (declare (axis a))
+  (if (= 1 a)
+      'payload
+      `(let ((o payload))
+         (block
+           nil
+           ,@(loop
+               with len = (axis-length a)
+               for i below len
+               collect `(unless (deep o)
+                          (return
+                            (values
+                              nil
+                              ',(make-stop (if (zerop i) 1 (axle-mint a i))))))
+                   collect `(setq o (,(if (axle-nth i a len) 'tail 'head) o)))
+           o))))
 
-(defun compile-child-meter (assumption z case-pairs)
+(defun compile-parent-frag (a)
+  (declare (axis a))
+  (if (= 1 a)
+      `(if (deep payload)
+           (get-speed payload)
+           (values nil ',(make-stop 1)))
+      (let* ((last-accessor (if (logbitp 0 a) 'tail 'head))
+             (sub (ash a -1)))
+        `(multiple-value-bind (last-cell fail)
+           ,(compile-frag-fail sub)
+           (if (null last-cell)
+               (values nil fail)
+               (if (not (deep last-cell))
+                   (values nil ',(make-stop sub))
+                   (let ((core-cell (,last-accessor last-cell)))
+                     (if (not (deep core-cell))
+                         (values nil ',(make-stop a))
+                         (let ((core (cell->core core-cell)))
+                           (setf (,last-accessor last-cell) core)
+                           (core-speed core))))))))))
+
+(defun compile-child-meter (assumption a case-pairs)
+  (declare (axis a))
   (compile
     nil
     `(lambda (payload)
-       (if (not (deep payload))
-           #* ; stop whole payload
-           (multiple-value-bind (pspd fail)
-             ,(zig-compile-parent-frag z 'payload)
-             (if (null pspd)
-                 fail ; stop at fail axis
-                 (case pspd
-                   ,@case-pairs
-                   (t (if (typep pspd 'fast)
-                          (make-spry ,z pspd ',assumption)
-                          (make-slow ,z pspd))))))))))
+       (multiple-value-bind (pspd fail) ,(compile-parent-frag a)
+         (case pspd
+           ((nil) fail)
+           ,@case-pairs
+           (t (if (typep pspd 'fast)
+                  (make-spry ,a pspd ',assumption)
+                  (make-slow ,a pspd))))))))
 
 (defun get-battery (core)
   (or (cached-battery core)

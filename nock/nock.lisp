@@ -311,36 +311,37 @@
          (let ((f (@0 ,axis)))
            (or ,@jet-forms (@2 s f))))))
 
-(defun econs (z old head tail)
-  (declare (zig z))
+(defun econs (a len old head tail)
+  (declare (axle a) (axle-length len))
   (let ((spd (valid-cached-speed old)))
-    (if (and spd (not (zig-changes-speed z spd)))
+    (if (and spd (not (axle-changes-speed a len spd)))
         (core-cons head tail spd nil)
         (slim-cons head tail))))
 
-(defun edit-on (zig)
-  (let ((end (1- (length zig))))
-    (labels ((rec (i)
-               (let ((tail (not (zerop (bit zig i)))))
-                 (if (= i end)
-                     (if tail
-                         '(econs #*1 o (head o) n)
-                         '(econs #*0 o n (tail o)))
-                     (let* ((side (if tail 'tail 'head))
-                            (more `(let ((o (,side o)))
-                                     ,(rec (1+ i))))
-                            (parts (if tail
-                                       `((head o) ,more)
-                                       `(,more (tail o)))))
-                       `(econs ,(subseq zig i) o ,@parts))))))
-      (rec 0))))
+(defun edit-on (a)
+  (declare (decomposable a))
+  (labels
+    ((rec (len)
+       (dax (a len) (tail more)
+         (if (zerop more)
+             (if tail
+                 '(econs 3 1 o (head o) n)
+                 '(econs 2 1 o n (tail o)))
+             (let* ((side (if tail 'tail 'head))
+                    (rest `(let ((o (,side o)))
+                             ,(rec more)))
+                    (parts (if tail
+                               `((head o) ,rest)
+                               `(,rest (tail o)))))
+               `(econs ,(axle-mint a len) ,len o ,@parts))))))
+    (rec (axis-length a))))
 
 (defmacro @10 ((ax small) big)
   (case ax
     (0 +crash+)
     (1 `(progn ,big ,small))
     (t `(let ((o ,big) (n ,small))
-          ,(edit-on (axis->zig ax))))))
+          ,(edit-on ax)))))
 
 ; hint macros
 
@@ -409,7 +410,7 @@
         (error 'cell-required :given battery)
         (let ((context (tail (tail gate)))
               (nock (icell-function battery))
-              (sample-changes-speed (zig-changes-speed #*10 gate-speed)))
+              (sample-changes-speed (axle-changes-speed 6 2 gate-speed)))
           (labels ((pay (sample) (slim-cons sample context))
                    (slam (payload spd)
                      (let ((subject (core-cons battery payload spd nil)))
@@ -423,7 +424,7 @@
                       (unless (speed-valid gate-speed)
                         (setq gate-speed (get-speed gate))
                         (setq sample-changes-speed
-                              (zig-changes-speed #*10 gate-speed)))
+                              (axle-changes-speed 6 2 gate-speed)))
                       (if sample-changes-speed
                           (measure sample)
                           (quick sample))))
@@ -460,8 +461,7 @@
          (symbol-function
            (compile
              (gensym
-               (string-upcase
-                 (format nil "~a/~a" (peg 2 axis) name)))
+               (format nil "~a/~a" (peg 2 axis) name))
              (heavy-form (icell-formula formula)))))))
 
 (defun compile-stencil-dispatch (stencil battery name sfx jet arms)
@@ -472,12 +472,11 @@
                          (sfx ',sfx)
                          (stencil ',stencil))
                      (if-let (arm (compile-stencil-arm battery sfx axis))
-                       (progn
+                       (prog1 arm
                          (setf (stencil-dispatch stencil)
                                (compile-stencil-dispatch
                                  stencil battery ',name sfx jet
-                                 (cons `(,axis ',arm) arms)))
-                         arm)
+                                 (cons `(,axis ',arm) arms))))
                        (error 'exit)))))))
     (compile
       name

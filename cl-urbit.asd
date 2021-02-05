@@ -30,7 +30,6 @@
             :components
             ((:file "math")
              (:file "axis")
-             (:file "zig")
              (:file "data")
              (:file "common")
              (:file "mug")
@@ -75,7 +74,6 @@
                  (:file "math")
                  (:file "axis")
                  (:file "convert")
-                 (:file "zig")
                  (:file "mug")
                  (:file "data")
                  (:file "common")
